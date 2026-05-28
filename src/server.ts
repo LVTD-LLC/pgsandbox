@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { SandboxConfig } from "./config.js";
 import { PostgresSandboxManager } from "./postgres.js";
+import { VERSION } from "./version.js";
 
 const profileSchema = z.string().optional();
 const databaseSelectorSchema = {
@@ -14,7 +15,7 @@ export function createServer(config: SandboxConfig): McpServer {
   const manager = new PostgresSandboxManager(config);
   const server = new McpServer({
     name: "pgsandbox-mcp",
-    version: "0.1.0",
+    version: VERSION,
   });
 
   server.registerTool(

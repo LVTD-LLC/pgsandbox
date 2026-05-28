@@ -21,7 +21,9 @@ The goal is to make the safe path the easy path:
 This package is designed for local MCP clients via npm:
 
 ```bash
-npx pgsandbox-mcp
+npm install -g pgsandbox-mcp
+pgsandbox-mcp setup --client codex --admin-url postgres://postgres:postgres@localhost:5432/postgres
+pgsandbox-mcp doctor
 ```
 
 For development from this repo:
@@ -29,8 +31,45 @@ For development from this repo:
 ```bash
 npm install
 npm run build
-npm start
+npm link
+pgsandbox-mcp setup --client codex --admin-url postgres://postgres:postgres@localhost:5432/postgres
+pgsandbox-mcp smoke-test
 ```
+
+Restart the MCP client after setup. In Codex, run `/mcp` to verify the `pgsandbox` server is available.
+
+### Homebrew
+
+The intended macOS flow is:
+
+```bash
+brew tap LVTD-LLC/tap
+brew install pgsandbox-mcp
+pgsandbox-mcp setup --client codex --admin-url postgres://postgres:postgres@localhost:5432/postgres
+```
+
+See [docs/homebrew.md](docs/homebrew.md) for the tap formula shape and release checklist.
+
+### MCP Client Setup
+
+The setup command writes the right MCP config shape for each supported client:
+
+```bash
+pgsandbox-mcp setup --client codex --admin-url "$PGSANDBOX_ADMIN_DATABASE_URL"
+pgsandbox-mcp setup --client cursor --scope project --admin-url "$PGSANDBOX_ADMIN_DATABASE_URL"
+pgsandbox-mcp setup --client vscode --scope project --admin-url "$PGSANDBOX_ADMIN_DATABASE_URL"
+pgsandbox-mcp setup --client claude-desktop --admin-url "$PGSANDBOX_ADMIN_DATABASE_URL"
+pgsandbox-mcp setup --client all --admin-url "$PGSANDBOX_ADMIN_DATABASE_URL"
+```
+
+Supported targets:
+
+- Codex: `~/.codex/config.toml` or project `.codex/config.toml`
+- Cursor: `~/.cursor/mcp.json` or project `.cursor/mcp.json`
+- VS Code: user `mcp.json` or project `.vscode/mcp.json`
+- Claude Desktop: `claude_desktop_config.json`
+
+Use `--dry-run` to print the config without writing files. Passing `--admin-url` writes the admin database URL into the MCP client config so desktop clients do not depend on shell startup files.
 
 ## Configuration
 
@@ -66,7 +105,7 @@ Then run:
 
 ```bash
 export PGSANDBOX_CONFIG="./pgsandbox.config.json"
-npx pgsandbox-mcp
+pgsandbox-mcp
 ```
 
 PGSandbox does not install or manage Postgres versions itself. It can target different versions through different profiles as long as those Postgres servers are already running.
@@ -95,6 +134,14 @@ The service uses:
 - optional Docker Compose only for local demo Postgres
 
 Start with [docker-compose.example.yml](docker-compose.example.yml) only if you do not already have local Postgres running.
+
+The MCP server runs over stdio:
+
+```bash
+pgsandbox-mcp
+# or explicitly
+pgsandbox-mcp stdio
+```
 
 ## Safety Rules
 

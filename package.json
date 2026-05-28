@@ -8,15 +8,19 @@
   },
   "files": [
     "dist",
+    "!dist/*.tar.gz",
     "docs",
     "README.md",
     "LICENSE"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "node scripts/clean-dist.mjs && tsc -p tsconfig.json",
+    "bundle": "npm run build && node scripts/build-bundle.mjs",
     "check": "tsc -p tsconfig.json --noEmit",
+    "package:homebrew": "npm run bundle && node scripts/package-homebrew.mjs",
     "prepack": "npm run build",
     "test": "vitest run",
+    "typecheck": "npm run check",
     "start": "node dist/index.js"
   },
   "keywords": [
@@ -28,7 +32,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/LVTD-LLC/postgres-experiment-mcp.git"
+    "url": "git+https://github.com/LVTD-LLC/pgsandbox-mcp.git"
   },
   "license": "MIT",
   "dependencies": {
@@ -41,6 +45,7 @@
     "@types/node": "^25.9.1",
     "@types/pg": "^8.20.0",
     "@types/pg-cursor": "^2.7.2",
+    "esbuild": "^0.28.0",
     "typescript": "^6.0.3",
     "vitest": "^4.1.7"
   },
