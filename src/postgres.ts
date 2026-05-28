@@ -168,6 +168,7 @@ export class PostgresSandboxManager {
                  created_at, expires_at, deleted_at
           FROM ${quoteIdent(METADATA_TABLE)}
           WHERE profile_name = $1
+            AND deleted_at IS NULL
             AND ($2::text IS NULL OR owner = $2)
           ORDER BY created_at DESC
           LIMIT 100
@@ -197,7 +198,8 @@ export class PostgresSandboxManager {
         await client.query("BEGIN READ ONLY");
       }
 
-      const result = await client.query(input.sql);
+      // values: [] forces the extended query protocol, rejecting multi-statement strings.
+      const result = await client.query({ text: input.sql, values: [] });
 
       if (input.readonly) {
         await client.query("ROLLBACK");
@@ -392,7 +394,7 @@ function buildConnectionString(
 }
 
 function clampTtl(ttlMinutes: number | undefined, profile: SandboxProfile): number {
-  if (!ttlMinutes) {
+  if (ttlMinutes === undefined) {
     return profile.defaultTtlMinutes;
   }
 
