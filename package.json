@@ -1,0 +1,50 @@
+{
+  "name": "pgsandbox-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for disposable Postgres sandboxes.",
+  "type": "module",
+  "bin": {
+    "pgsandbox-mcp": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "docs",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "prepack": "npm run build",
+    "test": "vitest run",
+    "start": "node dist/index.js"
+  },
+  "keywords": [
+    "mcp",
+    "postgres",
+    "postgresql",
+    "agents",
+    "sandbox"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LVTD-LLC/postgres-experiment-mcp.git"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "pg": "^8.21.0",
+    "pg-cursor": "^2.20.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.1",
+    "@types/pg": "^8.20.0",
+    "@types/pg-cursor": "^2.7.2",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.7"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

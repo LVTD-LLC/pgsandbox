@@ -1,6 +1,6 @@
 # MCP Tool Contract
 
-This is the proposed v0 tool surface. Names and argument shapes can change before implementation.
+This is the v0 tool surface. Names and argument shapes may still change before publishing to npm.
 
 ## `create_database`
 
@@ -8,18 +8,19 @@ Creates an isolated database and login role.
 
 Inputs:
 
-- `name_hint`: short human-readable purpose
-- `ttl_minutes`: optional TTL, capped by server config
+- `profile`: optional Postgres profile name
+- `nameHint`: short human-readable purpose
+- `ttlMinutes`: optional TTL, capped by server config
 - `owner`: optional agent/session identifier
 - `labels`: optional key/value metadata
 
 Returns:
 
-- `database_id`
-- `database_name`
-- `role_name`
-- `expires_at`
-- `connection_string`
+- `databaseId`
+- `databaseName`
+- `roleName`
+- `expiresAt`
+- `connectionString`
 
 ## `delete_database`
 
@@ -27,7 +28,8 @@ Deletes a database and role created by this MCP.
 
 Inputs:
 
-- `database_id` or `database_name`
+- `profile`: optional Postgres profile name
+- `databaseId` or `databaseName`
 
 Returns:
 
@@ -39,12 +41,13 @@ Returns the connection string for a database created by this MCP.
 
 Inputs:
 
-- `database_id` or `database_name`
+- `profile`: optional Postgres profile name
+- `databaseId` or `databaseName`
 
 Returns:
 
-- `connection_string`
-- `expires_at`
+- `connectionString`
+- `expiresAt`
 
 ## `run_sql`
 
@@ -52,9 +55,11 @@ Runs SQL against an experiment database.
 
 Inputs:
 
-- `database_id` or `database_name`
+- `profile`: optional Postgres profile name
+- `databaseId` or `databaseName`
 - `sql`
 - `readonly`: optional boolean
+- `rowLimit`: optional max row count, capped at 1000
 
 Returns:
 
@@ -68,7 +73,8 @@ Returns tables, columns, indexes, and extensions for an experiment database.
 
 Inputs:
 
-- `database_id` or `database_name`
+- `profile`: optional Postgres profile name
+- `databaseId` or `databaseName`
 
 Returns:
 
@@ -80,7 +86,8 @@ Lists active experiment databases.
 
 Inputs:
 
-- optional owner/label filters
+- `profile`: optional Postgres profile name
+- `owner`: optional owner filter
 
 Returns:
 
@@ -92,7 +99,8 @@ Deletes expired resources.
 
 Inputs:
 
-- `dry_run`: optional boolean
+- `profile`: optional Postgres profile name
+- `dryRun`: optional boolean
 
 Returns:
 

@@ -2,31 +2,34 @@
 
 ## V0 Design
 
-The first version should be a thin MCP server in front of one Postgres instance.
+The first version is a thin MCP server in front of one or more reachable Postgres admin connections. It does not require Docker. Docker is only useful as a quick way to run Postgres locally if the developer does not already have it installed.
 
 ```text
 Agent / MCP client
         |
         v
-Postgres Experiment MCP
+PGSandbox MCP
         |
         v
-Admin Postgres connection
+Configured Postgres profile
         |
         v
 Task-specific databases and roles
 ```
 
-The MCP server should own all database lifecycle metadata in an internal table, for example:
+The MCP server owns all database lifecycle metadata in an internal table:
 
+- database id
+- profile name
 - database name
 - role name
+- role password
 - owner agent/session
 - purpose
+- labels
 - created timestamp
 - expiry timestamp
-- status
-- last cleanup attempt
+- deleted timestamp
 
 ## Resource Model
 
@@ -41,7 +44,31 @@ Each experiment gets:
 Generated names should be deterministic enough to audit but random enough to avoid collisions:
 
 ```text
-agent_exp_<agent>_<slug>_<short_id>
+pgsandbox_<slug>_<short_id>
+```
+
+The admin connection is used only for lifecycle operations. Tool calls that run user SQL connect using the generated sandbox role.
+
+## Profiles
+
+Profiles are the mechanism for supporting multiple Postgres versions or hosts without PGSandbox installing Postgres itself.
+
+Example:
+
+```json
+{
+  "defaultProfile": "local-pg17",
+  "profiles": [
+    {
+      "name": "local-pg17",
+      "adminUrl": "postgres://postgres:postgres@localhost:5432/postgres"
+    },
+    {
+      "name": "local-pg16",
+      "adminUrl": "postgres://postgres:postgres@localhost:5433/postgres"
+    }
+  ]
+}
 ```
 
 ## Cleanup

@@ -1,12 +1,12 @@
-# Postgres Experiment MCP
+# PGSandbox MCP
 
-Agent-facing MCP for disposable Postgres experimentation databases.
+Agent-facing MCP server for disposable Postgres sandboxes.
 
-This repo is for a small internal tool that gives coding agents safe, low-friction Postgres sandboxes. The first useful version should be boring: create isolated databases and users, return connection strings, run SQL, inspect schema, and clean up expired resources.
+PGSandbox lets local coding agents create isolated Postgres databases on demand without requiring Docker, a hosted control plane, or a browser. It works against any reachable Postgres admin connection: a local install, a container-local Postgres, a VPS, or a private development database host.
 
 ## Why This Exists
 
-Agents often need a real database to validate migrations, reproduce backend bugs, test SQL assumptions, or build seeded demo states. Today that usually means touching a shared development database, hand-rolling a local container, or skipping the database verification entirely.
+Agents often need a real database to validate migrations, reproduce backend bugs, test SQL assumptions, or build seeded demo states. Today that usually means touching a shared development database, hand-rolling a container, or skipping database verification entirely.
 
 The goal is to make the safe path the easy path:
 
@@ -16,9 +16,64 @@ The goal is to make the safe path the easy path:
 - run SQL and inspect results
 - delete it automatically after a TTL
 
-## Initial Scope
+## Install
 
-V0 should support one persistent Postgres instance and MCP tools for database lifecycle operations:
+This package is designed for local MCP clients via npm:
+
+```bash
+npx pgsandbox-mcp
+```
+
+For development from this repo:
+
+```bash
+npm install
+npm run build
+npm start
+```
+
+## Configuration
+
+The fastest setup is one admin connection string:
+
+```bash
+export PGSANDBOX_ADMIN_DATABASE_URL="postgres://postgres:postgres@localhost:5432/postgres"
+npx pgsandbox-mcp
+```
+
+For multiple Postgres versions or hosts, use profiles:
+
+```json
+{
+  "defaultProfile": "local-pg17",
+  "profiles": [
+    {
+      "name": "local-pg17",
+      "adminUrl": "postgres://postgres:postgres@localhost:5432/postgres",
+      "databasePrefix": "pgsandbox",
+      "defaultTtlMinutes": 240,
+      "maxTtlMinutes": 1440
+    },
+    {
+      "name": "local-pg16",
+      "adminUrl": "postgres://postgres:postgres@localhost:5433/postgres"
+    }
+  ]
+}
+```
+
+Then run:
+
+```bash
+export PGSANDBOX_CONFIG="./pgsandbox.config.json"
+npx pgsandbox-mcp
+```
+
+PGSandbox does not install or manage Postgres versions itself. It can target different versions through different profiles as long as those Postgres servers are already running.
+
+## MCP Tools
+
+V0 supports:
 
 - `create_database`
 - `delete_database`
@@ -28,38 +83,28 @@ V0 should support one persistent Postgres instance and MCP tools for database li
 - `list_databases`
 - `cleanup_expired`
 
-See [docs/mcp-tools.md](docs/mcp-tools.md) for the proposed tool contract.
-
-## Non-Goals For V0
-
-- no production database access
-- no instant branching or copy-on-write clones
-- no Supabase/Auth/Storage/Realtime-style app platform
-- no internet-exposed admin surface
-- no multi-tenant SaaS assumptions
-
-If simple database creation proves useful, we can evaluate DBLab, stagDB, or Neon-style branching as a backend later.
+See [docs/mcp-tools.md](docs/mcp-tools.md) for details.
 
 ## Local Shape
 
-The expected local development stack is:
+The service uses:
 
 - Node.js/TypeScript MCP server
 - Postgres admin connection with permissions to create databases and roles
-- metadata table for ownership, TTL, and audit data
-- optional local Docker Compose file for development
+- metadata table for ownership, TTL, credentials, and cleanup state
+- optional Docker Compose only for local demo Postgres
 
-Start with [docker-compose.example.yml](docker-compose.example.yml) as the local Postgres baseline.
+Start with [docker-compose.example.yml](docker-compose.example.yml) only if you do not already have local Postgres running.
 
 ## Safety Rules
 
-- All databases must have explicit TTLs.
-- Generated role names and database names must use a predictable prefix.
-- Agent-created users must not be superusers.
-- Destructive tools must only operate on resources created by this MCP.
-- Connection strings should be returned only to the caller and should not be logged in full.
-- The service should run on a private network or behind OpenClaw-controlled access, not exposed publicly.
+- All databases have explicit TTLs.
+- Generated role names and database names use a predictable prefix.
+- Agent-created users are not superusers.
+- Destructive tools only operate on resources created by this MCP.
+- Connection strings are returned only to the caller and are not logged in full.
+- The service should run locally or on a private network, not as a public internet-exposed admin surface.
 
-## Repo Status
+## Status
 
-Planning/scaffold only. No production implementation exists yet.
+Early v0. Treat this as a local/internal utility until the MCP surface and cleanup semantics have more mileage.
