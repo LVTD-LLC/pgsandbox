@@ -8,6 +8,12 @@ import { makeSandboxNames, quoteIdent, quoteLiteral } from "./names.js";
 const METADATA_TABLE = "pgsandbox_databases";
 const DEFAULT_ROW_LIMIT = 100;
 
+type QueryExecutionResult = {
+  rowCount: number | null;
+  rows: Record<string, unknown>[];
+  truncated: boolean;
+};
+
 type SandboxRecord = {
   database_id: string;
   profile_name: string;
@@ -198,6 +204,7 @@ export class PostgresSandboxManager {
     try {
       if (input.readonly) {
         assertSafeReadonlySql(input.sql);
+        await client.query("SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY");
         await client.query("BEGIN READ ONLY");
       }
 
@@ -209,14 +216,7 @@ export class PostgresSandboxManager {
         await client.query("ROLLBACK");
       }
 
-      return {
-        databaseId: connection.databaseId,
-        databaseName: connection.databaseName,
-        rowCount: result.rowCount,
-        rows: result.rows.slice(0, rowLimit),
-        truncated: result.rows.length > rowLimit,
-        elapsedMs: Date.now() - startedAt,
-      };
+      return buildRunSqlResponse(connection, result, Date.now() - startedAt);
     } catch (error) {
       if (input.readonly) {
         await client.query("ROLLBACK").catch(() => undefined);
@@ -411,12 +411,35 @@ function clampTtl(ttlMinutes: number | undefined, profile: SandboxProfile): numb
 }
 
 export function assertSafeReadonlySql(sql: string) {
-  if (/\b(begin|commit|rollback|savepoint|release|set\s+(session|transaction)|reset)\b/i.test(sql)) {
+  if (
+    /\b(begin|commit|rollback|abort|end|savepoint|release|set\s+(session|transaction)|reset)\b/i.test(
+      sql,
+    )
+  ) {
     throw new Error("readonly SQL cannot include transaction-control or session-setting statements.");
   }
 }
 
-async function runCursorQuery(client: Client, sql: string, rowLimit: number) {
+export function buildRunSqlResponse(
+  connection: { databaseId: string; databaseName: string },
+  result: QueryExecutionResult,
+  elapsedMs: number,
+) {
+  return {
+    databaseId: connection.databaseId,
+    databaseName: connection.databaseName,
+    rowCount: result.rowCount,
+    rows: result.rows,
+    truncated: result.truncated,
+    elapsedMs,
+  };
+}
+
+async function runCursorQuery(
+  client: Client,
+  sql: string,
+  rowLimit: number,
+): Promise<QueryExecutionResult> {
   const cursor = client.query(new Cursor<Record<string, unknown>>(sql, []));
 
   try {
@@ -431,7 +454,11 @@ async function runCursorQuery(client: Client, sql: string, rowLimit: number) {
   }
 }
 
-async function runDirectQuery(client: Client, sql: string, rowLimit: number) {
+async function runDirectQuery(
+  client: Client,
+  sql: string,
+  rowLimit: number,
+): Promise<QueryExecutionResult> {
   // values: [] forces the extended query protocol, rejecting multi-statement strings.
   const result = await client.query({ text: sql, values: [] });
 
