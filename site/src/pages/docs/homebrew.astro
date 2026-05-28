@@ -1,0 +1,8 @@
+---
+import DocsLayout from '../../layouts/DocsLayout.astro';
+---
+<DocsLayout title="Homebrew packaging" description="Homebrew formula and release checklist for PGSandbox MCP."><h1>Homebrew packaging</h1><p>The intended macOS flow is a thin installer for a versioned GitHub release artifact.</p><pre class="shell"><code>brew tap LVTD-LLC/tap
+brew install pgsandbox-mcp
+pgsandbox-mcp setup --client codex --admin-url postgres://postgres:postgres@localhost:5432/postgres</code></pre><h2>Release shape</h2><ol><li>Build the TypeScript package.</li><li>Publish the npm package for npm and npx users.</li><li>Create a GitHub release tarball with an executable Node entrypoint.</li><li>Update the Homebrew tap formula with the release URL and SHA256.</li></ol><h2>Release checklist</h2><pre class="shell"><code>npm ci
+npm test
+npm run package:homebrew</code></pre></DocsLayout>

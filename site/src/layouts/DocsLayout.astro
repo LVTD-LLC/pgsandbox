@@ -1,0 +1,10 @@
+---
+import BaseLayout from './BaseLayout.astro';
+const { title, description } = Astro.props;
+---
+<BaseLayout title={`${title} — PGSandbox MCP docs`} description={description}>
+  <main class="container docs-page"><aside class="sidebar card"><a href="/docs/">Docs home</a><a href="/docs/install/">Install</a><a href="/docs/mcp-tools/">MCP tools</a><a href="/docs/architecture/">Architecture</a><a href="/docs/homebrew/">Homebrew</a></aside><article class="content card"><slot /></article></main>
+</BaseLayout>
+<style is:global>
+  .docs-page{display:grid;grid-template-columns:240px minmax(0,1fr);gap:1.2rem;padding:3rem 0 7rem;align-items:start}.sidebar{position:sticky;top:5.2rem;display:grid;gap:.3rem;padding:.8rem;box-shadow:none}.sidebar a{color:var(--muted);padding:.75rem .85rem;border-radius:14px}.sidebar a:hover{color:var(--text);background:rgba(255,255,255,.06)}.content{padding:min(5vw,3rem);box-shadow:none}.content h1{margin:0 0 1rem;font-size:clamp(2.4rem,5vw,4.4rem);line-height:.95;letter-spacing:-.07em}.content h2{margin-top:2.5rem;font-size:1.7rem;letter-spacing:-.03em}.content p,.content li{color:var(--muted);line-height:1.75}.content a{color:var(--cyan)}.content ul,.content ol{padding-left:1.2rem}@media(max-width:840px){.docs-page{grid-template-columns:1fr}.sidebar{position:static;grid-template-columns:repeat(2,1fr)}}
+</style>

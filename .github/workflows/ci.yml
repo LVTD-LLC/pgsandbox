@@ -19,3 +19,5 @@ jobs:
       - run: npm run check
       - run: npm test
       - run: npm run build
+      - run: npm --prefix site ci --include=dev
+      - run: npm run site:build

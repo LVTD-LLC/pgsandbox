@@ -1,0 +1,70 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+<BaseLayout title="PGSandbox MCP — disposable Postgres for coding agents">
+  <main>
+    <section class="hero container">
+      <div class="hero-copy">
+        <p class="eyebrow">Disposable Postgres for autonomous coding loops</p>
+        <h1>Real databases. Zero shared-state drama.</h1>
+        <p class="lede">PGSandbox MCP gives agents a private Postgres playground for migrations, bug repros, seeded demos, and SQL validation — with TTLs and cleanup built in.</p>
+        <div class="actions">
+          <a class="button primary" href="#start">Get started</a>
+          <a class="button" href="/docs/">Read the docs</a>
+        </div>
+      </div>
+      <div class="hero-card card" aria-label="PGSandbox workflow diagram">
+        <div class="orbit"></div>
+        <div class="terminal shell"><pre><code>npm install -g pgsandbox-mcp
+pgsandbox-mcp setup \
+  --client codex \
+  --admin-url "$PGSANDBOX_ADMIN_DATABASE_URL"
+pgsandbox-mcp doctor</code></pre></div>
+        <div class="pipeline"><span>agent</span><span>mcp</span><span>postgres</span><span>ttl cleanup</span></div>
+      </div>
+    </section>
+
+    <section class="section container">
+      <p class="eyebrow">Why it exists</p>
+      <h2>The safe path should be the fastest path.</h2>
+      <div class="grid three">
+        <article class="mini card"><h3>Isolated by default</h3><p>Every task gets its own database and scoped role, instead of touching a shared dev database.</p></article>
+        <article class="mini card"><h3>No control plane</h3><p>Point it at any reachable Postgres admin connection: local, Docker, VPS, or private dev host.</p></article>
+        <article class="mini card"><h3>Agent-native</h3><p>Expose database creation, SQL execution, schema inspection, and cleanup through MCP tools.</p></article>
+      </div>
+    </section>
+
+    <section id="start" class="section container split">
+      <div>
+        <p class="eyebrow">Start in minutes</p>
+        <h2>Install, register, verify.</h2>
+        <p>Use an admin connection for a Postgres instance you control. PGSandbox creates task databases and limited roles under a predictable prefix.</p>
+      </div>
+      <div class="card code-card shell"><pre><code>export PGSANDBOX_ADMIN_DATABASE_URL="postgres://postgres:postgres@localhost:5432/postgres"
+npm install -g pgsandbox-mcp
+pgsandbox-mcp setup --client codex --admin-url "$PGSANDBOX_ADMIN_DATABASE_URL"
+pgsandbox-mcp doctor</code></pre></div>
+    </section>
+
+    <section class="section container">
+      <p class="eyebrow">MCP tool surface</p>
+      <h2>Everything an agent needs to prove database work.</h2>
+      <div class="tools">{['create_database','run_sql','describe_schema','get_connection_string','list_databases','cleanup_expired','delete_database'].map((tool) => <span>{tool}</span>)}</div>
+    </section>
+
+    <section class="section container split final-cta card">
+      <div>
+        <p class="eyebrow">Built for local-first validation</p>
+        <h2>Give agents a real Postgres sandbox before they ship.</h2>
+        <p>Start with npm or Homebrew, then wire it into Codex, Cursor, VS Code, or Claude Desktop.</p>
+      </div>
+      <div class="actions stacked">
+        <a class="button primary" href="/docs/install/">Installation guide</a>
+        <a class="button" href="https://github.com/LVTD-LLC/pgsandbox-mcp">View repository</a>
+      </div>
+    </section>
+  </main>
+</BaseLayout>
+<style>
+  .hero{display:grid;grid-template-columns:minmax(0,1fr) minmax(340px,.82fr);gap:2rem;align-items:center;min-height:78vh;padding:5rem 0}h1{margin:.55rem 0 1rem;max-width:850px;font-size:clamp(3.4rem,8.8vw,7.9rem);line-height:.86;letter-spacing:-.09em}.lede{max-width:680px;color:var(--muted);font-size:clamp(1.1rem,2vw,1.35rem);line-height:1.65}.actions{display:flex;flex-wrap:wrap;gap:.85rem;margin-top:2rem}.hero-card{position:relative;overflow:hidden;min-height:520px;padding:1.2rem}.hero-card::before{content:"";position:absolute;inset:-40%;background:conic-gradient(from 180deg,transparent,rgba(77,240,255,.28),rgba(168,119,255,.28),transparent);animation:spin 12s linear infinite}.hero-card>*{position:relative;z-index:1}.orbit{position:absolute;inset:52px;border:1px solid rgba(77,240,255,.26);border-radius:999px;box-shadow:inset 0 0 45px rgba(77,240,255,.08),0 0 55px rgba(168,119,255,.18)}.terminal{position:absolute;left:1.2rem;right:1.2rem;bottom:1.2rem}.pipeline{position:absolute;top:2rem;left:2rem;right:2rem;display:grid;gap:.7rem}.pipeline span{border:1px solid var(--line);border-radius:999px;padding:.78rem 1rem;background:rgba(5,7,18,.72);color:var(--text);font-weight:800;text-transform:uppercase;letter-spacing:.08em;font-size:.75rem}.grid{display:grid;gap:1rem}.three{grid-template-columns:repeat(3,1fr)}.mini{padding:1.3rem;box-shadow:none}.mini h3{margin:0 0 .45rem;font-size:1.25rem}.mini p{margin:0}.split{display:grid;grid-template-columns:.9fr 1.1fr;gap:2rem;align-items:center}.code-card{padding:1rem;box-shadow:none}.tools{display:flex;flex-wrap:wrap;gap:.8rem}.tools span{padding:.85rem 1rem;border-radius:999px;color:#06101c;background:linear-gradient(135deg,rgba(77,240,255,.95),rgba(156,255,135,.95));font-weight:900}.final-cta{padding:2rem;margin-bottom:5rem}.stacked{justify-content:flex-end}@keyframes spin{to{transform:rotate(360deg)}}@media(max-width:900px){.hero,.split,.three{grid-template-columns:1fr}.hero{padding-top:3rem}.hero-card{min-height:430px}}
+</style>
