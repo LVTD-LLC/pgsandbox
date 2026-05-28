@@ -25,7 +25,7 @@ export function makeSandboxNames(input: {
   return {
     databaseId,
     databaseName: base,
-    roleName: trimIdentifier(`${base}_role`),
+    roleName: `${base.slice(0, MAX_IDENTIFIER_LENGTH - 5).replace(/_+$/g, "")}_role`,
   };
 }
 

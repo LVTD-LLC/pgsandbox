@@ -18,6 +18,18 @@ describe("names", () => {
     expect(names.roleName.length).toBeLessThanOrEqual(63);
   });
 
+  it("keeps role names distinct when database names hit the identifier limit", () => {
+    const names = makeSandboxNames({
+      prefix: "p".repeat(80),
+      nameHint: "x".repeat(80),
+    });
+
+    expect(names.databaseName.length).toBe(63);
+    expect(names.roleName.length).toBeLessThanOrEqual(63);
+    expect(names.roleName).not.toBe(names.databaseName);
+    expect(names.roleName.endsWith("_role")).toBe(true);
+  });
+
   it("quotes identifiers and literals", () => {
     expect(quoteIdent('weird"name')).toBe('"weird""name"');
     expect(quoteLiteral("can't")).toBe("'can''t'");

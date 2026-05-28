@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { Client } from "pg";
+import Cursor from "pg-cursor";
 import type { SandboxConfig, SandboxProfile } from "./config.js";
 import { findProfile } from "./config.js";
 import { makeSandboxNames, quoteIdent, quoteLiteral } from "./names.js";
@@ -191,21 +192,23 @@ export class PostgresSandboxManager {
     const connection = await this.getConnectionString(input);
     const client = new Client({ connectionString: connection.connectionString });
     const startedAt = Date.now();
+    const rowLimit = input.rowLimit ?? DEFAULT_ROW_LIMIT;
 
     await client.connect();
     try {
       if (input.readonly) {
+        assertSafeReadonlySql(input.sql);
         await client.query("BEGIN READ ONLY");
       }
 
-      // values: [] forces the extended query protocol, rejecting multi-statement strings.
-      const result = await client.query({ text: input.sql, values: [] });
+      const result = input.readonly || looksRowProducing(input.sql)
+        ? await runCursorQuery(client, input.sql, rowLimit)
+        : await runDirectQuery(client, input.sql, rowLimit);
 
       if (input.readonly) {
         await client.query("ROLLBACK");
       }
 
-      const rowLimit = input.rowLimit ?? DEFAULT_ROW_LIMIT;
       return {
         databaseId: connection.databaseId,
         databaseName: connection.databaseName,
@@ -405,4 +408,40 @@ function clampTtl(ttlMinutes: number | undefined, profile: SandboxProfile): numb
   }
 
   return ttlMinutes;
+}
+
+export function assertSafeReadonlySql(sql: string) {
+  if (/\b(begin|commit|rollback|savepoint|release|set\s+(session|transaction)|reset)\b/i.test(sql)) {
+    throw new Error("readonly SQL cannot include transaction-control or session-setting statements.");
+  }
+}
+
+async function runCursorQuery(client: Client, sql: string, rowLimit: number) {
+  const cursor = client.query(new Cursor<Record<string, unknown>>(sql, []));
+
+  try {
+    const rows = await cursor.read(rowLimit + 1);
+    return {
+      rowCount: rows.length > rowLimit ? null : rows.length,
+      rows: rows.slice(0, rowLimit),
+      truncated: rows.length > rowLimit,
+    };
+  } finally {
+    await cursor.close().catch(() => undefined);
+  }
+}
+
+async function runDirectQuery(client: Client, sql: string, rowLimit: number) {
+  // values: [] forces the extended query protocol, rejecting multi-statement strings.
+  const result = await client.query({ text: sql, values: [] });
+
+  return {
+    rowCount: result.rowCount,
+    rows: result.rows.slice(0, rowLimit),
+    truncated: result.rows.length > rowLimit,
+  };
+}
+
+function looksRowProducing(sql: string) {
+  return /^\s*(select|with|values|show|explain)\b/i.test(sql);
 }

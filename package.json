@@ -34,11 +34,13 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
     "pg": "^8.21.0",
+    "pg-cursor": "^2.20.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^25.9.1",
     "@types/pg": "^8.20.0",
+    "@types/pg-cursor": "^2.7.2",
     "typescript": "^6.0.3",
     "vitest": "^4.1.7"
   },
