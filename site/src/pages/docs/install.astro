@@ -2,11 +2,22 @@
 import DocsLayout from '../../layouts/DocsLayout.astro';
 ---
 <DocsLayout title="Install and setup" description="Install and verify PGSandbox MCP."><h1>Install and setup</h1><p>PGSandbox MCP is designed for local MCP clients via npm, npx, or Homebrew. It needs an admin Postgres connection that can create databases and roles.</p><h2>npm</h2><pre class="shell"><code>npm install -g pgsandbox-mcp
-pgsandbox-mcp setup --client codex --admin-url postgres://postgres:postgres@localhost:5432/postgres</code></pre><h2>npx</h2><pre class="shell"><code>npx -y pgsandbox-mcp setup --client codex --admin-url postgres://postgres:postgres@localhost:5432/postgres</code></pre><p>For npx, edit the generated MCP config to pin a version or replace it after installing globally.</p><h2>Homebrew</h2><pre class="shell"><code>brew tap LVTD-LLC/tap
+pgsandbox-mcp setup \
+  --client codex \
+  --admin-url postgres://postgres:postgres@localhost:5432/postgres</code></pre><h2>npx</h2><pre class="shell"><code>npx -y pgsandbox-mcp setup \
+  --client codex \
+  --admin-url postgres://postgres:postgres@localhost:5432/postgres</code></pre><p>For npx, edit the generated MCP config to pin a version or replace it after installing globally.</p><h2>Homebrew</h2><pre class="shell"><code>brew tap LVTD-LLC/tap
 brew install pgsandbox-mcp
-pgsandbox-mcp setup --client codex --admin-url postgres://postgres:postgres@localhost:5432/postgres</code></pre><h2>Supported clients</h2><pre class="shell"><code>pgsandbox-mcp setup --client codex --admin-url "$PGSANDBOX_ADMIN_DATABASE_URL"
-pgsandbox-mcp setup --client cursor --scope project --admin-url "$PGSANDBOX_ADMIN_DATABASE_URL"
-pgsandbox-mcp setup --client vscode --scope project --admin-url "$PGSANDBOX_ADMIN_DATABASE_URL"
-pgsandbox-mcp setup --client claude-desktop --admin-url "$PGSANDBOX_ADMIN_DATABASE_URL"
-pgsandbox-mcp setup --client all --admin-url "$PGSANDBOX_ADMIN_DATABASE_URL"</code></pre><h2>Verify</h2><pre class="shell"><code>pgsandbox-mcp doctor
+pgsandbox-mcp setup \
+  --client codex \
+  --admin-url postgres://postgres:postgres@localhost:5432/postgres</code></pre><h2>Supported clients</h2><pre class="shell"><code>pgsandbox-mcp setup --client codex \
+  --admin-url "$PGSANDBOX_ADMIN_DATABASE_URL"
+pgsandbox-mcp setup --client cursor --scope project \
+  --admin-url "$PGSANDBOX_ADMIN_DATABASE_URL"
+pgsandbox-mcp setup --client vscode --scope project \
+  --admin-url "$PGSANDBOX_ADMIN_DATABASE_URL"
+pgsandbox-mcp setup --client claude-desktop \
+  --admin-url "$PGSANDBOX_ADMIN_DATABASE_URL"
+pgsandbox-mcp setup --client all \
+  --admin-url "$PGSANDBOX_ADMIN_DATABASE_URL"</code></pre><h2>Verify</h2><pre class="shell"><code>pgsandbox-mcp doctor
 pgsandbox-mcp smoke-test</code></pre><p>Restart your MCP client after setup. In Codex, run <code>/mcp</code> to verify the <code>pgsandbox</code> server is available.</p></DocsLayout>

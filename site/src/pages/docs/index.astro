@@ -1,5 +1,6 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
+
 const docs = [
   ['Install and setup', '/docs/install/', 'npm, npx, Homebrew, and verification commands.'],
   ['MCP tools', '/docs/mcp-tools/', 'The v0 tool contract exposed to MCP clients.'],
@@ -7,5 +8,97 @@ const docs = [
   ['Homebrew packaging', '/docs/homebrew/', 'Formula shape and release checklist.']
 ];
 ---
-<BaseLayout title="PGSandbox MCP docs"><main class="container docs-home"><p class="eyebrow">Documentation</p><h1>Run real Postgres checks from your agent workflow.</h1><p class="intro">These docs cover installation, MCP tool behavior, architecture, and packaging notes for the early PGSandbox MCP release.</p><div class="doc-grid">{docs.map(([title, href, body]) => <a class="card doc-card" href={href}><h2>{title}</h2><p>{body}</p></a>)}</div></main></BaseLayout>
-<style>.docs-home{padding:5rem 0 7rem}h1{max-width:880px;margin:.5rem 0 1rem;font-size:clamp(2.8rem,6vw,5.8rem);line-height:.9;letter-spacing:-.08em}.intro{max-width:720px;color:var(--muted);font-size:1.15rem;line-height:1.7}.doc-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1rem;margin-top:2rem}.doc-card{padding:1.4rem;box-shadow:none}.doc-card h2{margin:0 0 .5rem}.doc-card p{margin:0;color:var(--muted);line-height:1.6}.doc-card:hover{border-color:rgba(77,240,255,.55)}@media(max-width:760px){.doc-grid{grid-template-columns:1fr}}</style>
+<BaseLayout
+  title="PGSandbox MCP docs"
+  description="Installation, MCP tools, architecture, and packaging notes for PGSandbox MCP."
+>
+  <main id="content" class="container docs-home">
+    <p class="eyebrow">Documentation</p>
+    <h1>Run real Postgres checks from your agent workflow.</h1>
+    <p class="intro">
+      Installation, tool behavior, architecture, and packaging notes for the early PGSandbox MCP release.
+    </p>
+    <div class="doc-grid">
+      {docs.map(([title, href, body]) => (
+        <a class="doc-card" href={href}>
+          <h2>{title}</h2>
+          <p>{body}</p>
+        </a>
+      ))}
+    </div>
+  </main>
+</BaseLayout>
+
+<style>
+  .docs-home {
+    padding: 5rem 0 7rem;
+  }
+
+  h1 {
+    max-width: 880px;
+    margin: 0.6rem 0 1rem;
+    color: var(--ink);
+    font-size: 4.6rem;
+    line-height: 0.95;
+    letter-spacing: 0;
+    text-wrap: balance;
+  }
+
+  .intro {
+    max-width: 720px;
+    color: var(--muted);
+    font-size: 1.15rem;
+    line-height: 1.7;
+  }
+
+  .doc-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+    margin-top: 2rem;
+  }
+
+  .doc-card {
+    display: grid;
+    min-height: 180px;
+    align-content: space-between;
+    padding: 1.25rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: rgba(255, 255, 255, 0.7);
+    transition: transform 180ms ease, border-color 180ms ease, background 180ms ease;
+  }
+
+  .doc-card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(47, 117, 107, 0.36);
+    background: #fff;
+  }
+
+  .doc-card h2 {
+    margin: 0;
+    color: var(--ink);
+    font-size: 1.45rem;
+    letter-spacing: 0;
+  }
+
+  .doc-card p {
+    margin: 1.5rem 0 0;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  @media (max-width: 760px) {
+    .docs-home {
+      padding-top: 3.5rem;
+    }
+
+    h1 {
+      font-size: 2.85rem;
+    }
+
+    .doc-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

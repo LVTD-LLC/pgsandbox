@@ -1,10 +1,132 @@
 ---
 import BaseLayout from './BaseLayout.astro';
+
 const { title, description } = Astro.props;
+const pathname = Astro.url.pathname;
+const links = [
+  ['Docs home', '/docs/'],
+  ['Install', '/docs/install/'],
+  ['MCP tools', '/docs/mcp-tools/'],
+  ['Architecture', '/docs/architecture/'],
+  ['Homebrew', '/docs/homebrew/']
+];
 ---
-<BaseLayout title={`${title} — PGSandbox MCP docs`} description={description}>
-  <main class="container docs-page"><aside class="sidebar card"><a href="/docs/">Docs home</a><a href="/docs/install/">Install</a><a href="/docs/mcp-tools/">MCP tools</a><a href="/docs/architecture/">Architecture</a><a href="/docs/homebrew/">Homebrew</a></aside><article class="content card"><slot /></article></main>
+<BaseLayout title={`${title} - PGSandbox MCP docs`} description={description}>
+  <main id="content" class="container docs-page">
+    <nav class="docs-nav" aria-label="Docs navigation">
+      {links.map(([label, href]) => (
+        <a href={href} aria-current={pathname === href ? 'page' : undefined}>{label}</a>
+      ))}
+    </nav>
+    <article class="docs-content">
+      <slot />
+    </article>
+  </main>
 </BaseLayout>
+
 <style is:global>
-  .docs-page{display:grid;grid-template-columns:240px minmax(0,1fr);gap:1.2rem;padding:3rem 0 7rem;align-items:start}.sidebar{position:sticky;top:5.2rem;display:grid;gap:.3rem;padding:.8rem;box-shadow:none}.sidebar a{color:var(--muted);padding:.75rem .85rem;border-radius:14px}.sidebar a:hover{color:var(--text);background:rgba(255,255,255,.06)}.content{padding:min(5vw,3rem);box-shadow:none}.content h1{margin:0 0 1rem;font-size:clamp(2.4rem,5vw,4.4rem);line-height:.95;letter-spacing:-.07em}.content h2{margin-top:2.5rem;font-size:1.7rem;letter-spacing:-.03em}.content p,.content li{color:var(--muted);line-height:1.75}.content a{color:var(--cyan)}.content ul,.content ol{padding-left:1.2rem}@media(max-width:840px){.docs-page{grid-template-columns:1fr}.sidebar{position:static;grid-template-columns:repeat(2,1fr)}}
+  .docs-page {
+    display: grid;
+    grid-template-columns: 230px minmax(0, 1fr);
+    gap: 1.5rem;
+    align-items: start;
+    padding: 3rem 0 7rem;
+  }
+
+  .docs-nav {
+    position: sticky;
+    top: 5.75rem;
+    display: grid;
+    min-width: 0;
+    gap: 0.25rem;
+    padding: 0.45rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: rgba(255, 255, 255, 0.66);
+  }
+
+  .docs-nav a {
+    display: block;
+    padding: 0.72rem 0.8rem;
+    border-radius: 7px;
+    color: var(--muted);
+    font-weight: 700;
+    transition: background 180ms ease, color 180ms ease;
+  }
+
+  .docs-nav a:hover,
+  .docs-nav a[aria-current="page"] {
+    background: var(--accent-soft);
+    color: var(--accent-strong);
+  }
+
+  .docs-content {
+    min-width: 0;
+    padding: 2.75rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: rgba(255, 255, 255, 0.78);
+    box-shadow: 0 18px 54px rgba(28, 61, 53, 0.08);
+  }
+
+  .docs-content h1 {
+    margin: 0 0 1rem;
+    max-width: 780px;
+    color: var(--ink);
+    font-size: 3.65rem;
+    line-height: 0.98;
+    letter-spacing: 0;
+    text-wrap: balance;
+  }
+
+  .docs-content h2 {
+    margin: 2.4rem 0 0.75rem;
+    color: var(--ink);
+    font-size: 1.65rem;
+    letter-spacing: 0;
+  }
+
+  .docs-content p,
+  .docs-content li {
+    max-width: 72ch;
+    color: var(--muted);
+    line-height: 1.75;
+  }
+
+  .docs-content a {
+    color: var(--accent-strong);
+    font-weight: 750;
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 4px;
+  }
+
+  .docs-content ul,
+  .docs-content ol {
+    padding-left: 1.25rem;
+  }
+
+  .docs-content section {
+    padding-block: 0.25rem;
+  }
+
+  @media (max-width: 840px) {
+    .docs-page {
+      grid-template-columns: 1fr;
+      padding-top: 1.5rem;
+    }
+
+    .docs-nav {
+      position: static;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .docs-content {
+      padding: 1.4rem;
+    }
+
+    .docs-content h1 {
+      font-size: 2.65rem;
+    }
+  }
 </style>
