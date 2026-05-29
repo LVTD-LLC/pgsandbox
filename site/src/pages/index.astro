@@ -39,7 +39,7 @@ const tools = [
           Give every agent task its own real database, scoped credentials, and cleanup policy. Validate migrations,
           repro bugs, and inspect schemas without touching shared development state.
         </p>
-        <div class="actions" aria-label="Primary actions">
+        <div class="actions" role="group" aria-label="Primary actions">
           <a class="button primary" href="#start">Get started</a>
           <a class="button" href="/docs/">Read docs</a>
         </div>
@@ -54,8 +54,7 @@ const tools = [
           <pre><code>npm install -g pgsandbox-mcp
 pgsandbox-mcp setup \
   --client codex \
-  --admin-url \
-  "$PGSANDBOX_ADMIN_DATABASE_URL"
+  --admin-url "$PGSANDBOX_ADMIN_DATABASE_URL"
 pgsandbox-mcp doctor</code></pre>
         </div>
         <ol class="run-list">
