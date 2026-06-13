@@ -30,10 +30,8 @@ jobs:
 
       - name: Derive release version
         id: release
-        env:
-          TAG_NAME: ${{ github.event.release.tag_name }}
         run: |
-          tag="$TAG_NAME"
+          tag="$GITHUB_REF_NAME"
 
           case "$tag" in
             v[0-9]*)
