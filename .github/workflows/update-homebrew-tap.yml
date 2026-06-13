@@ -77,10 +77,8 @@ jobs:
 
           if [ -f "dist/$ASSET" ]; then
             echo "found=true" >> "$GITHUB_OUTPUT"
-            echo "source=downloaded" >> "$GITHUB_OUTPUT"
           else
             echo "found=false" >> "$GITHUB_OUTPUT"
-            echo "source=missing" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Set up Node
