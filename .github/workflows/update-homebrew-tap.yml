@@ -1,0 +1,214 @@
+name: Update Homebrew tap
+
+on:
+  release:
+    types:
+      - published
+
+permissions:
+  contents: write
+
+jobs:
+  update-homebrew-tap:
+    name: Update LVTD-LLC/homebrew-tap
+    runs-on: macos-latest
+    env:
+      TAP_REPOSITORY: LVTD-LLC/homebrew-tap
+      FORMULA_PATH: Formula/pgsandbox-mcp.rb
+    steps:
+      - name: Check required secret
+        env:
+          HOMEBREW_TAP_PAT: ${{ secrets.HOMEBREW_TAP_PAT }}
+        run: |
+          if [ -z "${HOMEBREW_TAP_PAT:-}" ]; then
+            echo "::error::HOMEBREW_TAP_PAT is required to update LVTD-LLC/homebrew-tap"
+            exit 1
+          fi
+
+      - name: Check out pgsandbox-mcp
+        uses: actions/checkout@v6.0.2
+
+      - name: Derive release version
+        id: release
+        run: |
+          tag="$GITHUB_REF_NAME"
+
+          case "$tag" in
+            v[0-9]*)
+              ;;
+            *)
+              echo "::error::Release tag must start with v, got: $tag"
+              exit 1
+              ;;
+          esac
+
+          version="${tag#v}"
+
+          case "$version" in
+            '' | *[!0-9A-Za-z.+-]*)
+              echo "::error::Release version contains unsupported characters: $version"
+              exit 1
+              ;;
+          esac
+
+          asset="pgsandbox-mcp-${version}.tar.gz"
+
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "asset=$asset" >> "$GITHUB_OUTPUT"
+          echo "archive=dist/$asset" >> "$GITHUB_OUTPUT"
+
+      - name: Download release asset
+        id: archive
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release.outputs.tag }}
+          ASSET: ${{ steps.release.outputs.asset }}
+        run: |
+          mkdir -p dist
+
+          if ! gh release download "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern "$ASSET" \
+            --dir dist \
+            --clobber; then
+            echo "Release asset $ASSET was not found; the workflow will build and upload it."
+          fi
+
+          if [ -f "dist/$ASSET" ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Node
+        if: steps.archive.outputs.found != 'true'
+        uses: actions/setup-node@v6.4.0
+        with:
+          node-version: 22
+
+      - name: Set up Rust
+        if: steps.archive.outputs.found != 'true'
+        uses: dtolnay/rust-toolchain@1.91.1
+
+      - name: Cache Rust build
+        if: steps.archive.outputs.found != 'true'
+        uses: Swatinem/rust-cache@v2.9.1
+
+      - name: Build release asset
+        if: steps.archive.outputs.found != 'true'
+        env:
+          ARCHIVE: ${{ steps.release.outputs.archive }}
+        run: |
+          npm run package:homebrew
+
+          if [ ! -f "$ARCHIVE" ]; then
+            echo "::error::Package script did not create $ARCHIVE. Check that Cargo.toml version matches the release tag."
+            exit 1
+          fi
+
+      - name: Upload built release asset
+        if: steps.archive.outputs.found != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release.outputs.tag }}
+          ARCHIVE: ${{ steps.release.outputs.archive }}
+        run: |
+          gh release upload "$TAG" "$ARCHIVE" \
+            --repo "$GITHUB_REPOSITORY" \
+            --clobber
+
+      - name: Compute release asset SHA256
+        id: checksum
+        env:
+          ARCHIVE: ${{ steps.release.outputs.archive }}
+        run: |
+          if [ ! -f "$ARCHIVE" ]; then
+            echo "::error::Release archive not found: $ARCHIVE"
+            exit 1
+          fi
+
+          sha256="$(shasum -a 256 "$ARCHIVE" | awk '{print $1}')"
+          echo "sha256=$sha256" >> "$GITHUB_OUTPUT"
+          echo "Release asset SHA256: $sha256"
+
+      - name: Check out Homebrew tap
+        uses: actions/checkout@v6.0.2
+        with:
+          repository: ${{ env.TAP_REPOSITORY }}
+          token: ${{ secrets.HOMEBREW_TAP_PAT }}
+          path: homebrew-tap
+
+      - name: Update formula
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+          SHA256: ${{ steps.checksum.outputs.sha256 }}
+        run: |
+          sh scripts/update-homebrew-formula.sh "homebrew-tap/$FORMULA_PATH" "$VERSION" "$SHA256"
+
+      - name: Open Homebrew tap PR
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_PAT }}
+          VERSION: ${{ steps.release.outputs.version }}
+          SHA256: ${{ steps.checksum.outputs.sha256 }}
+          TAG: ${{ steps.release.outputs.tag }}
+          ASSET: ${{ steps.release.outputs.asset }}
+        working-directory: homebrew-tap
+        run: |
+          branch="pgsandbox-mcp-${VERSION}"
+          title="Update pgsandbox-mcp to ${VERSION}"
+          body_file="$(mktemp)"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          branch_exists=false
+          if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
+            branch_exists=true
+            git fetch origin "$branch:refs/remotes/origin/$branch"
+          fi
+
+          git checkout -B "$branch"
+          git add "$FORMULA_PATH"
+
+          if git diff --cached --quiet; then
+            echo "Formula is already up to date for ${VERSION}."
+            exit 0
+          fi
+
+          git commit -m "chore: update pgsandbox-mcp to ${VERSION}"
+          if [ "$branch_exists" = true ]; then
+            git push --force-with-lease origin "$branch"
+          else
+            git push origin "$branch"
+          fi
+
+          cat > "$body_file" <<EOF
+          Updates \`Formula/pgsandbox-mcp.rb\` for pgsandbox-mcp ${VERSION}.
+
+          - Release: https://github.com/LVTD-LLC/pgsandbox-mcp/releases/tag/${TAG}
+          - Asset: https://github.com/LVTD-LLC/pgsandbox-mcp/releases/download/${TAG}/${ASSET}
+          - SHA256: \`${SHA256}\`
+
+          This keeps the formula pinned to an immutable versioned release asset.
+          EOF
+
+          existing_pr="$(gh pr list \
+            --repo "$TAP_REPOSITORY" \
+            --head "$branch" \
+            --json number \
+            --jq '.[0].number // ""')"
+
+          if [ -n "$existing_pr" ]; then
+            gh pr edit "$existing_pr" \
+              --repo "$TAP_REPOSITORY" \
+              --title "$title" \
+              --body-file "$body_file"
+          else
+            gh pr create \
+              --repo "$TAP_REPOSITORY" \
+              --base main \
+              --head "$branch" \
+              --title "$title" \
+              --body-file "$body_file"
+          fi

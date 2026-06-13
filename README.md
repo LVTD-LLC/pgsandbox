@@ -178,9 +178,15 @@ npm run package:homebrew
 npm run package:release
 ```
 
-Upload the generated release archives and checksum file, then update
-`Formula/pgsandbox-mcp.rb` in
-[LVTD-LLC/homebrew-tap](https://github.com/LVTD-LLC/homebrew-tap).
+Upload the generated release archives and checksum file before publishing the
+GitHub release. When the release is published,
+`.github/workflows/update-homebrew-tap.yml` opens a PR against
+[LVTD-LLC/homebrew-tap](https://github.com/LVTD-LLC/homebrew-tap) with the
+immutable release URL and SHA256 for `Formula/pgsandbox-mcp.rb`.
+
+The workflow requires a repository secret named `HOMEBREW_TAP_PAT`. Use a
+fine-grained token with `Contents: Read and write` and `Pull requests: Read and
+write` access to `LVTD-LLC/homebrew-tap`, or an equivalent classic PAT.
 
 ## Safety Rules
 

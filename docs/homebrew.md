@@ -51,8 +51,18 @@ The Homebrew package command prints the release archive and SHA256 for the tap
 formula. The release package command creates a platform-specific archive named
 `pgsandbox-mcp-<version>-<target>.tar.gz` plus
 `pgsandbox-mcp-<version>-checksums.txt` for the GitHub install script. Upload
-the archives from `dist/`, then update the formula URL, version, and SHA in
-`LVTD-LLC/homebrew-tap`. Verify from the tap checkout:
+the archives from `dist/` before publishing the GitHub release.
+
+The published release starts the `Update Homebrew tap` workflow, which opens a
+PR in `LVTD-LLC/homebrew-tap` updating `Formula/pgsandbox-mcp.rb` to the
+versioned release URL and computed SHA256.
+
+The workflow requires a `HOMEBREW_TAP_PAT` repository secret in
+`LVTD-LLC/pgsandbox-mcp`. Use a fine-grained token with `Contents: Read and
+write` and `Pull requests: Read and write` access to `LVTD-LLC/homebrew-tap`, or
+an equivalent classic PAT.
+
+After the Homebrew tap PR merges, verify from the tap checkout:
 
 ```bash
 brew install --build-from-source Formula/pgsandbox-mcp.rb

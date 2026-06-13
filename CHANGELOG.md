@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Added release automation to open Homebrew tap update PRs with versioned release asset URLs and SHA256 checksums.
 - Added a static Astro marketing/docs site under `site/` with a futuristic landing page, getting-started docs, Docker/CapRover packaging, and a GitHub Actions deployment workflow for main-branch updates.
 - Renamed the product direction to PGSandbox MCP and removed the default "experiment" framing from user-facing docs.
 - Added a TypeScript/npm MCP server v0 with local Postgres profile support.
