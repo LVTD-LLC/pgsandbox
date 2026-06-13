@@ -31,12 +31,21 @@ have() {
   command -v "$1" >/dev/null 2>&1
 }
 
+wget_supports_secure_tls() {
+  wget --help 2>&1 | grep -q -- '--https-only' \
+    && wget --help 2>&1 | grep -q -- '--secure-protocol'
+}
+
 http_get() {
   url="$1"
   if have curl; then
-    curl -fsSL "$url"
+    curl -fsSL --proto '=https' --tlsv1.2 "$url"
   elif have wget; then
-    wget -qO- "$url"
+    if wget_supports_secure_tls; then
+      wget --https-only --secure-protocol=TLSv1_2 -qO- "$url"
+    else
+      die "wget fallback requires --https-only and --secure-protocol; install curl or GNU Wget with HTTPS-only support"
+    fi
   else
     die "curl or wget is required"
   fi
@@ -48,7 +57,11 @@ download() {
   if have curl; then
     curl -fL --retry 3 --proto '=https' --tlsv1.2 -o "$output" "$url"
   elif have wget; then
-    wget -q -O "$output" "$url"
+    if wget_supports_secure_tls; then
+      wget --https-only --secure-protocol=TLSv1_2 -q -O "$output" "$url"
+    else
+      die "wget fallback requires --https-only and --secure-protocol; install curl or GNU Wget with HTTPS-only support"
+    fi
   else
     die "curl or wget is required"
   fi
@@ -64,6 +77,20 @@ latest_version() {
   printf '%s' "${tag#v}"
 }
 
+is_musl_linux() {
+  if have ldd && ldd --version 2>&1 | grep -qi musl; then
+    return 0
+  fi
+
+  for musl_lib in /lib/ld-musl-*.so.1 /lib/libc.musl-*.so.1 /usr/lib/ld-musl-*.so.1; do
+    if [ -e "$musl_lib" ]; then
+      return 0
+    fi
+  done
+
+  return 1
+}
+
 detect_target() {
   os="$(uname -s)"
   arch="$(uname -m)"
@@ -76,7 +103,13 @@ detect_target() {
 
   case "$os" in
     Darwin) printf '%s-apple-darwin' "$arch" ;;
-    Linux) printf '%s-unknown-linux-gnu' "$arch" ;;
+    Linux)
+      libc="gnu"
+      if is_musl_linux; then
+        libc="musl"
+      fi
+      printf '%s-unknown-linux-%s' "$arch" "$libc"
+      ;;
     *) die "unsupported operating system: $os" ;;
   esac
 }
@@ -98,7 +131,7 @@ verify_checksum() {
   asset_name="$3"
 
   expected="$(
-    grep "  $asset_name\$" "$checksum_file" | awk '{print $1}' | head -n 1 || true
+    awk -v name="$asset_name" '$2 == name { print $1; exit }' "$checksum_file" || true
   )"
 
   if [ -z "$expected" ]; then
@@ -108,8 +141,7 @@ verify_checksum() {
 
   actual="$(sha256_file "$archive" || true)"
   if [ -z "$actual" ]; then
-    warn "shasum or sha256sum is required to verify checksums"
-    return 0
+    die "shasum or sha256sum is required to verify checksums"
   fi
 
   [ "$expected" = "$actual" ] || die "checksum mismatch for $asset_name"
