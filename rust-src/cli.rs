@@ -137,7 +137,7 @@ async fn smoke_test(args: &[String]) -> anyhow::Result<u8> {
                 profile: None,
                 database_id: database_id.clone(),
                 database_name: None,
-                sql: "create table items(id serial primary key, name text not null)".to_string(),
+                sql: "create table items(id serial primary key, name text not null, price numeric(10,2) not null)".to_string(),
                 readonly: Some(false),
                 row_limit: None,
             })
@@ -149,7 +149,7 @@ async fn smoke_test(args: &[String]) -> anyhow::Result<u8> {
                 profile: None,
                 database_id: database_id.clone(),
                 database_name: None,
-                sql: "insert into items(name) values ('alpha') returning id, name".to_string(),
+                sql: "insert into items(name, price) values ('alpha', 12.34) returning id, name, price".to_string(),
                 readonly: Some(false),
                 row_limit: None,
             })
@@ -162,6 +162,15 @@ async fn smoke_test(args: &[String]) -> anyhow::Result<u8> {
                 .and_then(|value| value.as_str())
                 == Some("alpha"),
             "INSERT ... RETURNING did not return the inserted row"
+        );
+        anyhow::ensure!(
+            inserted
+                .rows
+                .first()
+                .and_then(|row| row.get("price"))
+                .and_then(|value| value.as_str())
+                == Some("12.34"),
+            "NUMERIC value did not serialize as an exact string"
         );
         println!("{}", serde_json::to_string_pretty(&inserted)?);
 
@@ -183,6 +192,15 @@ async fn smoke_test(args: &[String]) -> anyhow::Result<u8> {
                 .and_then(|value| value.as_str())
                 == Some("alpha"),
             "TABLE query did not return the inserted row"
+        );
+        anyhow::ensure!(
+            query
+                .rows
+                .first()
+                .and_then(|row| row.get("price"))
+                .and_then(|value| value.as_str())
+                == Some("12.34"),
+            "TABLE query did not preserve the NUMERIC value"
         );
         println!("{}", serde_json::to_string_pretty(&query)?);
 

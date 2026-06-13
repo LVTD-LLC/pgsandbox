@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use tokio_postgres::{
-    types::{ToSql, Type},
+    types::{FromSql, ToSql, Type},
     Client, Row, SimpleQueryMessage,
 };
 use url::Url;
@@ -179,6 +179,25 @@ enum QueryMode {
     Cursor,
     TypedRows,
     Simple,
+}
+
+#[derive(Debug)]
+struct PgNumeric(String);
+
+impl<'a> FromSql<'a> for PgNumeric {
+    fn from_sql(
+        ty: &Type,
+        raw: &'a [u8],
+    ) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
+        if *ty != Type::NUMERIC {
+            return Err(format!("unsupported type for PgNumeric: {}", ty.name()).into());
+        }
+        Ok(Self(decode_pg_numeric(raw)?))
+    }
+
+    fn accepts(ty: &Type) -> bool {
+        *ty == Type::NUMERIC
+    }
 }
 
 impl PostgresSandboxManager {
@@ -473,10 +492,10 @@ impl PostgresSandboxManager {
         Ok(DescribeSchemaOutput {
             database_id: connection.database_id,
             database_name: connection.database_name,
-            tables: rows_to_json(tables),
-            columns: rows_to_json(columns),
-            indexes: rows_to_json(indexes),
-            extensions: rows_to_json(extensions),
+            tables: rows_to_json(tables)?,
+            columns: rows_to_json(columns)?,
+            indexes: rows_to_json(indexes)?,
+            extensions: rows_to_json(extensions)?,
         })
     }
 
@@ -789,7 +808,7 @@ async fn run_cursor_query(
         } else {
             Some(visible_rows.len() as u64)
         },
-        rows: rows_to_json(visible_rows),
+        rows: rows_to_json(visible_rows)?,
         truncated,
     })
 }
@@ -808,7 +827,7 @@ async fn run_typed_query(
         } else {
             Some(visible_rows.len() as u64)
         },
-        rows: rows_to_json(visible_rows),
+        rows: rows_to_json(visible_rows)?,
         truncated,
     })
 }
@@ -978,35 +997,36 @@ fn record_to_json(record: &SandboxRecord) -> Value {
     })
 }
 
-fn rows_to_json(rows: Vec<Row>) -> Vec<Value> {
+fn rows_to_json(rows: Vec<Row>) -> anyhow::Result<Vec<Value>> {
     rows.iter().map(row_to_json).collect()
 }
 
-fn row_to_json(row: &Row) -> Value {
+fn row_to_json(row: &Row) -> anyhow::Result<Value> {
     let mut object = serde_json::Map::new();
     for (index, column) in row.columns().iter().enumerate() {
         object.insert(
             column.name().to_string(),
-            cell_to_json(row, index, column.type_()),
+            cell_to_json(row, index, column.type_())
+                .with_context(|| format!("failed to serialize column {}", column.name()))?,
         );
     }
-    Value::Object(object)
+    Ok(Value::Object(object))
 }
 
-fn cell_to_json(row: &Row, index: usize, value_type: &Type) -> Value {
+fn cell_to_json(row: &Row, index: usize, value_type: &Type) -> anyhow::Result<Value> {
     if matches!(
         value_type,
         &Type::TEXT | &Type::VARCHAR | &Type::BPCHAR | &Type::NAME
     ) {
-        return row
+        return Ok(row
             .try_get::<_, Option<String>>(index)
             .ok()
             .flatten()
             .map(Value::String)
-            .unwrap_or(Value::Null);
+            .unwrap_or(Value::Null));
     }
 
-    match *value_type {
+    let value = match *value_type {
         Type::BOOL => row
             .try_get::<_, Option<bool>>(index)
             .ok()
@@ -1043,6 +1063,12 @@ fn cell_to_json(row: &Row, index: usize, value_type: &Type) -> Value {
             .flatten()
             .map(|value| json!(value))
             .unwrap_or(Value::Null),
+        Type::NUMERIC => row
+            .try_get::<_, Option<PgNumeric>>(index)
+            .ok()
+            .flatten()
+            .map(|value| Value::String(value.0))
+            .unwrap_or(Value::Null),
         Type::JSON | Type::JSONB => row
             .try_get::<_, Option<Value>>(index)
             .ok()
@@ -1072,13 +1098,99 @@ fn cell_to_json(row: &Row, index: usize, value_type: &Type) -> Value {
             .flatten()
             .map(|value| Value::String(value.to_string()))
             .unwrap_or(Value::Null),
-        _ => row
-            .try_get::<_, Option<String>>(index)
-            .ok()
-            .flatten()
-            .map(Value::String)
-            .unwrap_or(Value::Null),
+        _ => {
+            let type_name = value_type.name();
+            anyhow::bail!("unsupported Postgres type {type_name}");
+        }
+    };
+    Ok(value)
+}
+
+fn decode_pg_numeric(raw: &[u8]) -> anyhow::Result<String> {
+    let mut offset = 0;
+    let ndigits = read_i16(raw, &mut offset)? as usize;
+    let weight = read_i16(raw, &mut offset)?;
+    let sign = read_u16(raw, &mut offset)?;
+    let dscale = read_i16(raw, &mut offset)?;
+    if dscale < 0 {
+        anyhow::bail!("invalid NUMERIC scale");
     }
+
+    let mut digits = Vec::with_capacity(ndigits);
+    for _ in 0..ndigits {
+        let digit = read_i16(raw, &mut offset)?;
+        if !(0..=9999).contains(&digit) {
+            anyhow::bail!("invalid NUMERIC digit");
+        }
+        digits.push(digit as u16);
+    }
+
+    if offset != raw.len() {
+        anyhow::bail!("invalid NUMERIC payload length");
+    }
+
+    match sign {
+        0xC000 => return Ok("NaN".to_string()),
+        0xD000 => return Ok("Infinity".to_string()),
+        0xF000 => return Ok("-Infinity".to_string()),
+        0x0000 | 0x4000 => {}
+        _ => anyhow::bail!("invalid NUMERIC sign"),
+    }
+
+    let integer_groups = i32::from(weight) + 1;
+    let mut integer = String::new();
+    if integer_groups > 0 {
+        for group_index in 0..integer_groups as usize {
+            let digit = digits.get(group_index).copied().unwrap_or(0);
+            if group_index == 0 {
+                integer.push_str(&digit.to_string());
+            } else {
+                integer.push_str(&format!("{digit:04}"));
+            }
+        }
+    }
+    let integer = integer.trim_start_matches('0');
+    let integer = if integer.is_empty() { "0" } else { integer };
+
+    let scale = dscale as usize;
+    let mut fraction = String::new();
+    let fractional_start = integer_groups.max(0) as usize;
+    for digit in digits.iter().skip(fractional_start) {
+        fraction.push_str(&format!("{digit:04}"));
+    }
+    if fraction.len() < scale {
+        fraction.push_str(&"0".repeat(scale - fraction.len()));
+    }
+    fraction.truncate(scale);
+
+    let mut value = String::new();
+    if sign == 0x4000 && (integer != "0" || fraction.chars().any(|c| c != '0')) {
+        value.push('-');
+    }
+    value.push_str(integer);
+    if scale > 0 {
+        value.push('.');
+        value.push_str(&fraction);
+    }
+    Ok(value)
+}
+
+fn read_i16(raw: &[u8], offset: &mut usize) -> anyhow::Result<i16> {
+    if raw.len() < *offset + 2 {
+        anyhow::bail!("invalid NUMERIC payload length");
+    }
+    let value = i16::from_be_bytes([raw[*offset], raw[*offset + 1]]);
+    *offset += 2;
+    Ok(value)
+}
+
+fn read_u16(raw: &[u8], offset: &mut usize) -> anyhow::Result<u16> {
+    if raw.len() < *offset + 2 {
+        anyhow::bail!("invalid NUMERIC payload length");
+    }
+    let value = u16::from_be_bytes([raw[*offset], raw[*offset + 1]]);
+    *offset += 2;
+    Ok(value)
 }
 
 #[cfg(test)]
@@ -1135,5 +1247,33 @@ mod tests {
             unprotect_role_password(&stored, &profile).unwrap(),
             "sandbox-secret"
         );
+    }
+
+    #[test]
+    fn decodes_postgres_numeric_values() {
+        assert_eq!(
+            decode_pg_numeric(&numeric_raw(1, 0x0000, 2, &[1, 2345, 6700])).unwrap(),
+            "12345.67"
+        );
+        assert_eq!(
+            decode_pg_numeric(&numeric_raw(-1, 0x4000, 4, &[12])).unwrap(),
+            "-0.0012"
+        );
+        assert_eq!(
+            decode_pg_numeric(&numeric_raw(1, 0x0000, 0, &[10])).unwrap(),
+            "100000"
+        );
+    }
+
+    fn numeric_raw(weight: i16, sign: u16, dscale: i16, digits: &[i16]) -> Vec<u8> {
+        let mut raw = Vec::new();
+        raw.extend_from_slice(&(digits.len() as i16).to_be_bytes());
+        raw.extend_from_slice(&weight.to_be_bytes());
+        raw.extend_from_slice(&sign.to_be_bytes());
+        raw.extend_from_slice(&dscale.to_be_bytes());
+        for digit in digits {
+            raw.extend_from_slice(&digit.to_be_bytes());
+        }
+        raw
     }
 }
