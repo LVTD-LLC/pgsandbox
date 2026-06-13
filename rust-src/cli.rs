@@ -137,7 +137,7 @@ async fn smoke_test(args: &[String]) -> anyhow::Result<u8> {
                 profile: None,
                 database_id: database_id.clone(),
                 database_name: None,
-                sql: "create table items(id serial primary key, name text not null, price numeric(10,2) not null, payload bytea not null, starts_at time not null, starts_at_tz timetz not null)".to_string(),
+                sql: "create table items(id serial primary key, name text not null, price numeric(10,2) not null, ratio numeric(12,8) not null, payload bytea not null, starts_at time not null, starts_at_tz timetz not null)".to_string(),
                 readonly: Some(false),
                 row_limit: None,
             })
@@ -149,7 +149,7 @@ async fn smoke_test(args: &[String]) -> anyhow::Result<u8> {
                 profile: None,
                 database_id: database_id.clone(),
                 database_name: None,
-                sql: "insert into items(name, price, payload, starts_at, starts_at_tz) values ('alpha', 12.34, decode('cafe', 'hex'), time '12:34:56', timetz '12:34:56-05') returning id, name, price, payload, starts_at, starts_at_tz".to_string(),
+                sql: "insert into items(name, price, ratio, payload, starts_at, starts_at_tz) values ('alpha', 12.34, 0.00000012, decode('cafe', 'hex'), time '12:34:56', timetz '12:34:56-05') returning id, name, price, ratio, payload, starts_at, starts_at_tz".to_string(),
                 readonly: Some(false),
                 row_limit: None,
             })
@@ -171,6 +171,15 @@ async fn smoke_test(args: &[String]) -> anyhow::Result<u8> {
                 .and_then(|value| value.as_str())
                 == Some("12.34"),
             "NUMERIC value did not serialize as an exact string"
+        );
+        anyhow::ensure!(
+            inserted
+                .rows
+                .first()
+                .and_then(|row| row.get("ratio"))
+                .and_then(|value| value.as_str())
+                == Some("0.00000012"),
+            "small NUMERIC value did not serialize with leading fractional zeros"
         );
         anyhow::ensure!(
             inserted
@@ -206,7 +215,7 @@ async fn smoke_test(args: &[String]) -> anyhow::Result<u8> {
                 profile: None,
                 database_id: database_id.clone(),
                 database_name: None,
-                sql: "insert into items(name, price, payload, starts_at, starts_at_tz) values ('beta', 45.67, decode('beef', 'hex'), time '01:02:03', timetz '01:02:03+02') returning id, name -- agent note".to_string(),
+                sql: "insert into items(name, price, ratio, payload, starts_at, starts_at_tz) values ('beta', 45.67, 0.00000034, decode('beef', 'hex'), time '01:02:03', timetz '01:02:03+02') returning id, name -- agent note".to_string(),
                 readonly: Some(false),
                 row_limit: None,
             })
@@ -265,6 +274,15 @@ async fn smoke_test(args: &[String]) -> anyhow::Result<u8> {
                 .and_then(|value| value.as_str())
                 == Some("12.34"),
             "SELECT query did not preserve the NUMERIC value"
+        );
+        anyhow::ensure!(
+            query
+                .rows
+                .first()
+                .and_then(|row| row.get("ratio"))
+                .and_then(|value| value.as_str())
+                == Some("0.00000012"),
+            "SELECT query did not preserve the small NUMERIC value"
         );
         anyhow::ensure!(
             query

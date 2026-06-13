@@ -1363,6 +1363,11 @@ fn decode_pg_numeric(raw: &[u8]) -> anyhow::Result<String> {
     let scale = dscale as usize;
     let mut fraction = String::new();
     let fractional_start = integer_groups.max(0) as usize;
+    if integer_groups < 0 {
+        for _ in 0..(-integer_groups) {
+            fraction.push_str("0000");
+        }
+    }
     for digit in digits.iter().skip(fractional_start) {
         fraction.push_str(&format!("{digit:04}"));
     }
@@ -1564,6 +1569,14 @@ mod tests {
         assert_eq!(
             decode_pg_numeric(&numeric_raw(-1, 0x4000, 4, &[12])).unwrap(),
             "-0.0012"
+        );
+        assert_eq!(
+            decode_pg_numeric(&numeric_raw(-2, 0x0000, 8, &[12])).unwrap(),
+            "0.00000012"
+        );
+        assert_eq!(
+            decode_pg_numeric(&numeric_raw(-3, 0x4000, 12, &[12])).unwrap(),
+            "-0.000000000012"
         );
         assert_eq!(
             decode_pg_numeric(&numeric_raw(1, 0x0000, 0, &[10])).unwrap(),
