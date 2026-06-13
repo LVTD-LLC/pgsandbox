@@ -227,7 +227,7 @@ pgsandbox-mcp doctor</code></pre>
       const value = promptData instanceof HTMLTemplateElement ? promptData.content.textContent || '' : '';
 
       try {
-        if (!navigator.clipboard?.writeText) {
+        if (!navigator.clipboard?.writeText || !value) {
           throw new Error('copy failed');
         }
         await navigator.clipboard.writeText(value);
