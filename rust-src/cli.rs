@@ -201,6 +201,27 @@ async fn smoke_test(args: &[String]) -> anyhow::Result<u8> {
         );
         println!("{}", serde_json::to_string_pretty(&inserted)?);
 
+        let inserted_with_comment = manager
+            .run_sql(RunSqlInput {
+                profile: None,
+                database_id: database_id.clone(),
+                database_name: None,
+                sql: "insert into items(name, price, payload, starts_at, starts_at_tz) values ('beta', 45.67, decode('beef', 'hex'), time '01:02:03', timetz '01:02:03+02') returning id, name -- agent note".to_string(),
+                readonly: Some(false),
+                row_limit: None,
+            })
+            .await?;
+        anyhow::ensure!(
+            inserted_with_comment
+                .rows
+                .first()
+                .and_then(|row| row.get("name"))
+                .and_then(|value| value.as_str())
+                == Some("beta"),
+            "INSERT ... RETURNING with a trailing line comment did not return the inserted row"
+        );
+        println!("{}", serde_json::to_string_pretty(&inserted_with_comment)?);
+
         let updated = manager
             .run_sql(RunSqlInput {
                 profile: None,
@@ -222,7 +243,7 @@ async fn smoke_test(args: &[String]) -> anyhow::Result<u8> {
                 profile: None,
                 database_id: database_id.clone(),
                 database_name: None,
-                sql: "table items".to_string(),
+                sql: "select * from items where id = 1".to_string(),
                 readonly: Some(true),
                 row_limit: None,
             })
@@ -234,7 +255,7 @@ async fn smoke_test(args: &[String]) -> anyhow::Result<u8> {
                 .and_then(|row| row.get("name"))
                 .and_then(|value| value.as_str())
                 == Some("not returning"),
-            "TABLE query did not return the inserted row"
+            "SELECT query did not return the updated row"
         );
         anyhow::ensure!(
             query
@@ -243,7 +264,7 @@ async fn smoke_test(args: &[String]) -> anyhow::Result<u8> {
                 .and_then(|row| row.get("price"))
                 .and_then(|value| value.as_str())
                 == Some("12.34"),
-            "TABLE query did not preserve the NUMERIC value"
+            "SELECT query did not preserve the NUMERIC value"
         );
         anyhow::ensure!(
             query
@@ -252,7 +273,7 @@ async fn smoke_test(args: &[String]) -> anyhow::Result<u8> {
                 .and_then(|row| row.get("payload"))
                 .and_then(|value| value.as_str())
                 == Some("\\xcafe"),
-            "TABLE query did not preserve the BYTEA value"
+            "SELECT query did not preserve the BYTEA value"
         );
         anyhow::ensure!(
             query
@@ -261,7 +282,7 @@ async fn smoke_test(args: &[String]) -> anyhow::Result<u8> {
                 .and_then(|row| row.get("starts_at"))
                 .and_then(|value| value.as_str())
                 == Some("12:34:56"),
-            "TABLE query did not preserve the TIME value"
+            "SELECT query did not preserve the TIME value"
         );
         anyhow::ensure!(
             query
@@ -270,7 +291,7 @@ async fn smoke_test(args: &[String]) -> anyhow::Result<u8> {
                 .and_then(|row| row.get("starts_at_tz"))
                 .and_then(|value| value.as_str())
                 == Some("12:34:56-05:00"),
-            "TABLE query did not preserve the TIMETZ value"
+            "SELECT query did not preserve the TIMETZ value"
         );
         println!("{}", serde_json::to_string_pretty(&query)?);
 

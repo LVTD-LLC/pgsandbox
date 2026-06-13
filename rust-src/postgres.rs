@@ -888,7 +888,7 @@ fn dml_returning_limit_sql(sql: &str, row_limit: usize) -> Option<String> {
     }
     let trimmed = sql.trim().trim_end_matches(';').trim_end();
     Some(format!(
-        "WITH pgsandbox_limited_returning AS ({trimmed}) SELECT * FROM pgsandbox_limited_returning LIMIT {}",
+        "WITH pgsandbox_limited_returning AS (\n{trimmed}\n) SELECT * FROM pgsandbox_limited_returning LIMIT {}",
         row_limit + 1
     ))
 }
@@ -1516,8 +1516,14 @@ mod tests {
         )
         .unwrap();
 
-        assert!(limited.starts_with("WITH pgsandbox_limited_returning AS (insert into users"));
+        assert!(limited.starts_with("WITH pgsandbox_limited_returning AS (\ninsert into users"));
         assert!(limited.ends_with("LIMIT 101"));
+        let with_trailing_comment = dml_returning_limit_sql(
+            "insert into users(name) values ('a') returning id -- newly created row",
+            100,
+        )
+        .unwrap();
+        assert!(with_trailing_comment.contains("-- newly created row\n) SELECT"));
         assert!(dml_returning_limit_sql("select 'returning' as word", 100).is_none());
         assert!(
             dml_returning_limit_sql("update users set status = 'returning' where id = 1", 100)
