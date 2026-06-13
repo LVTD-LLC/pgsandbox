@@ -274,6 +274,27 @@ async fn smoke_test(args: &[String]) -> anyhow::Result<u8> {
         );
         println!("{}", serde_json::to_string_pretty(&query)?);
 
+        let readonly_literal = manager
+            .run_sql(RunSqlInput {
+                profile: None,
+                database_id: database_id.clone(),
+                database_name: None,
+                sql: "select 'rollback' as stage".to_string(),
+                readonly: Some(true),
+                row_limit: None,
+            })
+            .await?;
+        anyhow::ensure!(
+            readonly_literal
+                .rows
+                .first()
+                .and_then(|row| row.get("stage"))
+                .and_then(|value| value.as_str())
+                == Some("rollback"),
+            "readonly guard rejected or altered a safe string literal"
+        );
+        println!("{}", serde_json::to_string_pretty(&readonly_literal)?);
+
         manager
             .delete_database(DatabaseSelector {
                 profile: None,

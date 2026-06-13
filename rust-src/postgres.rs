@@ -30,13 +30,6 @@ const DEFAULT_ROW_LIMIT: usize = 100;
 const LIST_DATABASES_LIMIT: usize = 100;
 const ENCRYPTED_PASSWORD_PREFIX: &str = "v1";
 
-static READONLY_FORBIDDEN_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(
-        r"(?i)\b(begin|commit|rollback|abort|end|savepoint|release|set\s+(session|transaction|local)|reset)\b",
-    )
-    .expect("readonly SQL guard regex compiles")
-});
-
 static CURSOR_QUERY_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?is)^\s*(?:--[^\n]*(?:\n|$)|/\*.*?\*/\s*)*(select|with|values|table)\b")
         .expect("cursor query regex compiles")
@@ -750,10 +743,20 @@ fn clamp_ttl(ttl_minutes: Option<u32>, profile: &SandboxProfile) -> anyhow::Resu
 }
 
 pub fn assert_safe_readonly_sql(sql: &str) -> anyhow::Result<()> {
-    if READONLY_FORBIDDEN_RE.is_match(sql) {
-        anyhow::bail!(
-            "readonly SQL cannot include transaction-control or session-setting statements."
-        );
+    let tokens = sql_keyword_tokens(sql);
+    for (index, token) in tokens.iter().enumerate() {
+        if matches!(
+            token.as_str(),
+            "begin" | "commit" | "rollback" | "abort" | "end" | "savepoint" | "release" | "reset"
+        ) || (token == "set"
+            && tokens
+                .get(index + 1)
+                .is_some_and(|next| matches!(next.as_str(), "session" | "transaction" | "local")))
+        {
+            anyhow::bail!(
+                "readonly SQL cannot include transaction-control or session-setting statements."
+            );
+        }
     }
     Ok(())
 }
@@ -957,30 +960,19 @@ fn query_mode(sql: &str) -> QueryMode {
 }
 
 fn first_sql_keyword(sql: &str) -> Option<String> {
-    let bytes = sql.as_bytes();
-    let mut index = 0;
-    while index < bytes.len() {
-        if skip_sql_noise(bytes, &mut index) {
-            continue;
-        }
-        if is_ident_start(bytes[index]) {
-            let start = index;
-            index += 1;
-            while index < bytes.len() && is_ident_part(bytes[index]) {
-                index += 1;
-            }
-            return std::str::from_utf8(&bytes[start..index])
-                .ok()
-                .map(|token| token.to_ascii_lowercase());
-        }
-        index += 1;
-    }
-    None
+    sql_keyword_tokens(sql).into_iter().next()
 }
 
 fn contains_sql_keyword(sql: &str, keyword: &str) -> bool {
+    sql_keyword_tokens(sql)
+        .iter()
+        .any(|token| token.eq_ignore_ascii_case(keyword))
+}
+
+fn sql_keyword_tokens(sql: &str) -> Vec<String> {
     let bytes = sql.as_bytes();
     let mut index = 0;
+    let mut tokens = Vec::new();
     while index < bytes.len() {
         if skip_sql_noise(bytes, &mut index) {
             continue;
@@ -992,15 +984,13 @@ fn contains_sql_keyword(sql: &str, keyword: &str) -> bool {
                 index += 1;
             }
             if let Ok(token) = std::str::from_utf8(&bytes[start..index]) {
-                if token.eq_ignore_ascii_case(keyword) {
-                    return true;
-                }
+                tokens.push(token.to_ascii_lowercase());
             }
             continue;
         }
         index += 1;
     }
-    false
+    tokens
 }
 
 fn skip_sql_noise(bytes: &[u8], index: &mut usize) -> bool {
@@ -1473,6 +1463,9 @@ mod tests {
     #[test]
     fn readonly_guard_rejects_transaction_control() {
         assert!(assert_safe_readonly_sql("select * from users").is_ok());
+        assert!(assert_safe_readonly_sql("select 'rollback' as stage").is_ok());
+        assert!(assert_safe_readonly_sql("select $$commit$$ as stage").is_ok());
+        assert!(assert_safe_readonly_sql("select 1 -- rollback").is_ok());
         assert!(assert_safe_readonly_sql("rollback; drop table users").is_err());
         assert!(
             assert_safe_readonly_sql("set session characteristics as transaction read write")
