@@ -15,7 +15,15 @@ jobs:
         with:
           node-version: 22
           cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            site/package-lock.json
+      - uses: dtolnay/rust-toolchain@1.91.1
+        with:
+          components: rustfmt
+      - uses: Swatinem/rust-cache@v2
       - run: npm ci
+      - run: cargo fmt -- --check
       - run: npm run check
       - run: npm test
       - run: npm run build
