@@ -1,0 +1,8 @@
+---
+import DocsLayout from '../../layouts/DocsLayout.astro';
+---
+<DocsLayout title="Homebrew packaging" description="Homebrew formula and release checklist for PGSandbox MCP."><h1>Homebrew packaging</h1><p>The intended macOS flow is a thin installer for a versioned native binary artifact through the <a href="https://github.com/LVTD-LLC/homebrew-tap">LVTD-LLC/homebrew-tap</a> repository.</p><pre class="shell"><code>brew install LVTD-LLC/tap/pgsandbox-mcp
+pgsandbox-mcp setup \
+  --client codex \
+  --admin-url postgres://postgres:postgres@localhost:5432/postgres</code></pre><h2>Release shape</h2><ol><li>Build the Rust release binary.</li><li>Create a GitHub release tarball with the executable <code>pgsandbox-mcp</code> binary.</li><li>Update <code>Formula/pgsandbox-mcp.rb</code> in <a href="https://github.com/LVTD-LLC/homebrew-tap">LVTD-LLC/homebrew-tap</a> with the release URL and SHA256.</li></ol><h2>Release checklist</h2><pre class="shell"><code>cargo test
+npm run package:homebrew</code></pre></DocsLayout>

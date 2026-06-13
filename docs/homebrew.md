@@ -3,8 +3,7 @@
 The target user flow is:
 
 ```bash
-brew tap LVTD-LLC/tap
-brew install pgsandbox-mcp
+brew install LVTD-LLC/tap/pgsandbox-mcp
 pgsandbox-mcp setup --client codex --admin-url postgres://postgres:postgres@localhost:5432/postgres
 ```
 
@@ -12,16 +11,15 @@ pgsandbox-mcp setup --client codex --admin-url postgres://postgres:postgres@loca
 
 Use Homebrew as a thin installer for a versioned GitHub release artifact:
 
-1. Build the TypeScript package.
-2. Publish the npm package for `npm install -g` and `npx` users.
-3. Create a GitHub release tarball that contains an executable `pgsandbox-mcp` Node entrypoint.
-4. Update the Homebrew tap formula with the release URL and SHA256.
+1. Build the Rust release binary.
+2. Create a GitHub release tarball that contains the executable `pgsandbox-mcp` binary.
+3. Update `Formula/pgsandbox-mcp.rb` in [LVTD-LLC/homebrew-tap](https://github.com/LVTD-LLC/homebrew-tap) with the release URL and SHA256.
 
-This avoids asking Homebrew to resolve npm dependencies during install.
+This avoids asking users to install Node, npm, or a package manager runtime for a local MCP server.
 
 ## Formula Template
 
-Place this in the tap repo at `Formula/pgsandbox-mcp.rb`:
+Place this in [LVTD-LLC/homebrew-tap](https://github.com/LVTD-LLC/homebrew-tap) at `Formula/pgsandbox-mcp.rb`:
 
 ```ruby
 class PgsandboxMcp < Formula
@@ -31,10 +29,8 @@ class PgsandboxMcp < Formula
   sha256 "REPLACE_WITH_RELEASE_TARBALL_SHA256"
   license "MIT"
 
-  depends_on "node"
-
   def install
-    bin.install "pgsandbox-mcp", "pgsandbox-mcp.cjs"
+    bin.install "pgsandbox-mcp"
   end
 
   test do
@@ -46,12 +42,11 @@ end
 ## Release Checklist
 
 ```bash
-npm ci
-npm test
+cargo test
 npm run package:homebrew
 ```
 
-The package command prints the release archive and SHA256. Upload the archive from `dist/`, then update the formula URL, version, and SHA. Verify from the tap:
+The package command prints the release archive and SHA256. Upload the archive from `dist/`, then update the formula URL, version, and SHA in `LVTD-LLC/homebrew-tap`. Verify from the tap checkout:
 
 ```bash
 brew install --build-from-source Formula/pgsandbox-mcp.rb

@@ -1,0 +1,42 @@
+name: Deploy site
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'site/**'
+      - '.github/workflows/deploy-site.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - uses: actions/setup-node@v6.4.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+      - name: Install site dependencies
+        working-directory: site
+        run: npm ci --include=dev
+      - name: Build site
+        working-directory: site
+        run: npm run build
+      - name: Package site for CapRover
+        working-directory: site
+        run: tar --exclude=dist --exclude=node_modules -czf /tmp/pgsandbox-mcp-site.tar.gz .
+      - name: Deploy to CapRover
+        env:
+          CAPROVER_URL: ${{ secrets.CAPROVER_PGSANDBOX_SITE_URL }}
+          CAPROVER_APP: ${{ secrets.CAPROVER_PGSANDBOX_SITE_APP }}
+          CAPROVER_APP_TOKEN: ${{ secrets.CAPROVER_PGSANDBOX_SITE_TOKEN }}
+        run: |
+          npm install -g caprover
+          caprover deploy \
+            --caproverUrl "$CAPROVER_URL" \
+            --caproverApp "$CAPROVER_APP" \
+            --appToken "$CAPROVER_APP_TOKEN" \
+            --tarFile /tmp/pgsandbox-mcp-site.tar.gz

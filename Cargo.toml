@@ -1,0 +1,38 @@
+[package]
+name = "pgsandbox-mcp"
+version = "0.1.0"
+edition = "2021"
+description = "MCP server for disposable Postgres sandboxes."
+license = "MIT"
+repository = "https://github.com/LVTD-LLC/pgsandbox-mcp"
+
+[dependencies]
+anyhow = "1.0"
+aes-gcm = "0.10"
+base64 = "0.22"
+chrono = { version = "0.4", features = ["serde"] }
+dirs = "6.0"
+native-tls = "0.2"
+postgres-native-tls = "0.5"
+regex = "1.12"
+rmcp = { version = "1.7.0", features = ["server", "transport-io", "schemars"] }
+schemars = "1.1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sha2 = "0.10"
+thiserror = "2.0"
+tokio = { version = "1.48", features = ["full"] }
+tokio-postgres = { version = "0.7", features = ["with-chrono-0_4", "with-serde_json-1", "with-uuid-1"] }
+toml = "0.9"
+url = "2.5"
+uuid = { version = "1.18", features = ["v4", "serde"] }
+
+[dev-dependencies]
+tempfile = "3.23"
+
+[[bin]]
+name = "pgsandbox-mcp"
+path = "rust-src/main.rs"
+
+[lib]
+path = "rust-src/lib.rs"

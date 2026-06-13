@@ -1,56 +1,55 @@
 # PGSandbox MCP
 
-Agent-facing MCP server for disposable Postgres sandboxes.
+Safe disposable Postgres databases for coding agents.
 
-PGSandbox lets local coding agents create isolated Postgres databases on demand without requiring Docker, a hosted control plane, or a browser. It works against any reachable Postgres admin connection: a local install, a container-local Postgres, a VPS, or a private development database host.
+PGSandbox is a local MCP server that gives agents a narrow, tracked way to create, use, and clean up real Postgres databases. Agents could improvise this with `psql`, `createdb`, and shell scripts. PGSandbox exists so they do not have to improvise with admin credentials every time.
+
+It works against Postgres you already control: a local install, a container-local Postgres, a VPS, or a private development database host. It does not install Postgres or require Docker.
+Postgres URL `sslmode` settings are honored, so remote profiles can require TLS with `sslmode=require`.
 
 ## Why This Exists
 
-Agents often need a real database to validate migrations, reproduce backend bugs, test SQL assumptions, or build seeded demo states. Today that usually means touching a shared development database, hand-rolling a container, or skipping database verification entirely.
+Agents need real databases to validate migrations, reproduce backend bugs, test generated SQL, and build seeded demo states. Without a guardrail, the usual options are risky:
 
-The goal is to make the safe path the easy path:
+- hand an agent shared development credentials
+- let it invent database create/drop commands in a shell
+- keep stale test databases around after interrupted sessions
+- skip database verification because setup is annoying
 
-- create a fresh Postgres database for a task
-- isolate it from production and other agents
-- apply schema or seed data
-- run SQL and inspect results
-- delete it automatically after a TTL
+PGSandbox makes the safe path shorter:
+
+- create one database and one scoped login role per task
+- record every sandbox in metadata before it can be cleaned up
+- run SQL through the sandbox role, not the admin connection
+- cap TTLs and delete expired resources
+- drop only databases PGSandbox created for the selected profile
+- return bounded query results instead of dumping unbounded rows
+
+The value is not that agents cannot use Postgres by themselves. The value is that database lifecycle becomes explicit, auditable, and disposable by default.
 
 ## Install
 
-This package is designed for local MCP clients via npm:
+The intended local install is a native binary through Homebrew:
 
 ```bash
-npm install -g pgsandbox-mcp
+brew install LVTD-LLC/tap/pgsandbox-mcp
 pgsandbox-mcp setup --client codex --admin-url postgres://postgres:postgres@localhost:5432/postgres
 pgsandbox-mcp doctor
 ```
 
-For development from this repo:
-
-```bash
-npm install
-npm run build
-npm link
-pgsandbox-mcp setup --client codex --admin-url postgres://postgres:postgres@localhost:5432/postgres
-pgsandbox-mcp smoke-test
-```
+The Homebrew formula lives in [LVTD-LLC/homebrew-tap](https://github.com/LVTD-LLC/homebrew-tap). Homebrew exposes that repo as the `LVTD-LLC/tap` tap.
 
 Restart the MCP client after setup. In Codex, run `/mcp` to verify the `pgsandbox` server is available.
 
-### Homebrew
-
-The intended macOS flow is:
+For development from this repo:
 
 ```bash
-brew tap LVTD-LLC/tap
-brew install pgsandbox-mcp
-pgsandbox-mcp setup --client codex --admin-url postgres://postgres:postgres@localhost:5432/postgres
+cargo build
+cargo run -- setup --client codex --admin-url postgres://postgres:postgres@localhost:5432/postgres
+cargo run -- smoke-test --admin-url postgres://postgres:postgres@localhost:5432/postgres
 ```
 
-See [docs/homebrew.md](docs/homebrew.md) for the tap formula shape and release checklist.
-
-### MCP Client Setup
+## MCP Client Setup
 
 The setup command writes the right MCP config shape for each supported client:
 
@@ -77,7 +76,7 @@ The fastest setup is one admin connection string:
 
 ```bash
 export PGSANDBOX_ADMIN_DATABASE_URL="postgres://postgres:postgres@localhost:5432/postgres"
-npx pgsandbox-mcp
+pgsandbox-mcp
 ```
 
 For multiple Postgres versions or hosts, use profiles:
@@ -108,8 +107,6 @@ export PGSANDBOX_CONFIG="./pgsandbox.config.json"
 pgsandbox-mcp
 ```
 
-PGSandbox does not install or manage Postgres versions itself. It can target different versions through different profiles as long as those Postgres servers are already running.
-
 ## MCP Tools
 
 V0 supports:
@@ -128,9 +125,10 @@ See [docs/mcp-tools.md](docs/mcp-tools.md) for details.
 
 The service uses:
 
-- Node.js/TypeScript MCP server
-- Postgres admin connection with permissions to create databases and roles
-- metadata table for ownership, TTL, credentials, and cleanup state
+- Rust native binary
+- `rmcp` stdio MCP server
+- Postgres admin connection with permission to create databases and roles
+- metadata table for ownership, TTL, encrypted sandbox credentials, and cleanup state
 - optional Docker Compose only for local demo Postgres
 
 Start with [docker-compose.example.yml](docker-compose.example.yml) only if you do not already have local Postgres running.
@@ -143,15 +141,35 @@ pgsandbox-mcp
 pgsandbox-mcp stdio
 ```
 
+## Development
+
+```bash
+cargo check
+cargo test
+cargo build --release
+npm run site:build
+```
+
+Release packaging check:
+
+```bash
+npm run package:homebrew
+```
+
+Upload the generated release archive, then update `Formula/pgsandbox-mcp.rb` in [LVTD-LLC/homebrew-tap](https://github.com/LVTD-LLC/homebrew-tap).
+
 ## Safety Rules
 
 - All databases have explicit TTLs.
 - Generated role names and database names use a predictable prefix.
 - Agent-created users are not superusers.
 - Destructive tools only operate on resources created by this MCP.
+- Admin connections are used for lifecycle and metadata only.
+- User SQL runs through generated sandbox credentials.
+- Sandbox role passwords are encrypted before being stored in metadata.
 - Connection strings are returned only to the caller and are not logged in full.
 - The service should run locally or on a private network, not as a public internet-exposed admin surface.
 
 ## Status
 
-Early v0. Treat this as a local/internal utility until the MCP surface and cleanup semantics have more mileage.
+Early v0. Treat this as local/private infrastructure until the MCP surface and cleanup semantics have more mileage.

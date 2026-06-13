@@ -2,7 +2,8 @@
 
 ## V0 Design
 
-The first version is a thin MCP server in front of one or more reachable Postgres admin connections. It does not require Docker. Docker is only useful as a quick way to run Postgres locally if the developer does not already have it installed.
+The first version is a local Rust MCP server in front of one or more reachable Postgres admin connections. It does not require Docker. Docker is only useful as a quick way to run Postgres locally if the developer does not already have it installed.
+For remote Postgres profiles, the configured Postgres URL can require TLS with `sslmode=require`.
 
 ```text
 Agent / MCP client
@@ -23,7 +24,7 @@ The MCP server owns all database lifecycle metadata in an internal table:
 - profile name
 - database name
 - role name
-- role password
+- encrypted role password
 - owner agent/session
 - purpose
 - labels
@@ -48,6 +49,7 @@ pgsandbox_<slug>_<short_id>
 ```
 
 The admin connection is used only for lifecycle operations. Tool calls that run user SQL connect using the generated sandbox role.
+Sandbox role passwords are encrypted before being persisted in the metadata table; existing plaintext metadata rows remain readable for compatibility.
 
 ## Profiles
 

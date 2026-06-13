@@ -1,6 +1,6 @@
 # MCP Tool Contract
 
-This is the v0 tool surface. Names and argument shapes may still change before publishing to npm.
+This is the v0 tool surface. Names and argument shapes may still change before a stable release.
 
 ## `create_database`
 
@@ -91,7 +91,8 @@ Inputs:
 
 Returns:
 
-- database metadata without full secrets
+- `databases`: database metadata without full secrets
+- `truncated`: whether more matching records exist beyond the returned page
 
 ## `cleanup_expired`
 

@@ -1,26 +1,31 @@
 # Install And Setup
 
-## npm
-
-```bash
-npm install -g pgsandbox-mcp
-pgsandbox-mcp setup --client codex --admin-url postgres://postgres:postgres@localhost:5432/postgres
-```
-
-## npx
-
-```bash
-npx -y pgsandbox-mcp setup --client codex --admin-url postgres://postgres:postgres@localhost:5432/postgres
-```
-
-For `npx`, the generated MCP config should usually be edited to pin a version or replaced after installing the package globally.
+PGSandbox is distributed as a native Rust binary. It needs a reachable Postgres admin connection that can create databases and roles.
 
 ## Homebrew
 
 ```bash
-brew tap LVTD-LLC/tap
-brew install pgsandbox-mcp
+brew install LVTD-LLC/tap/pgsandbox-mcp
 pgsandbox-mcp setup --client codex --admin-url postgres://postgres:postgres@localhost:5432/postgres
+```
+
+This uses the [LVTD-LLC/homebrew-tap](https://github.com/LVTD-LLC/homebrew-tap) repository, which Homebrew addresses as `LVTD-LLC/tap`.
+
+## From Source
+
+```bash
+cargo install --path .
+pgsandbox-mcp setup --client codex --admin-url postgres://postgres:postgres@localhost:5432/postgres
+```
+
+## Supported Clients
+
+```bash
+pgsandbox-mcp setup --client codex --admin-url "$PGSANDBOX_ADMIN_DATABASE_URL"
+pgsandbox-mcp setup --client cursor --scope project --admin-url "$PGSANDBOX_ADMIN_DATABASE_URL"
+pgsandbox-mcp setup --client vscode --scope project --admin-url "$PGSANDBOX_ADMIN_DATABASE_URL"
+pgsandbox-mcp setup --client claude-desktop --admin-url "$PGSANDBOX_ADMIN_DATABASE_URL"
+pgsandbox-mcp setup --client all --admin-url "$PGSANDBOX_ADMIN_DATABASE_URL"
 ```
 
 ## Verify

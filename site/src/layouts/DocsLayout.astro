@@ -1,0 +1,156 @@
+---
+import BaseLayout from './BaseLayout.astro';
+
+const { title, description } = Astro.props;
+const pathname = Astro.url.pathname;
+const links = [
+  ['Docs home', '/docs/'],
+  ['Install', '/docs/install/'],
+  ['MCP tools', '/docs/mcp-tools/'],
+  ['Architecture', '/docs/architecture/'],
+  ['Homebrew', '/docs/homebrew/']
+];
+---
+<BaseLayout title={`${title} - PGSandbox MCP docs`} description={description}>
+  <main id="content" class="container docs-page">
+    <nav class="docs-nav" aria-label="Docs navigation">
+      {links.map(([label, href]) => (
+        <a href={href} aria-current={pathname === href ? 'page' : undefined}>{label}</a>
+      ))}
+    </nav>
+    <article class="docs-content">
+      <slot />
+    </article>
+  </main>
+</BaseLayout>
+
+<style is:global>
+  .docs-page {
+    display: grid;
+    grid-template-columns: 236px minmax(0, 1fr);
+    gap: 2rem;
+    align-items: start;
+    padding: 3rem 0 7rem;
+  }
+
+  .docs-nav {
+    position: sticky;
+    top: 5.75rem;
+    display: grid;
+    min-width: 0;
+    gap: 0.2rem;
+    padding: 0.35rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+  }
+
+  .docs-nav a {
+    display: block;
+    padding: 0.72rem 0.78rem;
+    border-radius: var(--radius-md);
+    color: var(--muted);
+    font-weight: 720;
+    transition:
+      background 180ms ease,
+      color 180ms ease;
+  }
+
+  .docs-nav a:hover,
+  .docs-nav a[aria-current="page"] {
+    background: var(--primary-soft);
+    color: var(--primary);
+  }
+
+  .docs-content {
+    min-width: 0;
+    padding: 2.8rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+  }
+
+  .docs-content h1 {
+    margin: 0 0 1rem;
+    max-width: 820px;
+    color: var(--ink);
+    font-size: 3.3rem;
+    line-height: 1.02;
+    letter-spacing: -0.025em;
+    text-wrap: balance;
+  }
+
+  .docs-content h2 {
+    margin: 2.35rem 0 0.75rem;
+    color: var(--ink);
+    font-size: 1.58rem;
+    line-height: 1.18;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+  }
+
+  .docs-content p,
+  .docs-content li {
+    max-width: 72ch;
+    color: var(--muted);
+    line-height: 1.72;
+  }
+
+  .docs-content p:first-of-type {
+    color: var(--text);
+    font-size: 1.06rem;
+  }
+
+  .docs-content a {
+    color: var(--primary);
+    font-weight: 760;
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 4px;
+  }
+
+  .docs-content a:hover {
+    color: var(--primary-hover);
+  }
+
+  .docs-content ul,
+  .docs-content ol {
+    padding-left: 1.25rem;
+  }
+
+  .docs-content section {
+    padding-block: 0.2rem;
+  }
+
+  .docs-content pre {
+    margin: 1.1rem 0 1.35rem;
+  }
+
+  @media (max-width: 880px) {
+    .docs-page {
+      grid-template-columns: 1fr;
+      gap: 1.2rem;
+      padding-top: 1.4rem;
+    }
+
+    .docs-nav {
+      position: static;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .docs-content {
+      padding: 1.35rem;
+    }
+
+    .docs-content h1 {
+      font-size: 2.42rem;
+      line-height: 1.08;
+    }
+  }
+
+  @media (max-width: 540px) {
+    .docs-nav {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

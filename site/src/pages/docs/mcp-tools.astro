@@ -1,0 +1,13 @@
+---
+import DocsLayout from '../../layouts/DocsLayout.astro';
+const tools = [
+  ['create_database', 'Creates an isolated database and login role. Returns the database id, database name, role name, expiry, and connection string.'],
+  ['delete_database', 'Deletes a database and role created by this MCP. Destructive operations are scoped to tracked sandbox resources.'],
+  ['get_connection_string', 'Returns the connection string for a created sandbox database plus expiry metadata.'],
+  ['run_sql', 'Runs SQL against an experiment database with optional readonly mode and capped row limits.'],
+  ['describe_schema', 'Returns tables, columns, indexes, and extensions for an experiment database.'],
+  ['list_databases', 'Lists active experiment databases, optionally filtered by owner, with a truncation flag and no full secrets.'],
+  ['cleanup_expired', 'Deletes expired resources, with dry-run support for audit-friendly cleanup.']
+];
+---
+<DocsLayout title="MCP tool contract" description="PGSandbox MCP v0 tool surface."><h1>MCP tool contract</h1><p>This is the early v0 surface. The tools are intentionally narrow: agents can request tracked database lifecycle operations without receiving a general-purpose database admin shell.</p>{tools.map(([name, body]) => <section><h2><code>{name}</code></h2><p>{body}</p></section>)}</DocsLayout>

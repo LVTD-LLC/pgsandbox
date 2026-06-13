@@ -1,0 +1,120 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+
+const docs = [
+  ['Install and setup', '/docs/install/', 'Homebrew, source install, supported clients, and verification commands.'],
+  ['MCP tools', '/docs/mcp-tools/', 'The v0 tool contract exposed to agents through MCP.'],
+  ['Architecture', '/docs/architecture/', 'How PGSandbox maps profiles, databases, roles, metadata, and cleanup.'],
+  ['Homebrew packaging', '/docs/homebrew/', 'Release archive shape and tap formula checklist.']
+];
+---
+<BaseLayout
+  title="PGSandbox MCP docs"
+  description="Installation, MCP tools, architecture, and packaging notes for PGSandbox MCP."
+>
+  <main id="content" class="container docs-home">
+    <span class="section-label">documentation</span>
+    <h1>Install one local binary, then give agents a safe database lifecycle.</h1>
+    <p class="intro">
+      The docs cover setup, the narrow MCP tool contract, the tracked resource model, and release packaging for the Rust PGSandbox binary.
+    </p>
+    <div class="doc-grid">
+      {docs.map(([title, href, body]) => (
+        <a class="doc-card" href={href}>
+          <span>Open guide</span>
+          <h2>{title}</h2>
+          <p>{body}</p>
+        </a>
+      ))}
+    </div>
+  </main>
+</BaseLayout>
+
+<style>
+  .docs-home {
+    padding: 5rem 0 7rem;
+  }
+
+  h1 {
+    max-width: 920px;
+    margin: 0 0 1rem;
+    color: var(--ink);
+    font-size: 3.8rem;
+    line-height: 1.02;
+    letter-spacing: -0.03em;
+    text-wrap: balance;
+  }
+
+  .intro {
+    max-width: 740px;
+    margin: 0;
+    color: var(--muted);
+    font-size: 1.1rem;
+    line-height: 1.7;
+  }
+
+  .doc-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+    margin-top: 2.4rem;
+  }
+
+  .doc-card {
+    display: grid;
+    min-height: 190px;
+    align-content: space-between;
+    gap: 1.5rem;
+    padding: 1.2rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+    transition:
+      transform 180ms cubic-bezier(0.22, 1, 0.36, 1),
+      border-color 180ms ease,
+      background 180ms ease;
+  }
+
+  .doc-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--primary);
+    background: var(--primary-soft);
+  }
+
+  .doc-card span {
+    width: fit-content;
+    color: var(--primary);
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    font-weight: 760;
+  }
+
+  .doc-card h2 {
+    margin: 0;
+    color: var(--ink);
+    font-size: 1.45rem;
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+  }
+
+  .doc-card p {
+    margin: 0;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  @media (max-width: 760px) {
+    .docs-home {
+      padding-top: 3.5rem;
+    }
+
+    h1 {
+      font-size: 2.55rem;
+      line-height: 1.08;
+    }
+
+    .doc-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
