@@ -135,8 +135,7 @@ verify_checksum() {
   )"
 
   if [ -z "$expected" ]; then
-    warn "no checksum entry found for $asset_name"
-    return 0
+    die "no checksum entry found for $asset_name"
   fi
 
   actual="$(sha256_file "$archive" || true)"
