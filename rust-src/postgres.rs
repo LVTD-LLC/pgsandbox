@@ -870,11 +870,11 @@ fn format_simple_query_result(
 }
 
 fn query_mode(sql: &str) -> QueryMode {
-    if TYPED_ROW_QUERY_RE.is_match(sql) {
-        return QueryMode::TypedRows;
-    }
     if CURSOR_QUERY_RE.is_match(sql) {
         return QueryMode::Cursor;
+    }
+    if TYPED_ROW_QUERY_RE.is_match(sql) {
+        return QueryMode::TypedRows;
     }
     QueryMode::Simple
 }
@@ -1100,6 +1100,10 @@ mod tests {
     fn query_mode_detects_row_producing_sql() {
         assert!(matches!(query_mode("select 1"), QueryMode::Cursor));
         assert!(matches!(query_mode("table users"), QueryMode::Cursor));
+        assert!(matches!(
+            query_mode("select 'returning' as word"),
+            QueryMode::Cursor
+        ));
         assert!(matches!(
             query_mode("insert into users(name) values ('a') returning id"),
             QueryMode::TypedRows
