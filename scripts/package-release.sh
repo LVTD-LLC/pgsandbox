@@ -6,7 +6,9 @@ die() {
   exit 1
 }
 
-version=$(grep '^version = ' Cargo.toml | head -n 1 | sed 's/version = "\(.*\)"/\1/')
+[ -r Cargo.toml ] || die "Cargo.toml not found or not readable"
+version="$(sed -n 's/^version = "\([^"]*\)"/\1/p' Cargo.toml | head -n 1)"
+[ -n "$version" ] || die "could not parse version from Cargo.toml"
 host_target="$(rustc -vV | sed -n 's/^host: //p')"
 explicit_target=false
 if [ "$#" -gt 0 ]; then
