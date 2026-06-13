@@ -41,16 +41,9 @@ static CURSOR_QUERY_RE: LazyLock<Regex> = LazyLock::new(|| {
         .expect("cursor query regex compiles")
 });
 
-static TYPED_ROW_QUERY_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?is)^\s*(?:--[^\n]*(?:\n|$)|/\*.*?\*/\s*)*(show|explain)\b|\breturning\b")
-        .expect("typed row query regex compiles")
-});
-
-static DML_RETURNING_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(
-        r"(?is)^\s*(?:--[^\n]*(?:\n|$)|/\*.*?\*/\s*)*(insert|update|delete|merge)\b.*\breturning\b",
-    )
-    .expect("DML returning regex compiles")
+static TYPED_ROW_PREFIX_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?is)^\s*(?:--[^\n]*(?:\n|$)|/\*.*?\*/\s*)*(show|explain)\b")
+        .expect("typed row prefix regex compiles")
 });
 
 #[derive(Clone)]
@@ -862,7 +855,12 @@ async fn run_typed_query(
 }
 
 fn dml_returning_limit_sql(sql: &str, row_limit: usize) -> Option<String> {
-    if !DML_RETURNING_RE.is_match(sql) {
+    let first_keyword = first_sql_keyword(sql)?;
+    if !matches!(
+        first_keyword.as_str(),
+        "insert" | "update" | "delete" | "merge"
+    ) || !contains_sql_keyword(sql, "returning")
+    {
         return None;
     }
     let trimmed = sql.trim().trim_end_matches(';').trim_end();
@@ -932,10 +930,138 @@ fn query_mode(sql: &str) -> QueryMode {
     if CURSOR_QUERY_RE.is_match(sql) {
         return QueryMode::Cursor;
     }
-    if TYPED_ROW_QUERY_RE.is_match(sql) {
+    if TYPED_ROW_PREFIX_RE.is_match(sql) || contains_sql_keyword(sql, "returning") {
         return QueryMode::TypedRows;
     }
     QueryMode::Simple
+}
+
+fn first_sql_keyword(sql: &str) -> Option<String> {
+    let bytes = sql.as_bytes();
+    let mut index = 0;
+    while index < bytes.len() {
+        if skip_sql_noise(bytes, &mut index) {
+            continue;
+        }
+        if is_ident_start(bytes[index]) {
+            let start = index;
+            index += 1;
+            while index < bytes.len() && is_ident_part(bytes[index]) {
+                index += 1;
+            }
+            return std::str::from_utf8(&bytes[start..index])
+                .ok()
+                .map(|token| token.to_ascii_lowercase());
+        }
+        index += 1;
+    }
+    None
+}
+
+fn contains_sql_keyword(sql: &str, keyword: &str) -> bool {
+    let bytes = sql.as_bytes();
+    let mut index = 0;
+    while index < bytes.len() {
+        if skip_sql_noise(bytes, &mut index) {
+            continue;
+        }
+        if is_ident_start(bytes[index]) {
+            let start = index;
+            index += 1;
+            while index < bytes.len() && is_ident_part(bytes[index]) {
+                index += 1;
+            }
+            if let Ok(token) = std::str::from_utf8(&bytes[start..index]) {
+                if token.eq_ignore_ascii_case(keyword) {
+                    return true;
+                }
+            }
+            continue;
+        }
+        index += 1;
+    }
+    false
+}
+
+fn skip_sql_noise(bytes: &[u8], index: &mut usize) -> bool {
+    if bytes[*index].is_ascii_whitespace() {
+        *index += 1;
+        return true;
+    }
+    if bytes[*index..].starts_with(b"--") {
+        *index += 2;
+        while *index < bytes.len() && bytes[*index] != b'\n' {
+            *index += 1;
+        }
+        return true;
+    }
+    if bytes[*index..].starts_with(b"/*") {
+        *index += 2;
+        while *index + 1 < bytes.len() && !bytes[*index..].starts_with(b"*/") {
+            *index += 1;
+        }
+        *index = (*index + 2).min(bytes.len());
+        return true;
+    }
+    if bytes[*index] == b'\'' {
+        skip_quoted(bytes, index, b'\'');
+        return true;
+    }
+    if bytes[*index] == b'"' {
+        skip_quoted(bytes, index, b'"');
+        return true;
+    }
+    if bytes[*index] == b'$' && skip_dollar_quoted(bytes, index) {
+        return true;
+    }
+    false
+}
+
+fn skip_quoted(bytes: &[u8], index: &mut usize, quote: u8) {
+    *index += 1;
+    while *index < bytes.len() {
+        if bytes[*index] == quote {
+            if *index + 1 < bytes.len() && bytes[*index + 1] == quote {
+                *index += 2;
+            } else {
+                *index += 1;
+                break;
+            }
+        } else {
+            *index += 1;
+        }
+    }
+}
+
+fn skip_dollar_quoted(bytes: &[u8], index: &mut usize) -> bool {
+    let start = *index;
+    let mut end = start + 1;
+    while end < bytes.len() && (bytes[end].is_ascii_alphanumeric() || bytes[end] == b'_') {
+        end += 1;
+    }
+    if end >= bytes.len() || bytes[end] != b'$' {
+        return false;
+    }
+
+    let delimiter = &bytes[start..=end];
+    *index = end + 1;
+    while *index + delimiter.len() <= bytes.len() {
+        if bytes[*index..].starts_with(delimiter) {
+            *index += delimiter.len();
+            return true;
+        }
+        *index += 1;
+    }
+    *index = bytes.len();
+    true
+}
+
+fn is_ident_start(byte: u8) -> bool {
+    byte.is_ascii_alphabetic() || byte == b'_'
+}
+
+fn is_ident_part(byte: u8) -> bool {
+    byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'$'
 }
 
 fn protect_role_password(password: &str, profile: &SandboxProfile) -> anyhow::Result<String> {
@@ -1348,6 +1474,18 @@ mod tests {
             QueryMode::TypedRows
         ));
         assert!(matches!(
+            query_mode("update users set status = 'returning' where id = 1"),
+            QueryMode::Simple
+        ));
+        assert!(matches!(
+            query_mode("update users set status = $$returning$$ where id = 1"),
+            QueryMode::Simple
+        ));
+        assert!(matches!(
+            query_mode("update users set status = 'done' -- returning\nwhere id = 1"),
+            QueryMode::Simple
+        ));
+        assert!(matches!(
             query_mode("show server_version"),
             QueryMode::TypedRows
         ));
@@ -1368,6 +1506,15 @@ mod tests {
         assert!(limited.starts_with("WITH pgsandbox_limited_returning AS (insert into users"));
         assert!(limited.ends_with("LIMIT 101"));
         assert!(dml_returning_limit_sql("select 'returning' as word", 100).is_none());
+        assert!(
+            dml_returning_limit_sql("update users set status = 'returning' where id = 1", 100)
+                .is_none()
+        );
+        assert!(dml_returning_limit_sql(
+            "/* returning */ update users set status = 'done' where id = 1",
+            100
+        )
+        .is_none());
     }
 
     #[test]

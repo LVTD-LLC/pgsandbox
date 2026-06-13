@@ -201,6 +201,22 @@ async fn smoke_test(args: &[String]) -> anyhow::Result<u8> {
         );
         println!("{}", serde_json::to_string_pretty(&inserted)?);
 
+        let updated = manager
+            .run_sql(RunSqlInput {
+                profile: None,
+                database_id: database_id.clone(),
+                database_name: None,
+                sql: "update items set name = 'not returning' where id = 1".to_string(),
+                readonly: Some(false),
+                row_limit: None,
+            })
+            .await?;
+        anyhow::ensure!(
+            updated.row_count == Some(1) && updated.rows.is_empty(),
+            "DML with 'returning' inside a string literal was not handled as a direct query"
+        );
+        println!("{}", serde_json::to_string_pretty(&updated)?);
+
         let query = manager
             .run_sql(RunSqlInput {
                 profile: None,
@@ -217,7 +233,7 @@ async fn smoke_test(args: &[String]) -> anyhow::Result<u8> {
                 .first()
                 .and_then(|row| row.get("name"))
                 .and_then(|value| value.as_str())
-                == Some("alpha"),
+                == Some("not returning"),
             "TABLE query did not return the inserted row"
         );
         anyhow::ensure!(
