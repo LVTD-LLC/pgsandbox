@@ -30,8 +30,10 @@ jobs:
 
       - name: Derive release version
         id: release
+        env:
+          TAG_NAME: ${{ github.event.release.tag_name }}
         run: |
-          tag="${{ github.event.release.tag_name }}"
+          tag="$TAG_NAME"
 
           case "$tag" in
             v[0-9]*)
@@ -43,6 +45,14 @@ jobs:
           esac
 
           version="${tag#v}"
+
+          case "$version" in
+            '' | *[!0-9A-Za-z.+-]*)
+              echo "::error::Release version contains unsupported characters: $version"
+              exit 1
+              ;;
+          esac
+
           asset="pgsandbox-mcp-${version}.tar.gz"
 
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
