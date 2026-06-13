@@ -12,6 +12,7 @@
 |   |-- names.ts                 safe names and SQL quoting
 |   |-- doctor.ts                diagnostics
 |   |-- setup/client-config.ts   MCP client config writers
+|   |-- version.ts               package version export
 |   `-- *.test.ts                Vitest unit tests beside source
 |-- docs/                        Architecture, install, MCP, release docs
 |-- scripts/                     Build, clean, and packaging scripts
