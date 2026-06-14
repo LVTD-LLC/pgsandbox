@@ -236,7 +236,7 @@ pub fn detect_existing_client_configs(cwd: &Path) -> Vec<ConfigTarget> {
         let scopes = if client == SupportedClient::ClaudeDesktop {
             vec![ConfigScope::User]
         } else {
-            vec![ConfigScope::User, ConfigScope::Project]
+            vec![ConfigScope::Project, ConfigScope::User]
         };
         for scope in scopes {
             if let Ok(target) = target_for_client(client, scope, cwd) {
