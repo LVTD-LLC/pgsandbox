@@ -207,11 +207,13 @@ const isDocs = pathname.startsWith('/docs');
         width: 36px;
         height: 36px;
         border-radius: var(--radius-md);
-        background: var(--primary);
-        color: var(--bg);
-        font-family: var(--font-mono);
-        font-size: 0.82rem;
-        box-shadow: inset 0 -1px 0 oklch(1 0 0 / 0.18);
+        overflow: hidden;
+      }
+
+      .brand-mark img {
+        display: block;
+        width: 100%;
+        height: 100%;
       }
 
       .nav-links {
@@ -441,13 +443,13 @@ const isDocs = pathname.startsWith('/docs');
     <nav class="nav" aria-label="Primary">
       <div class="container nav-inner">
         <a class="brand" href="/" aria-label="PGSandbox MCP home">
-          <span class="brand-mark">pg</span>
+          <span class="brand-mark" aria-hidden="true">
+            <img src="/favicon.svg" alt="" width="36" height="36" />
+          </span>
           <span>PGSandbox MCP</span>
         </a>
         <div class="nav-links">
-          <a class="nav-link" href="/#start">Install</a>
           <a class="nav-link" href="/docs/" aria-current={isDocs ? 'true' : undefined}>Docs</a>
-          <a class="nav-link hide-sm" href="/docs/mcp-tools/">MCP tools</a>
           <a class="button" href="https://github.com/LVTD-LLC/pgsandbox-mcp">View GitHub</a>
         </div>
       </div>
