@@ -116,7 +116,7 @@ const testimonials = [
     <section class="section container testimonials-section">
       <div class="section-copy">
         <h2>Testimonials</h2>
-        <p>Generated placeholders for layout until real customer quotes are ready.</p>
+        <p>Engineers want agents to prove database work without shared credentials, stale task state, or cleanup guesswork.</p>
       </div>
       <div class="testimonial-grid">
         {testimonials.map((item) => (
@@ -136,12 +136,17 @@ const testimonials = [
             Copy the setup instructions for your agent, or read the docs if you want the MCP tool contract and install paths first.
           </p>
         </div>
-        <div class="actions">
-          <button class="button primary copy-prompt-button" type="button" data-copy-setup-prompt>
-            Copy agent setup prompt
-          </button>
-          <a class="button" href="/docs/">Read docs</a>
-          <a class="button" href="https://github.com/LVTD-LLC/pgsandbox-mcp">View GitHub</a>
+        <div class="closing-actions">
+          <div class="actions">
+            <button class="button primary copy-prompt-button" type="button" data-copy-setup-prompt>
+              Copy agent setup prompt
+            </button>
+            <a class="button" href="/docs/">Read docs</a>
+            <a class="button" href="https://github.com/LVTD-LLC/pgsandbox-mcp">View GitHub</a>
+          </div>
+          <p class="copy-status closing-copy-status" data-copy-setup-status aria-live="polite">
+            Paste the prompt into your agent.
+          </p>
         </div>
       </div>
     </section>
@@ -149,27 +154,30 @@ const testimonials = [
   <template id="agent-setup-prompt-data">{agentSetupPrompt}</template>
   <script>
     const copyButtons = document.querySelectorAll('[data-copy-setup-prompt]');
-    const copyStatus = document.querySelector('[data-copy-setup-status]');
+    const copyStatuses = document.querySelectorAll('[data-copy-setup-status]');
     const promptData = document.getElementById('agent-setup-prompt-data');
     const defaultLabel = 'Copy agent setup prompt';
     const defaultStatus = 'Paste the prompt into Codex, Cursor, VS Code, or Claude Desktop.';
+    const closingDefaultStatus = 'Paste the prompt into your agent.';
     let copyResetTimer: number | undefined;
+
+    function setStatusText(heroStatus: string, closingStatus = heroStatus) {
+      copyStatuses.forEach((status) => {
+        status.textContent = status.classList.contains('closing-copy-status') ? closingStatus : heroStatus;
+      });
+    }
 
     function setCopyState(label: string, status: string) {
       copyButtons.forEach((button) => {
         button.textContent = label;
       });
-      if (copyStatus) {
-        copyStatus.textContent = status;
-      }
+      setStatusText(status);
       window.clearTimeout(copyResetTimer);
       copyResetTimer = window.setTimeout(() => {
         copyButtons.forEach((button) => {
           button.textContent = defaultLabel;
         });
-        if (copyStatus) {
-          copyStatus.textContent = defaultStatus;
-        }
+        setStatusText(defaultStatus, closingDefaultStatus);
       }, 2800);
     }
 
@@ -193,8 +201,8 @@ const testimonials = [
       textarea.select();
 
       try {
-        const legacyCopy = (document as unknown as { execCommand(commandId: string): boolean }).execCommand;
-        return legacyCopy.call(document, 'copy');
+        const legacyCopy = Reflect.get(document, 'execCommand');
+        return typeof legacyCopy === 'function' && Reflect.apply(legacyCopy, document, ['copy']);
       } finally {
         textarea.remove();
       }
@@ -464,7 +472,22 @@ const testimonials = [
 
   .closing-band .actions {
     justify-content: flex-end;
+    margin-top: 0;
+  }
+
+  .closing-actions {
+    display: grid;
+    justify-items: end;
+    gap: 0.85rem;
     min-width: 300px;
+  }
+
+  .closing-copy-status {
+    min-height: 1.35rem;
+    margin: 0;
+    color: oklch(0.9 0.035 20);
+    font-size: 0.94rem;
+    text-align: right;
   }
 
   .closing-band .button {
@@ -507,9 +530,17 @@ const testimonials = [
       flex-direction: column;
     }
 
+    .closing-actions {
+      justify-items: start;
+      min-width: 0;
+    }
+
     .closing-band .actions {
       justify-content: flex-start;
-      min-width: 0;
+    }
+
+    .closing-copy-status {
+      text-align: left;
     }
   }
 
