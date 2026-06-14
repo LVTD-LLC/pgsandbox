@@ -1014,8 +1014,19 @@ fn pg_tool_connection_from_url(raw_url: &str) -> anyhow::Result<PgToolConnection
         );
     }
     for (key, value) in parsed.query_pairs() {
-        if key.eq_ignore_ascii_case("sslmode") {
-            env.insert("PGSSLMODE".to_string(), value.into_owned());
+        let pg_env_key = if key.eq_ignore_ascii_case("sslmode") {
+            Some("PGSSLMODE")
+        } else if key.eq_ignore_ascii_case("sslrootcert") {
+            Some("PGSSLROOTCERT")
+        } else if key.eq_ignore_ascii_case("sslcert") {
+            Some("PGSSLCERT")
+        } else if key.eq_ignore_ascii_case("sslkey") {
+            Some("PGSSLKEY")
+        } else {
+            None
+        };
+        if let Some(env_key) = pg_env_key {
+            env.insert(env_key.to_string(), value.into_owned());
         }
     }
 
@@ -2013,6 +2024,31 @@ mod tests {
         assert_eq!(
             connection.env.get("PGSSLMODE").map(String::as_str),
             Some("require")
+        );
+    }
+
+    #[test]
+    fn pg_tool_connection_forwards_tls_certificate_parameters() {
+        let connection = pg_tool_connection_from_url(
+            "postgres://postgres@db.example.com/prod?sslmode=verify-full&sslrootcert=%2Fcerts%2Fca.pem&sslcert=%2Fcerts%2Fclient.pem&sslkey=%2Fcerts%2Fclient.key",
+        )
+        .unwrap();
+
+        assert_eq!(
+            connection.env.get("PGSSLMODE").map(String::as_str),
+            Some("verify-full")
+        );
+        assert_eq!(
+            connection.env.get("PGSSLROOTCERT").map(String::as_str),
+            Some("/certs/ca.pem")
+        );
+        assert_eq!(
+            connection.env.get("PGSSLCERT").map(String::as_str),
+            Some("/certs/client.pem")
+        );
+        assert_eq!(
+            connection.env.get("PGSSLKEY").map(String::as_str),
+            Some("/certs/client.key")
         );
     }
 
