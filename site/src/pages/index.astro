@@ -1,5 +1,6 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+import { agentSetupPrompt } from '../lib/agentSetupPrompt';
 
 const lifecycle = [
   {
@@ -50,9 +51,14 @@ const tools = [
           TTLs, and tracked cleanup. They can prove migrations and SQL against real Postgres without touching shared development state.
         </p>
         <div class="actions" role="group" aria-label="Primary actions">
-          <a class="button primary" href="#start">Install the binary</a>
+          <button class="button primary copy-prompt-button" type="button" data-copy-setup-prompt>
+            Copy setup prompt
+          </button>
           <a class="button subtle" href="/docs/">Read docs</a>
         </div>
+        <p class="copy-status" data-copy-setup-status aria-live="polite">
+          Paste it into Codex, Cursor, VS Code, or Claude Desktop.
+        </p>
         <dl class="client-list" aria-label="Supported MCP clients">
           <div>
             <dt>Clients</dt>
@@ -192,6 +198,45 @@ pgsandbox-mcp doctor</code></pre>
       </div>
     </section>
   </main>
+  <template id="agent-setup-prompt-data">{agentSetupPrompt}</template>
+  <script>
+    const copyButton = document.querySelector('[data-copy-setup-prompt]');
+    const copyStatus = document.querySelector('[data-copy-setup-status]');
+    const promptData = document.getElementById('agent-setup-prompt-data');
+    let copyResetTimer: number | undefined;
+
+    function setCopyState(label: string, status: string) {
+      if (copyButton) {
+        copyButton.textContent = label;
+      }
+      if (copyStatus) {
+        copyStatus.textContent = status;
+      }
+      window.clearTimeout(copyResetTimer);
+      copyResetTimer = window.setTimeout(() => {
+        if (copyButton) {
+          copyButton.textContent = 'Copy setup prompt';
+        }
+        if (copyStatus) {
+          copyStatus.textContent = 'Paste it into Codex, Cursor, VS Code, or Claude Desktop.';
+        }
+      }, 2800);
+    }
+
+    copyButton?.addEventListener('click', async () => {
+      const value = promptData instanceof HTMLTemplateElement ? promptData.content.textContent || '' : '';
+
+      try {
+        if (!navigator.clipboard?.writeText || !value) {
+          throw new Error('copy failed');
+        }
+        await navigator.clipboard.writeText(value);
+        setCopyState('Copied', 'Ready to paste into your AI agent.');
+      } catch {
+        setCopyState('Copy failed', 'Use the install guide prompt instead.');
+      }
+    });
+  </script>
 </BaseLayout>
 
 <style>
@@ -232,6 +277,18 @@ pgsandbox-mcp doctor</code></pre>
     flex-wrap: wrap;
     gap: 0.75rem;
     margin-top: 2rem;
+  }
+
+  .copy-prompt-button {
+    min-width: 11.4rem;
+  }
+
+  .copy-status {
+    min-height: 1.35rem;
+    margin: 0.8rem 0 0;
+    color: var(--muted);
+    font-size: 0.94rem;
+    line-height: 1.45;
   }
 
   .client-list {
