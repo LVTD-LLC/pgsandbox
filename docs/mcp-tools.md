@@ -22,6 +22,44 @@ Returns:
 - `expiresAt`
 - `connectionString`
 
+## `clone_database`
+
+Creates an isolated sandbox database and restores a dump from an existing
+Postgres source into it.
+
+The source database is read with `pg_dump`. The target sandbox is restored with
+`pg_restore` using the generated sandbox role, not the admin role. Ownership
+and privileges are omitted during dump/restore so cloned objects belong to the
+sandbox role where possible.
+
+Inputs:
+
+- `profile`: optional target Postgres profile name
+- `sourceDatabaseUrl`: source Postgres connection string
+- `nameHint`: short human-readable purpose
+- `ttlMinutes`: optional TTL, capped by server config
+- `owner`: optional agent/session identifier
+- `labels`: optional key/value metadata
+- `schemaOnly`: optional boolean to clone schema without table data
+
+Returns:
+
+- `databaseId`
+- `profile`
+- `databaseName`
+- `roleName`
+- `expiresAt`
+- `connectionString`
+- `source`: currently `external`
+- `schemaOnly`
+
+Notes:
+
+- Requires `pg_dump` and `pg_restore` on `PATH` for this tool only.
+- If restore fails, PGSandbox attempts to delete the newly created sandbox.
+- Do not paste production URLs into prompts when a secret input or local
+  environment variable can provide them.
+
 ## `delete_database`
 
 Deletes a database and role created by this MCP.

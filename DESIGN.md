@@ -13,7 +13,8 @@ output, command examples, and any future website or UI branch.
 - Separate npm, npx, Homebrew, and development-from-repo flows.
 - Call out safety constraints directly: admin URL, local/private use, TTLs, and
   cleanup behavior.
-- Avoid promising automatic Postgres installation or hosted infrastructure.
+- Avoid promising automatic Postgres installation or currently available hosted
+  infrastructure before that surface is designed and implemented.
 
 ## CLI Output Style
 
@@ -45,5 +46,10 @@ less concrete.
 
 - The product signal should be Postgres sandboxes for agents, not generic cloud
   infrastructure.
-- Show commands, lifecycle, profiles, and tool tables before abstract diagrams.
+- Show commands, lifecycle, profiles, cloning, and tool tables before abstract
+  diagrams.
 - Use diagrams only when they clarify the lifecycle or backend boundary.
+- If hosted platform work appears in docs or UI, keep it tied to concrete
+  database workflows: create, clone, inspect, share, delete, and audit. Avoid
+  positioning that makes the local product sound like a limited clone of another
+  hosted database service.

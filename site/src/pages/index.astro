@@ -12,6 +12,10 @@ const useCases = [
     body: 'Create a disposable Postgres target, load the failing state, run the repro query, and delete the database after the task.'
   },
   {
+    title: 'Clone realistic state',
+    body: 'Restore an existing Postgres source into a tracked sandbox when migrations or bug repros need production-shaped data.'
+  },
+  {
     title: 'Review generated SQL',
     body: 'Let an agent run bounded queries against real Postgres behavior instead of guessing from ORM code or static types.'
   },

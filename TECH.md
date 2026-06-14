@@ -2,28 +2,25 @@
 
 ## Stack
 
-- Runtime: Node.js, package engine `>=20`; CI uses Node 22.
-- Language: TypeScript with `strict` enabled and ESM via `type: "module"`.
-- Module settings: `NodeNext` module and resolution.
-- MCP: `@modelcontextprotocol/sdk`.
-- Database: `pg` and `pg-cursor`.
-- Validation: `zod`.
-- Tests: Vitest.
-- Packaging: npm package plus bundled release archive for Homebrew.
+- Runtime: Rust native binary.
+- Language: Rust 2021 edition.
+- MCP: `rmcp` stdio server.
+- Database: `tokio-postgres` with `native-tls` for TLS profiles.
+- Validation: Serde input/config structs plus explicit runtime checks.
+- Tests: Cargo unit tests beside source modules.
+- Packaging: GitHub release archives plus Homebrew-oriented packaging scripts.
 
 ## Commands
 
 ```bash
-npm ci
-npm run check
-npm test
-npm run build
+cargo check
+cargo test
+cargo build --release
 ```
 
 Other useful commands:
 
 ```bash
-npm run typecheck
 npm run package:homebrew
 pgsandbox-mcp doctor --admin-url postgres://postgres:postgres@localhost:5432/postgres
 pgsandbox-mcp smoke-test --admin-url postgres://postgres:postgres@localhost:5432/postgres
@@ -46,26 +43,31 @@ the precedence in `README.md` and tests.
 
 ## Core Modules
 
-- `src/index.ts`: CLI dispatch, stdio startup, setup, doctor, and smoke-test.
-- `src/server.ts`: MCP server and registered tool schemas.
-- `src/config.ts`: env/JSON config loading and profile validation.
-- `src/postgres.ts`: lifecycle, metadata, SQL execution, schema inspection, and
+- `rust-src/main.rs`: binary entrypoint.
+- `rust-src/cli.rs`: CLI dispatch, stdio startup, setup, doctor, and smoke-test.
+- `rust-src/mcp.rs`: MCP server and registered tool schemas.
+- `rust-src/config.rs`: env/JSON config loading and profile validation.
+- `rust-src/postgres.rs`: lifecycle, metadata, SQL execution, schema inspection, and
   cleanup.
-- `src/names.ts`: identifier generation and SQL quoting helpers.
-- `src/doctor.ts`: local diagnostics.
-- `src/setup/client-config.ts`: MCP client config target resolution and writers.
-- `src/version.ts`: package version export.
+- `rust-src/names.rs`: identifier generation and SQL quoting helpers.
+- `rust-src/doctor.rs`: local diagnostics.
+- `rust-src/setup.rs`: MCP client config target resolution and writers.
+- `rust-src/lib.rs`: library module exports and package version export.
 
 ## Database Rules
 
 - The admin URL must point to a database where the configured user can create
   databases and roles.
 - Sandbox SQL should run through the generated sandbox role, not the admin role.
+- Cloned database restores should run through the generated sandbox role, not
+  the admin role.
 - Metadata lives in `pgsandbox_databases` on the admin connection database.
 - Deletion and cleanup must find a live metadata row before dropping anything.
 - `cleanup_expired` should remain bounded; it currently selects up to 50 expired
   rows per call.
 - Readonly SQL must stay protected against transaction/session escape hatches.
+- `clone_database` may depend on `pg_dump` and `pg_restore`, but empty sandbox
+  creation must not require local PostgreSQL client tools.
 
 ## Client Config Rules
 
@@ -82,9 +84,9 @@ when changing any config shape.
 
 Use the existing dependencies before adding new ones:
 
-- Use `pg`/`pg-cursor` for Postgres access.
-- Use `zod` for external input and config validation.
-- Use Node standard library APIs for filesystem, paths, crypto, and OS-specific
+- Use `tokio-postgres` for Postgres access.
+- Use Serde-derived config/input structs plus explicit checks for external input.
+- Use Rust standard library APIs for filesystem, paths, crypto, and OS-specific
   locations.
 
 Add dependencies only when they materially simplify maintained behavior.

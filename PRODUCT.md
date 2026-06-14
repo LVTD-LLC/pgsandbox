@@ -16,7 +16,7 @@ isolated disposable one should be faster and safer than skipping verification.
 - Engineers who want agents to validate migrations, SQL, seeds, and backend
   reproduction steps against a real Postgres database.
 - Internal teams experimenting with agent workflows that need temporary
-  database state without a hosted control plane.
+  database state before they are ready to adopt a hosted control plane.
 
 ## Primary Workflows
 
@@ -25,6 +25,11 @@ isolated disposable one should be faster and safer than skipping verification.
 3. Ask an agent to create a disposable database for a task.
 4. Apply schema, seed data, run SQL, inspect the schema, and gather results.
 5. Delete the database explicitly or let TTL cleanup remove it.
+
+The next primary workflow is cloning an existing database into a disposable
+sandbox. The source may be production, staging, or another development
+database, but the destination should still be a scoped PGSandbox-owned database
+with TTL and metadata tracking.
 
 ## What Good Looks Like
 
@@ -42,17 +47,23 @@ isolated disposable one should be faster and safer than skipping verification.
 - Profiles for multiple Postgres hosts or versions.
 - Client config writers for Codex, Cursor, VS Code, and Claude Desktop.
 - Local/private development environments and trusted internal networks.
+- Database cloning into tracked sandboxes, starting with a practical
+  `pg_dump`/`pg_restore` path and leaving room for faster snapshot backends.
 - Release artifacts for npm and Homebrew-style installation.
 
 ## Out Of Scope
 
 - Installing or managing Postgres versions.
-- A hosted public control plane.
 - Production database access.
 - Long-lived application data.
-- Cross-user quota, billing, auth, or tenancy until there is a concrete product
-  requirement.
-- Seeded database cloning until the v0 empty-database lifecycle is solid.
+- A hosted public control plane in the current local-first product. A hosted
+  PGSandbox database platform is a likely future product line, but should be
+  designed deliberately around auth, tenancy, quotas, billing, data isolation,
+  and security review.
+- Direct mutation of production databases. Cloning reads from a source and
+  writes into a disposable sandbox.
+- Long-lived application data in local sandboxes.
+- Cross-user quota, billing, auth, or tenancy in the local-only runtime.
 
 ## Product Constraints
 
@@ -61,12 +72,14 @@ isolated disposable one should be faster and safer than skipping verification.
   `smoke-test` should be enough for a local developer.
 - Do not overfit to one agent client. MCP and the CLI should stay client-neutral
   wherever possible.
-- Advanced backends like DBLab, stagDB, Neon-style branching, or
-  `pg_dump`/`pg_restore` should preserve the current MCP mental model.
+- Hosted databases, advanced backends like DBLab, stagDB, Neon-style branching,
+  or `pg_dump`/`pg_restore` should preserve the current MCP mental model.
 
 ## Outcomes That Matter
 
 - Fewer agent tasks skip database verification.
 - Fewer agent tasks mutate shared or production-like databases.
+- More agent tasks can validate against realistic cloned data without touching
+  the source database.
 - Engineers can inspect and clean up agent-created resources confidently.
 - Adding a new supported MCP client or Postgres profile is mechanical.

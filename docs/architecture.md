@@ -5,6 +5,11 @@
 The first version is a local Rust MCP server in front of one or more reachable Postgres admin connections. It does not require Docker. Docker is only useful as a quick way to run Postgres locally if the developer does not already have it installed.
 For remote Postgres profiles, the configured Postgres URL can require TLS with `sslmode=require`.
 
+This local-first shape is the current deployment boundary, not the permanent
+product ceiling. A future hosted PGSandbox database platform should preserve
+the same agent workflow while adding managed compute, auth, tenancy, quotas,
+billing, and faster clone/fork backends.
+
 ```text
 Agent / MCP client
         |
@@ -41,6 +46,11 @@ Each experiment gets:
 - credentials scoped to that database
 - a TTL
 - optional labels for task, repo, branch, or agent
+
+Cloned experiments follow the same resource model. The source database is read
+through a supplied source connection string or a future source profile, and the
+destination is still a PGSandbox-created database and role recorded in
+metadata.
 
 Generated names should be deterministic enough to audit but random enough to avoid collisions:
 
@@ -82,9 +92,20 @@ Cleanup can run in two ways:
 
 Cleanup should only delete databases listed in the metadata table and matching the configured prefix.
 
-## Future Branching Backend
+## Cloning And Future Branching Backends
 
-If isolated empty databases are useful but slow for seeded application states, evaluate a cloning backend:
+The first cloning backend should favor portability and clarity:
+
+- create an empty sandbox database and scoped role
+- run `pg_dump` against the source database with ownership and privileges omitted
+- stream the dump into `pg_restore` connected as the sandbox role
+- delete the destination sandbox if the clone fails
+
+This requires local PostgreSQL client tools for cloning only. Normal empty
+sandbox creation should continue to work without `pg_dump` or `pg_restore`.
+
+If `pg_dump`/`pg_restore` becomes too slow for large seeded states, evaluate a
+branching backend:
 
 - DBLab Engine
 - stagDB

@@ -19,6 +19,7 @@ Agents need real databases to validate migrations, reproduce backend bugs, test 
 PGSandbox makes the safe path shorter:
 
 - create one database and one scoped login role per task
+- clone an existing Postgres source into a tracked sandbox when realistic data matters
 - record every sandbox in metadata before it can be cleaned up
 - run SQL through the sandbox role, not the admin connection
 - cap TTLs and delete expired resources
@@ -214,6 +215,7 @@ pgsandbox-mcp
 V0 supports:
 
 - `create_database`
+- `clone_database`
 - `delete_database`
 - `get_connection_string`
 - `run_sql`
@@ -231,6 +233,7 @@ The service uses:
 - `rmcp` stdio MCP server
 - Postgres admin connection with permission to create databases and roles
 - metadata table for ownership, TTL, encrypted sandbox credentials, and cleanup state
+- optional `pg_dump` and `pg_restore` on `PATH` for `clone_database`
 - optional Docker Compose only for local demo Postgres
 
 Start with [docker-compose.example.yml](docker-compose.example.yml) only if you do not already have local Postgres running.

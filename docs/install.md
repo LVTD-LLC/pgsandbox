@@ -2,6 +2,10 @@
 
 PGSandbox is distributed as a native Rust binary. It needs a reachable Postgres admin connection that can create databases and roles.
 
+The core create/query/delete workflow does not require PostgreSQL client tools.
+The `clone_database` MCP tool additionally requires `pg_dump` and `pg_restore`
+on `PATH` because it streams a source database dump into a new sandbox.
+
 ## Agent-Assisted Setup
 
 Copy this prompt into your coding agent if you want it to install and configure

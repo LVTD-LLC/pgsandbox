@@ -8,8 +8,8 @@ use serde::Serialize;
 use crate::{
     config::SandboxConfig,
     postgres::{
-        CleanupExpiredInput, CreateDatabaseInput, DatabaseSelector, ListDatabasesInput,
-        PostgresSandboxManager, RunSqlInput,
+        CleanupExpiredInput, CloneDatabaseInput, CreateDatabaseInput, DatabaseSelector,
+        ListDatabasesInput, PostgresSandboxManager, RunSqlInput,
     },
 };
 
@@ -34,6 +34,14 @@ impl PgsandboxServer {
         Parameters(input): Parameters<CreateDatabaseInput>,
     ) -> Result<CallToolResult, ErrorData> {
         tool_json(self.manager.create_database(input).await)
+    }
+
+    #[tool(description = "Clone an existing Postgres database into a new isolated sandbox.")]
+    async fn clone_database(
+        &self,
+        Parameters(input): Parameters<CloneDatabaseInput>,
+    ) -> Result<CallToolResult, ErrorData> {
+        tool_json(self.manager.clone_database(input).await)
     }
 
     #[tool(description = "Delete a sandbox database and role created by PGSandbox.")]

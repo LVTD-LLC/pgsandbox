@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, sync::LazyLock};
+use std::{collections::BTreeMap, process::Stdio, sync::LazyLock};
 
 use aes_gcm::{
     aead::{Aead, AeadCore, OsRng},
@@ -13,6 +13,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
+use tokio::{io::AsyncWriteExt, process::Command};
 use tokio_postgres::{
     types::{FromSql, ToSql, Type},
     Client, NoTls, Row, SimpleQueryMessage,
@@ -53,6 +54,18 @@ pub struct CreateDatabaseInput {
     pub ttl_minutes: Option<u32>,
     pub owner: Option<String>,
     pub labels: Option<BTreeMap<String, Value>>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CloneDatabaseInput {
+    pub profile: Option<String>,
+    pub source_database_url: String,
+    pub name_hint: Option<String>,
+    pub ttl_minutes: Option<u32>,
+    pub owner: Option<String>,
+    pub labels: Option<BTreeMap<String, Value>>,
+    pub schema_only: Option<bool>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -104,6 +117,19 @@ pub struct CreateDatabaseOutput {
     pub role_name: String,
     pub expires_at: DateTime<Utc>,
     pub connection_string: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CloneDatabaseOutput {
+    pub database_id: String,
+    pub profile: String,
+    pub database_name: String,
+    pub role_name: String,
+    pub expires_at: DateTime<Utc>,
+    pub connection_string: String,
+    pub source: String,
+    pub schema_only: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -326,6 +352,68 @@ impl PostgresSandboxManager {
                 &names.role_name,
                 &role_password,
             )?,
+        })
+    }
+
+    pub async fn clone_database(
+        &self,
+        input: CloneDatabaseInput,
+    ) -> anyhow::Result<CloneDatabaseOutput> {
+        let CloneDatabaseInput {
+            profile,
+            source_database_url,
+            name_hint,
+            ttl_minutes,
+            owner,
+            labels,
+            schema_only,
+        } = input;
+        let schema_only = schema_only.unwrap_or(false);
+        let created = self
+            .create_database(CreateDatabaseInput {
+                profile,
+                name_hint,
+                ttl_minutes,
+                owner,
+                labels,
+            })
+            .await?;
+
+        let clone_result = clone_with_pg_tools(
+            &source_database_url,
+            &created.connection_string,
+            schema_only,
+        )
+        .await;
+
+        if let Err(error) = clone_result {
+            let cleanup_result = self
+                .delete_database(DatabaseSelector {
+                    profile: Some(created.profile.clone()),
+                    database_id: Some(created.database_id.clone()),
+                    database_name: None,
+                })
+                .await;
+            match cleanup_result {
+                Ok(_) => {
+                    anyhow::bail!("database clone failed; created sandbox was deleted: {error}")
+                }
+                Err(cleanup_error) => anyhow::bail!(
+                    "database clone failed and cleanup also failed for {}: {error}; cleanup error: {cleanup_error}",
+                    created.database_name
+                ),
+            }
+        }
+
+        Ok(CloneDatabaseOutput {
+            database_id: created.database_id,
+            profile: created.profile,
+            database_name: created.database_name,
+            role_name: created.role_name,
+            expires_at: created.expires_at,
+            connection_string: created.connection_string,
+            source: "external".to_string(),
+            schema_only,
         })
     }
 
@@ -816,6 +904,199 @@ fn build_connection_string(
         .map_err(|_| anyhow::anyhow!("failed to set database password"))?;
     url.set_path(database_name);
     Ok(url.to_string())
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct PgToolConnection {
+    database: String,
+    env: BTreeMap<String, String>,
+}
+
+async fn clone_with_pg_tools(
+    source_database_url: &str,
+    target_database_url: &str,
+    schema_only: bool,
+) -> anyhow::Result<()> {
+    let source = pg_tool_connection_from_url(source_database_url)
+        .context("sourceDatabaseUrl is not a supported Postgres URL")?;
+    let target = pg_tool_connection_from_url(target_database_url)
+        .context("target sandbox connection string is not a supported Postgres URL")?;
+
+    let mut dump_command = Command::new("pg_dump");
+    dump_command
+        .args(pg_dump_args(&source.database, schema_only))
+        .envs(source.env.iter())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .kill_on_drop(true);
+    let mut dump = dump_command.spawn().context(
+        "failed to start pg_dump; install PostgreSQL client tools and ensure pg_dump is on PATH",
+    )?;
+    let dump_stdout = dump
+        .stdout
+        .take()
+        .context("pg_dump stdout pipe was not available")?;
+
+    let mut restore_command = Command::new("pg_restore");
+    restore_command
+        .args(pg_restore_args(&target.database))
+        .envs(target.env.iter())
+        .stdin(Stdio::piped())
+        .stderr(Stdio::piped())
+        .kill_on_drop(true);
+    let mut restore = restore_command.spawn().context(
+        "failed to start pg_restore; install PostgreSQL client tools and ensure pg_restore is on PATH",
+    )?;
+    let restore_stdin = restore
+        .stdin
+        .take()
+        .context("pg_restore stdin pipe was not available")?;
+
+    let copy_task = tokio::spawn(async move {
+        let mut dump_stdout = dump_stdout;
+        let mut restore_stdin = restore_stdin;
+        tokio::io::copy(&mut dump_stdout, &mut restore_stdin).await?;
+        restore_stdin.shutdown().await?;
+        anyhow::Ok(())
+    });
+    let (copy_result, dump_output_result, restore_output_result) = tokio::join!(
+        copy_task,
+        dump.wait_with_output(),
+        restore.wait_with_output()
+    );
+    let dump_output = dump_output_result.context("failed to wait for pg_dump")?;
+    let restore_output = restore_output_result.context("failed to wait for pg_restore")?;
+
+    if !dump_output.status.success() {
+        anyhow::bail!(
+            "pg_dump failed: {}",
+            summarize_tool_stderr(&dump_output.stderr)
+        );
+    }
+    if !restore_output.status.success() {
+        anyhow::bail!(
+            "pg_restore failed: {}",
+            summarize_tool_stderr(&restore_output.stderr)
+        );
+    }
+    copy_result
+        .context("dump/restore pipe task failed")?
+        .context("dump/restore pipe failed")?;
+
+    Ok(())
+}
+
+fn pg_tool_connection_from_url(raw_url: &str) -> anyhow::Result<PgToolConnection> {
+    let parsed = Url::parse(raw_url).context("Postgres URL is invalid")?;
+    if !matches!(parsed.scheme(), "postgres" | "postgresql") {
+        anyhow::bail!("Postgres URL must use postgres:// or postgresql://");
+    }
+
+    let database_path = parsed.path().trim_start_matches('/');
+    if database_path.is_empty() || database_path.contains('/') {
+        anyhow::bail!("Postgres URL must include a single database name path segment");
+    }
+
+    let mut env = BTreeMap::new();
+    if let Some(host) = parsed.host_str() {
+        env.insert("PGHOST".to_string(), host.to_string());
+    }
+    if let Some(port) = parsed.port() {
+        env.insert("PGPORT".to_string(), port.to_string());
+    }
+    if !parsed.username().is_empty() {
+        env.insert(
+            "PGUSER".to_string(),
+            percent_decode_url_component(parsed.username())
+                .context("Postgres username is invalid")?,
+        );
+    }
+    if let Some(password) = parsed.password() {
+        env.insert(
+            "PGPASSWORD".to_string(),
+            percent_decode_url_component(password).context("Postgres password is invalid")?,
+        );
+    }
+    for (key, value) in parsed.query_pairs() {
+        if key.eq_ignore_ascii_case("sslmode") {
+            env.insert("PGSSLMODE".to_string(), value.into_owned());
+        }
+    }
+
+    Ok(PgToolConnection {
+        database: percent_decode_url_component(database_path)
+            .context("Postgres database name is invalid")?,
+        env,
+    })
+}
+
+fn pg_dump_args(database: &str, schema_only: bool) -> Vec<String> {
+    let mut args = vec![
+        "--format=custom".to_string(),
+        "--no-owner".to_string(),
+        "--no-privileges".to_string(),
+    ];
+    if schema_only {
+        args.push("--schema-only".to_string());
+    }
+    args.extend(["--dbname".to_string(), database.to_string()]);
+    args
+}
+
+fn pg_restore_args(database: &str) -> Vec<String> {
+    vec![
+        "--no-owner".to_string(),
+        "--no-privileges".to_string(),
+        "--exit-on-error".to_string(),
+        "--single-transaction".to_string(),
+        "--dbname".to_string(),
+        database.to_string(),
+    ]
+}
+
+fn percent_decode_url_component(value: &str) -> anyhow::Result<String> {
+    let bytes = value.as_bytes();
+    let mut decoded = Vec::with_capacity(bytes.len());
+    let mut index = 0;
+
+    while index < bytes.len() {
+        if bytes[index] == b'%' {
+            if index + 2 >= bytes.len() {
+                anyhow::bail!("incomplete percent escape");
+            }
+            let high = hex_value(bytes[index + 1]).context("invalid percent escape")?;
+            let low = hex_value(bytes[index + 2]).context("invalid percent escape")?;
+            decoded.push((high << 4) | low);
+            index += 3;
+        } else {
+            decoded.push(bytes[index]);
+            index += 1;
+        }
+    }
+
+    String::from_utf8(decoded).context("decoded URL component is not valid UTF-8")
+}
+
+fn hex_value(byte: u8) -> Option<u8> {
+    match byte {
+        b'0'..=b'9' => Some(byte - b'0'),
+        b'a'..=b'f' => Some(byte - b'a' + 10),
+        b'A'..=b'F' => Some(byte - b'A' + 10),
+        _ => None,
+    }
+}
+
+fn summarize_tool_stderr(stderr: &[u8]) -> String {
+    let text = String::from_utf8_lossy(stderr).trim().to_string();
+    if text.is_empty() {
+        return "(no stderr)".to_string();
+    }
+    const MAX_ERROR_LEN: usize = 4_000;
+    if text.len() > MAX_ERROR_LEN {
+        format!("{}...", &text[..MAX_ERROR_LEN])
+    } else {
+        text
+    }
 }
 
 fn clamp_ttl(ttl_minutes: Option<u32>, profile: &SandboxProfile) -> anyhow::Result<u32> {
@@ -1682,6 +1963,75 @@ mod tests {
             unprotect_role_password(&stored, &profile).unwrap(),
             "sandbox-secret"
         );
+    }
+
+    #[test]
+    fn pg_tool_connection_uses_environment_for_credentials() {
+        let connection = pg_tool_connection_from_url(
+            "postgres://clone%2Duser:p%40ss%2Fword@db.example.com:6543/prod%2Dmain?sslmode=require",
+        )
+        .unwrap();
+
+        assert_eq!(connection.database, "prod-main");
+        assert_eq!(
+            connection.env.get("PGHOST").map(String::as_str),
+            Some("db.example.com")
+        );
+        assert_eq!(
+            connection.env.get("PGPORT").map(String::as_str),
+            Some("6543")
+        );
+        assert_eq!(
+            connection.env.get("PGUSER").map(String::as_str),
+            Some("clone-user")
+        );
+        assert_eq!(
+            connection.env.get("PGPASSWORD").map(String::as_str),
+            Some("p@ss/word")
+        );
+        assert_eq!(
+            connection.env.get("PGSSLMODE").map(String::as_str),
+            Some("require")
+        );
+    }
+
+    #[test]
+    fn pg_tool_connection_rejects_urls_without_database_names() {
+        assert!(pg_tool_connection_from_url("postgres://postgres@localhost").is_err());
+        assert!(pg_tool_connection_from_url("https://postgres@localhost/postgres").is_err());
+    }
+
+    #[test]
+    fn clone_dump_and_restore_args_do_not_include_connection_urls() {
+        let source = pg_tool_connection_from_url(
+            "postgres://source:secret@localhost/source_db?sslmode=require",
+        )
+        .unwrap();
+        let target = pg_tool_connection_from_url(
+            "postgres://target:target-secret@localhost/target_db?sslmode=require",
+        )
+        .unwrap();
+
+        let dump_args = pg_dump_args(&source.database, false);
+        let schema_only_dump_args = pg_dump_args(&source.database, true);
+        let restore_args = pg_restore_args(&target.database);
+        let joined_args = dump_args
+            .iter()
+            .chain(schema_only_dump_args.iter())
+            .chain(restore_args.iter())
+            .cloned()
+            .collect::<Vec<_>>()
+            .join(" ");
+
+        assert!(!joined_args.contains("postgres://"));
+        assert!(!joined_args.contains("secret"));
+        assert!(dump_args.contains(&"--format=custom".to_string()));
+        assert!(dump_args.contains(&"--no-owner".to_string()));
+        assert!(dump_args.contains(&"--no-privileges".to_string()));
+        assert!(schema_only_dump_args.contains(&"--schema-only".to_string()));
+        assert!(restore_args.contains(&"--single-transaction".to_string()));
+        assert!(restore_args.contains(&"--exit-on-error".to_string()));
+        assert!(restore_args.contains(&"target_db".to_string()));
     }
 
     #[test]

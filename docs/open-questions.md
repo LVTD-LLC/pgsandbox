@@ -7,4 +7,11 @@
 - Should cleanup be automatic only, explicit only, or both?
 - Do we need per-agent quotas from day one?
 - Which repos would actually benefit from a seeded database template first?
-- Should `fork_database` wait for DBLab/stagDB integration, or should we add a simple `pg_dump`/`pg_restore` implementation first?
+- How should users provide source database credentials for cloning without
+  putting production URLs in prompts or git-tracked files?
+- What sanitization or table-exclusion affordances are needed before cloning
+  production data becomes a common workflow?
+- When should `pg_dump`/`pg_restore` cloning give way to DBLab, stagDB,
+  Neon-style branching, filesystem snapshots, or a hosted PGSandbox backend?
+- What auth, tenancy, quota, billing, and audit model would a hosted PGSandbox
+  database platform need before public launch?
