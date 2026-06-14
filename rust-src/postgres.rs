@@ -967,17 +967,13 @@ async fn clone_with_pg_tools(
     let dump_output = dump_output_result.context("failed to wait for pg_dump")?;
     let restore_output = restore_output_result.context("failed to wait for pg_restore")?;
 
-    if !dump_output.status.success() {
-        anyhow::bail!(
-            "pg_dump failed: {}",
-            summarize_tool_stderr(&dump_output.stderr)
-        );
-    }
-    if !restore_output.status.success() {
-        anyhow::bail!(
-            "pg_restore failed: {}",
-            summarize_tool_stderr(&restore_output.stderr)
-        );
+    if let Some(message) = clone_tool_failure_message(
+        dump_output.status.success(),
+        &dump_output.stderr,
+        restore_output.status.success(),
+        &restore_output.stderr,
+    ) {
+        anyhow::bail!("{message}");
     }
     copy_result
         .context("dump/restore pipe task failed")?
@@ -1093,10 +1089,35 @@ fn summarize_tool_stderr(stderr: &[u8]) -> String {
     }
     const MAX_ERROR_LEN: usize = 4_000;
     if text.len() > MAX_ERROR_LEN {
-        format!("{}...", &text[..MAX_ERROR_LEN])
+        let mut end = MAX_ERROR_LEN;
+        while !text.is_char_boundary(end) {
+            end -= 1;
+        }
+        format!("{}...", &text[..end])
     } else {
         text
     }
+}
+
+fn clone_tool_failure_message(
+    dump_success: bool,
+    dump_stderr: &[u8],
+    restore_success: bool,
+    restore_stderr: &[u8],
+) -> Option<String> {
+    if !restore_success {
+        return Some(format!(
+            "pg_restore failed: {}",
+            summarize_tool_stderr(restore_stderr)
+        ));
+    }
+    if !dump_success {
+        return Some(format!(
+            "pg_dump failed: {}",
+            summarize_tool_stderr(dump_stderr)
+        ));
+    }
+    None
 }
 
 fn clamp_ttl(ttl_minutes: Option<u32>, profile: &SandboxProfile) -> anyhow::Result<u32> {
@@ -2032,6 +2053,30 @@ mod tests {
         assert!(restore_args.contains(&"--single-transaction".to_string()));
         assert!(restore_args.contains(&"--exit-on-error".to_string()));
         assert!(restore_args.contains(&"target_db".to_string()));
+    }
+
+    #[test]
+    fn summarizes_tool_stderr_without_splitting_utf8_characters() {
+        let stderr = format!("{}éproblem", "a".repeat(3_999));
+        let summary = summarize_tool_stderr(stderr.as_bytes());
+
+        assert!(summary.ends_with("..."));
+        assert_eq!(summary.len(), 4_002);
+        assert!(!summary.contains('é'));
+    }
+
+    #[test]
+    fn reports_restore_failure_before_dump_sigpipe_failure() {
+        let message = clone_tool_failure_message(
+            false,
+            b"pg_dump: error: could not write to output pipe",
+            false,
+            b"pg_restore: error: duplicate key value violates unique constraint",
+        )
+        .unwrap();
+
+        assert!(message.starts_with("pg_restore failed:"));
+        assert!(message.contains("duplicate key"));
     }
 
     #[test]
