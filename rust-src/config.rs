@@ -199,9 +199,24 @@ where
         .into_iter()
         .map(|(key, value)| (key.into(), value.into()))
         .collect::<std::collections::HashMap<_, _>>();
-    let mut config = TelemetryConfig::default();
+    let mut config = env
+        .get("PGSANDBOX_CONFIG")
+        .map(|path| telemetry_config_from_file(path).unwrap_or(TelemetryConfig { enabled: false }))
+        .unwrap_or_default();
     apply_telemetry_env_overrides(&mut config, &env);
     config
+}
+
+fn telemetry_config_from_file(path: &str) -> Result<TelemetryConfig, ConfigError> {
+    let raw = fs::read_to_string(path).map_err(|source| ConfigError::ReadFile {
+        path: path.to_string(),
+        source,
+    })?;
+    let value = serde_json::from_str::<serde_json::Value>(&raw)?;
+    let Some(telemetry) = value.get("telemetry") else {
+        return Ok(TelemetryConfig::default());
+    };
+    Ok(serde_json::from_value(telemetry.clone())?)
 }
 
 fn apply_telemetry_env_overrides(
@@ -336,6 +351,46 @@ mod tests {
             ("PGSANDBOX_TELEMETRY", "true"),
             ("PGSANDBOX_NO_TELEMETRY", "1"),
         ]);
+
+        assert!(!config.enabled);
+    }
+
+    #[test]
+    fn standalone_telemetry_loader_respects_config_file_opt_out() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("pgsandbox.config.json");
+        fs::write(
+            &path,
+            r#"{
+              "defaultProfile": "local",
+              "profiles": [{ "name": "local", "adminUrl": "postgres://localhost/postgres" }],
+              "telemetry": { "enabled": false }
+            }"#,
+        )
+        .unwrap();
+
+        let config = telemetry_config_from_env([("PGSANDBOX_CONFIG", path.to_str().unwrap())]);
+
+        assert!(!config.enabled);
+    }
+
+    #[test]
+    fn env_override_can_enable_config_file_telemetry_opt_out() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("pgsandbox.config.json");
+        fs::write(&path, r#"{ "telemetry": { "enabled": false } }"#).unwrap();
+
+        let config = telemetry_config_from_env([
+            ("PGSANDBOX_CONFIG", path.to_str().unwrap()),
+            ("PGSANDBOX_TELEMETRY", "true"),
+        ]);
+
+        assert!(config.enabled);
+    }
+
+    #[test]
+    fn unreadable_config_file_disables_standalone_telemetry() {
+        let config = telemetry_config_from_env([("PGSANDBOX_CONFIG", "/missing/pgsandbox.json")]);
 
         assert!(!config.enabled);
     }
