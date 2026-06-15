@@ -61,6 +61,18 @@ pgsandbox_<slug>_<short_id>
 The admin connection is used only for lifecycle operations. Tool calls that run user SQL connect using the generated sandbox role.
 Sandbox role passwords are encrypted before being persisted in the metadata table; existing plaintext metadata rows remain readable for compatibility.
 
+## Telemetry
+
+The local server sends anonymous PostHog events for CLI command completion,
+MCP server startup, and MCP tool completion. The events are usage-level only:
+tool or command names, version, OS/architecture, success, elapsed time, and
+small booleans or counts such as `dryRun`, `readonly`, and label count.
+
+Telemetry must not include Postgres URLs, connection strings, database names or
+ids, SQL text, owner values, label keys or values, full local paths, or raw
+error messages. Users can disable telemetry with environment variables or with
+`"telemetry": { "enabled": false }` in `PGSANDBOX_CONFIG`.
+
 ## Profiles
 
 Profiles are the mechanism for supporting multiple Postgres versions or hosts without PGSandbox installing Postgres itself.

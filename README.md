@@ -210,6 +210,44 @@ export PGSANDBOX_CONFIG="./pgsandbox.config.json"
 pgsandbox-mcp
 ```
 
+## Telemetry
+
+PGSandbox sends anonymous usage telemetry to PostHog so the project can see
+which CLI commands and MCP tools are used, whether they succeed, and how long
+they take. Telemetry is enabled by default and never blocks the CLI or MCP tool
+result.
+
+Telemetry uses a random local installation id and sends personless PostHog
+events. It does not send Postgres URLs, connection strings, database names or
+ids, SQL text, owner values, label keys or values, full file paths, or error
+messages.
+
+Disable telemetry with any of:
+
+```bash
+export PGSANDBOX_TELEMETRY=false
+export PGSANDBOX_NO_TELEMETRY=1
+export PGSANDBOX_DISABLE_TELEMETRY=1
+export DO_NOT_TRACK=1
+```
+
+When using `PGSANDBOX_CONFIG`, telemetry can also be disabled in JSON:
+
+```json
+{
+  "defaultProfile": "local-pg17",
+  "profiles": [
+    {
+      "name": "local-pg17",
+      "adminUrl": "postgres://postgres:postgres@localhost:5432/postgres"
+    }
+  ],
+  "telemetry": {
+    "enabled": false
+  }
+}
+```
+
 ## MCP Tools
 
 V0 supports:

@@ -34,12 +34,20 @@ Single-profile setup comes from environment variables:
 - `PGSANDBOX_DATABASE_PREFIX`
 - `PGSANDBOX_DEFAULT_TTL_MINUTES`
 - `PGSANDBOX_MAX_TTL_MINUTES`
+- `PGSANDBOX_TELEMETRY`
+- `PGSANDBOX_NO_TELEMETRY`
+- `PGSANDBOX_DISABLE_TELEMETRY`
+- `DO_NOT_TRACK`
 
 Multi-profile setup comes from `PGSANDBOX_CONFIG`, which points at a JSON file
 matching the shape documented in `README.md`.
 
 Do not introduce config sources that silently override these without documenting
 the precedence in `README.md` and tests.
+
+Telemetry is enabled by default. `PGSANDBOX_TELEMETRY=false` disables it, and
+the no-telemetry flags above disable it regardless of `PGSANDBOX_TELEMETRY`.
+JSON config files may also set `"telemetry": { "enabled": false }`.
 
 ## Core Modules
 
@@ -52,6 +60,7 @@ the precedence in `README.md` and tests.
 - `rust-src/names.rs`: identifier generation and SQL quoting helpers.
 - `rust-src/doctor.rs`: local diagnostics.
 - `rust-src/setup.rs`: MCP client config target resolution and writers.
+- `rust-src/telemetry.rs`: anonymous PostHog capture client and payload shaping.
 - `rust-src/lib.rs`: library module exports and package version export.
 
 ## Database Rules
@@ -79,6 +88,13 @@ the precedence in `README.md` and tests.
 
 Upsert behavior must preserve unrelated existing config. Add or update tests
 when changing any config shape.
+
+## Telemetry Rules
+
+- Telemetry must stay anonymous and usage-focused.
+- Do not send Postgres URLs, connection strings, database identifiers, SQL text,
+  owner or label values, full local paths, or raw error messages.
+- Telemetry must never make a CLI command or MCP tool fail.
 
 ## Preferred Libraries
 

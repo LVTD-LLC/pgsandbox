@@ -4,6 +4,7 @@ use rmcp::{
     tool, tool_router, ErrorData, ServiceExt,
 };
 use serde::Serialize;
+use serde_json::{json, Map, Value};
 
 use crate::{
     config::SandboxConfig,
@@ -11,18 +12,45 @@ use crate::{
         CleanupExpiredInput, CloneDatabaseInput, CreateDatabaseInput, DatabaseSelector,
         ListDatabasesInput, PostgresSandboxManager, RunSqlInput,
     },
+    telemetry::{properties, Telemetry, EVENT_MCP_SERVER_STARTED, EVENT_MCP_TOOL_COMPLETED},
 };
 
 #[derive(Clone)]
 pub struct PgsandboxServer {
     manager: PostgresSandboxManager,
+    telemetry: Telemetry,
 }
 
 impl PgsandboxServer {
     pub fn new(config: SandboxConfig) -> Self {
+        let telemetry = Telemetry::new(config.telemetry.clone());
         Self {
             manager: PostgresSandboxManager::new(config),
+            telemetry,
         }
+    }
+
+    async fn tracked_tool<T, Fut>(
+        &self,
+        tool: &'static str,
+        mut event_properties: Map<String, Value>,
+        operation: Fut,
+    ) -> Result<CallToolResult, ErrorData>
+    where
+        T: Serialize,
+        Fut: std::future::Future<Output = anyhow::Result<T>>,
+    {
+        let started = std::time::Instant::now();
+        let result = operation.await;
+        event_properties.insert("tool".to_string(), json!(tool));
+        event_properties.insert("success".to_string(), json!(result.is_ok()));
+        event_properties.insert(
+            "elapsedMs".to_string(),
+            json!(started.elapsed().as_millis()),
+        );
+        self.telemetry
+            .capture_background(EVENT_MCP_TOOL_COMPLETED, event_properties);
+        tool_json(result)
     }
 }
 
@@ -33,7 +61,22 @@ impl PgsandboxServer {
         &self,
         Parameters(input): Parameters<CreateDatabaseInput>,
     ) -> Result<CallToolResult, ErrorData> {
-        tool_json(self.manager.create_database(input).await)
+        let event_properties = properties([
+            ("hasProfile", json!(input.profile.is_some())),
+            ("hasNameHint", json!(input.name_hint.is_some())),
+            ("hasOwner", json!(input.owner.is_some())),
+            ("hasTtlMinutes", json!(input.ttl_minutes.is_some())),
+            (
+                "labelCount",
+                json!(input.labels.as_ref().map_or(0, |labels| labels.len())),
+            ),
+        ]);
+        self.tracked_tool(
+            "create_database",
+            event_properties,
+            self.manager.create_database(input),
+        )
+        .await
     }
 
     #[tool(description = "Clone an existing Postgres database into a new isolated sandbox.")]
@@ -41,7 +84,23 @@ impl PgsandboxServer {
         &self,
         Parameters(input): Parameters<CloneDatabaseInput>,
     ) -> Result<CallToolResult, ErrorData> {
-        tool_json(self.manager.clone_database(input).await)
+        let event_properties = properties([
+            ("hasProfile", json!(input.profile.is_some())),
+            ("hasNameHint", json!(input.name_hint.is_some())),
+            ("hasOwner", json!(input.owner.is_some())),
+            ("hasTtlMinutes", json!(input.ttl_minutes.is_some())),
+            (
+                "labelCount",
+                json!(input.labels.as_ref().map_or(0, |labels| labels.len())),
+            ),
+            ("schemaOnly", json!(input.schema_only.unwrap_or(false))),
+        ]);
+        self.tracked_tool(
+            "clone_database",
+            event_properties,
+            self.manager.clone_database(input),
+        )
+        .await
     }
 
     #[tool(description = "Delete a sandbox database and role created by PGSandbox.")]
@@ -49,7 +108,13 @@ impl PgsandboxServer {
         &self,
         Parameters(input): Parameters<DatabaseSelector>,
     ) -> Result<CallToolResult, ErrorData> {
-        tool_json(self.manager.delete_database(input).await)
+        let event_properties = selector_properties(&input);
+        self.tracked_tool(
+            "delete_database",
+            event_properties,
+            self.manager.delete_database(input),
+        )
+        .await
     }
 
     #[tool(description = "Return the connection string for a sandbox database.")]
@@ -57,7 +122,13 @@ impl PgsandboxServer {
         &self,
         Parameters(input): Parameters<DatabaseSelector>,
     ) -> Result<CallToolResult, ErrorData> {
-        tool_json(self.manager.get_connection_string(input).await)
+        let event_properties = selector_properties(&input);
+        self.tracked_tool(
+            "get_connection_string",
+            event_properties,
+            self.manager.get_connection_string(input),
+        )
+        .await
     }
 
     #[tool(description = "Run SQL against a sandbox database.")]
@@ -65,7 +136,15 @@ impl PgsandboxServer {
         &self,
         Parameters(input): Parameters<RunSqlInput>,
     ) -> Result<CallToolResult, ErrorData> {
-        tool_json(self.manager.run_sql(input).await)
+        let event_properties = properties([
+            ("hasProfile", json!(input.profile.is_some())),
+            ("hasDatabaseId", json!(input.database_id.is_some())),
+            ("hasDatabaseName", json!(input.database_name.is_some())),
+            ("readonly", json!(input.readonly.unwrap_or(false))),
+            ("hasRowLimit", json!(input.row_limit.is_some())),
+        ]);
+        self.tracked_tool("run_sql", event_properties, self.manager.run_sql(input))
+            .await
     }
 
     #[tool(description = "Return schema metadata for a sandbox database.")]
@@ -73,7 +152,13 @@ impl PgsandboxServer {
         &self,
         Parameters(input): Parameters<DatabaseSelector>,
     ) -> Result<CallToolResult, ErrorData> {
-        tool_json(self.manager.describe_schema(input).await)
+        let event_properties = selector_properties(&input);
+        self.tracked_tool(
+            "describe_schema",
+            event_properties,
+            self.manager.describe_schema(input),
+        )
+        .await
     }
 
     #[tool(description = "List sandbox databases known to PGSandbox.")]
@@ -81,7 +166,16 @@ impl PgsandboxServer {
         &self,
         Parameters(input): Parameters<ListDatabasesInput>,
     ) -> Result<CallToolResult, ErrorData> {
-        tool_json(self.manager.list_databases(input).await)
+        let event_properties = properties([
+            ("hasProfile", json!(input.profile.is_some())),
+            ("hasOwnerFilter", json!(input.owner.is_some())),
+        ]);
+        self.tracked_tool(
+            "list_databases",
+            event_properties,
+            self.manager.list_databases(input),
+        )
+        .await
     }
 
     #[tool(description = "Delete expired sandbox databases.")]
@@ -89,16 +183,38 @@ impl PgsandboxServer {
         &self,
         Parameters(input): Parameters<CleanupExpiredInput>,
     ) -> Result<CallToolResult, ErrorData> {
-        tool_json(self.manager.cleanup_expired(input).await)
+        let event_properties = properties([
+            ("hasProfile", json!(input.profile.is_some())),
+            ("dryRun", json!(input.dry_run.unwrap_or(false))),
+        ]);
+        self.tracked_tool(
+            "cleanup_expired",
+            event_properties,
+            self.manager.cleanup_expired(input),
+        )
+        .await
     }
 }
 
 pub async fn serve_stdio(config: SandboxConfig) -> anyhow::Result<()> {
-    let service = PgsandboxServer::new(config)
-        .serve(rmcp::transport::stdio())
-        .await?;
+    let profile_count = config.profiles.len();
+    let server = PgsandboxServer::new(config);
+    let telemetry = server.telemetry.clone();
+    let service = server.serve(rmcp::transport::stdio()).await?;
+    telemetry.capture_background(
+        EVENT_MCP_SERVER_STARTED,
+        properties([("profileCount", json!(profile_count))]),
+    );
     service.waiting().await?;
     Ok(())
+}
+
+fn selector_properties(input: &DatabaseSelector) -> Map<String, Value> {
+    properties([
+        ("hasProfile", json!(input.profile.is_some())),
+        ("hasDatabaseId", json!(input.database_id.is_some())),
+        ("hasDatabaseName", json!(input.database_name.is_some())),
+    ])
 }
 
 fn tool_json<T: Serialize>(result: anyhow::Result<T>) -> Result<CallToolResult, ErrorData> {

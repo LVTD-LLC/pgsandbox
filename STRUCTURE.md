@@ -13,6 +13,7 @@
 |   |-- names.rs                 safe names and SQL quoting
 |   |-- doctor.rs                diagnostics
 |   |-- setup.rs                 MCP client config writers
+|   |-- telemetry.rs             anonymous usage telemetry
 |   `-- lib.rs                   Library exports and package version
 |-- docs/                        Architecture, install, MCP, release docs
 |-- scripts/                     Build, clean, and packaging scripts
@@ -31,6 +32,7 @@
 - Keep database lifecycle and SQL behavior in `rust-src/postgres.rs`.
 - Keep identifier normalization and SQL quoting in `rust-src/names.rs`.
 - Keep client-specific config file formats in `rust-src/setup.rs`.
+- Keep anonymous analytics payload construction in `rust-src/telemetry.rs`.
 - Keep docs in `docs/` unless the content is essential to the first README scan.
 
 ## Placement Rules

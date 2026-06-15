@@ -11,6 +11,7 @@ use crate::{
         build_launch_config, config_snippet, parse_client, parse_scope, resolve_targets,
         write_client_config,
     },
+    telemetry::{properties, Telemetry},
     VERSION,
 };
 
@@ -55,6 +56,8 @@ async fn start_server() -> anyhow::Result<()> {
 }
 
 async fn setup(args: &[String]) -> anyhow::Result<u8> {
+    let started = std::time::Instant::now();
+    let telemetry = Telemetry::new(crate::config::load_telemetry_config());
     let options = parse_options(args)?;
     let client = parse_client(options.get("client").map(String::as_str).unwrap_or("codex"))?;
     let scope = parse_scope(options.get("scope").map(String::as_str).unwrap_or("user"))?;
@@ -87,20 +90,58 @@ async fn setup(args: &[String]) -> anyhow::Result<u8> {
     }
 
     println!("Next: restart the MCP client, then run `pgsandbox-mcp doctor`.");
+    telemetry
+        .capture(
+            crate::telemetry::EVENT_CLI_COMMAND_COMPLETED,
+            properties([
+                ("command", serde_json::json!("setup")),
+                ("client", serde_json::json!(client_selector_name(client))),
+                ("scope", serde_json::json!(scope.to_string())),
+                ("dryRun", serde_json::json!(dry_run)),
+                ("hasAdminUrl", serde_json::json!(admin_url.is_some())),
+                ("success", serde_json::json!(true)),
+                (
+                    "elapsedMs",
+                    serde_json::json!(started.elapsed().as_millis()),
+                ),
+            ]),
+        )
+        .await;
     Ok(0)
 }
 
 async fn doctor(args: &[String]) -> anyhow::Result<u8> {
+    let started = std::time::Instant::now();
+    let telemetry = Telemetry::new(crate::config::load_telemetry_config());
     let options = parse_options(args)?;
     let cwd = std::env::current_dir()?;
     let result = run_doctor(options.get("admin-url").map(String::as_str), &cwd).await;
     for line in result.lines {
         println!("{line}");
     }
-    Ok(if result.ok { 0 } else { 1 })
+    let code = if result.ok { 0 } else { 1 };
+    telemetry
+        .capture(
+            crate::telemetry::EVENT_CLI_COMMAND_COMPLETED,
+            properties([
+                ("command", serde_json::json!("doctor")),
+                (
+                    "hasAdminUrl",
+                    serde_json::json!(options.contains_key("admin-url")),
+                ),
+                ("success", serde_json::json!(result.ok)),
+                (
+                    "elapsedMs",
+                    serde_json::json!(started.elapsed().as_millis()),
+                ),
+            ]),
+        )
+        .await;
+    Ok(code)
 }
 
 async fn smoke_test(args: &[String]) -> anyhow::Result<u8> {
+    let started = std::time::Instant::now();
     let options = parse_options(args)?;
     let env = if let Some(admin_url) = options.get("admin-url") {
         let mut env = std::env::vars().collect::<Vec<_>>();
@@ -116,6 +157,7 @@ async fn smoke_test(args: &[String]) -> anyhow::Result<u8> {
         Some(env) => load_config_from_env(env)?,
         None => load_config()?,
     };
+    let telemetry = Telemetry::new(config.telemetry.clone());
     let manager = PostgresSandboxManager::new(config);
     let mut database_id = None;
 
@@ -357,6 +399,24 @@ async fn smoke_test(args: &[String]) -> anyhow::Result<u8> {
             .await;
     }
 
+    let success = result.is_ok();
+    telemetry
+        .capture(
+            crate::telemetry::EVENT_CLI_COMMAND_COMPLETED,
+            properties([
+                ("command", serde_json::json!("smoke-test")),
+                (
+                    "hasAdminUrl",
+                    serde_json::json!(options.contains_key("admin-url")),
+                ),
+                ("success", serde_json::json!(success)),
+                (
+                    "elapsedMs",
+                    serde_json::json!(started.elapsed().as_millis()),
+                ),
+            ]),
+        )
+        .await;
     result?;
     Ok(0)
 }
@@ -410,6 +470,16 @@ fn next_value<'a>(args: &'a [String], index: usize, flag: &str) -> anyhow::Resul
 fn has_help_flag(args: &[String]) -> bool {
     args.iter()
         .any(|arg| matches!(arg.as_str(), "--help" | "-h" | "help"))
+}
+
+fn client_selector_name(client: crate::setup::ClientSelector) -> &'static str {
+    match client {
+        crate::setup::ClientSelector::Codex => "codex",
+        crate::setup::ClientSelector::ClaudeDesktop => "claude-desktop",
+        crate::setup::ClientSelector::Cursor => "cursor",
+        crate::setup::ClientSelector::Vscode => "vscode",
+        crate::setup::ClientSelector::All => "all",
+    }
 }
 
 fn print_help() {
