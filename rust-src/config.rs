@@ -227,11 +227,11 @@ fn apply_telemetry_env_overrides(
     config: &mut TelemetryConfig,
     env: &std::collections::HashMap<String, String>,
 ) {
-    if let Some(enabled) = env
+    if let Some(false) = env
         .get("PGSANDBOX_TELEMETRY")
         .and_then(|value| parse_bool_flag(value))
     {
-        config.enabled = enabled;
+        config.enabled = false;
     }
 
     if [
@@ -379,7 +379,7 @@ mod tests {
     }
 
     #[test]
-    fn env_override_can_enable_config_file_telemetry_opt_out() {
+    fn telemetry_true_does_not_override_config_file_opt_out() {
         let directory = tempfile::tempdir().unwrap();
         let path = directory.path().join("pgsandbox.config.json");
         fs::write(&path, r#"{ "telemetry": { "enabled": false } }"#).unwrap();
@@ -389,7 +389,7 @@ mod tests {
             ("PGSANDBOX_TELEMETRY", "true"),
         ]);
 
-        assert!(config.enabled);
+        assert!(!config.enabled);
     }
 
     #[test]
