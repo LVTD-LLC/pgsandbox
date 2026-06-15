@@ -8,12 +8,18 @@ pgsandbox-mcp setup \
   --admin-url postgres://postgres:postgres@localhost:5432/postgres</code></pre><p>This uses the <a href="https://github.com/LVTD-LLC/homebrew-tap">LVTD-LLC/homebrew-tap</a> repository, which Homebrew addresses as <code>LVTD-LLC/tap</code>.</p><h2>From source</h2><pre class="shell"><code>cargo install --path .
 pgsandbox-mcp setup \
   --client codex \
-  --admin-url postgres://postgres:postgres@localhost:5432/postgres</code></pre><h2>Update</h2><p>The installed CLI binary is the MCP server process that clients launch. Updating the CLI and restarting the MCP client updates the server. Rerun <code>setup</code> when the binary path, admin URL, selected client, or scope changes.</p><h3>Homebrew</h3><pre class="shell"><code>brew update
+  --admin-url postgres://postgres:postgres@localhost:5432/postgres</code></pre><h2>Update</h2><p>The installed CLI binary is the MCP server process that clients launch. Updating the CLI and restarting the MCP client updates the server. Rerun <code>setup</code> when the binary path, admin URL, selected client, or scope changes.</p><p>Homebrew can only upgrade after a newer GitHub release exists and the <code>LVTD-LLC/homebrew-tap</code> formula has been updated. If <code>brew upgrade LVTD-LLC/tap/pgsandbox-mcp</code> says the current version is already installed, the tap does not have a newer version yet.</p><h3>Homebrew</h3><pre class="shell"><code>brew update
 brew upgrade LVTD-LLC/tap/pgsandbox-mcp
 pgsandbox-mcp --version
 pgsandbox-mcp setup --client codex \
   --admin-url "$PGSANDBOX_ADMIN_DATABASE_URL"
-pgsandbox-mcp doctor</code></pre><h3>GitHub install script</h3><pre class="shell"><code>curl -fsSL https://raw.githubusercontent.com/LVTD-LLC/pgsandbox-mcp/main/scripts/install.sh | sh
+pgsandbox-mcp doctor</code></pre><p>If <code>pgsandbox-mcp --version</code> prints a Node.js stack trace or references <code>dist/index.js</code>, another install is shadowing the Homebrew binary.</p><pre class="shell"><code>which -a pgsandbox-mcp
+/opt/homebrew/bin/pgsandbox-mcp --version
+npm uninstall -g pgsandbox-mcp
+hash -r 2&gt;/dev/null || rehash
+pgsandbox-mcp setup --client codex \
+  --command /opt/homebrew/bin/pgsandbox-mcp \
+  --admin-url "$PGSANDBOX_ADMIN_DATABASE_URL"</code></pre><h3>GitHub install script</h3><pre class="shell"><code>curl -fsSL https://raw.githubusercontent.com/LVTD-LLC/pgsandbox-mcp/main/scripts/install.sh | sh
 pgsandbox-mcp --version
 pgsandbox-mcp setup --client codex \
   --admin-url "$PGSANDBOX_ADMIN_DATABASE_URL"
@@ -22,7 +28,7 @@ pgsandbox-mcp setup --client codex \
   --command /usr/local/bin/pgsandbox-mcp \
   --admin-url "$PGSANDBOX_ADMIN_DATABASE_URL"</code></pre><h3>Source install</h3><pre class="shell"><code>cargo install --path . --force
 # or, from GitHub:
-cargo install --git https://github.com/LVTD-LLC/pgsandbox-mcp --tag v&lt;VERSION&gt; --force</code></pre><p>Replace <code>v&lt;VERSION&gt;</code> with the release tag you want to install.</p><p>Rerunning <code>setup</code> updates the existing local MCP config entry and preserves unrelated MCP servers. Restart the MCP client after updating; in Codex, run <code>/mcp</code> after restart to verify the <code>pgsandbox</code> server is available.</p><h2>Supported clients</h2><pre class="shell"><code>pgsandbox-mcp setup --client codex \
+cargo install --git https://github.com/LVTD-LLC/pgsandbox-mcp --tag v&lt;VERSION&gt; --force</code></pre><p>Replace <code>v&lt;VERSION&gt;</code> with the release tag you want to install.</p><p>Rerunning <code>setup</code> updates the existing local MCP config entry and preserves unrelated MCP servers. Restart the MCP client after updating; in Codex, run <code>/mcp</code> after restart to verify the <code>pgsandbox</code> server is available.</p><p>Maintainers publishing a new version should bump the package version, publish a GitHub release with the generated archives, wait for the <code>Update Homebrew tap</code> workflow to open a PR in <code>LVTD-LLC/homebrew-tap</code>, and merge that tap PR before telling Homebrew users to run <code>brew upgrade</code>.</p><h2>Supported clients</h2><pre class="shell"><code>pgsandbox-mcp setup --client codex \
   --admin-url "$PGSANDBOX_ADMIN_DATABASE_URL"
 pgsandbox-mcp setup --client cursor --scope project \
   --admin-url "$PGSANDBOX_ADMIN_DATABASE_URL"

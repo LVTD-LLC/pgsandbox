@@ -134,7 +134,7 @@ pgsandbox-mcp doctor
 
 The installer downloads a platform-specific release archive, verifies the
 checksum when the release includes `pgsandbox-mcp-<version>-checksums.txt`, and
-installs to `~/.local/bin` by default. Use `PGSANDBOX_VERSION=0.1.0` to pin a
+installs to `~/.local/bin` by default. Use `PGSANDBOX_VERSION=0.1.1` to pin a
 release or `PGSANDBOX_INSTALL_DIR=/usr/local/bin` to choose a different install
 directory.
 
@@ -149,7 +149,7 @@ cargo run -- smoke-test --admin-url postgres://postgres:postgres@localhost:5432/
 Rust users can also install directly from GitHub:
 
 ```bash
-cargo install --git https://github.com/LVTD-LLC/pgsandbox-mcp --tag v0.1.0
+cargo install --git https://github.com/LVTD-LLC/pgsandbox-mcp --tag v0.1.1
 ```
 
 ## Update
@@ -157,6 +157,11 @@ cargo install --git https://github.com/LVTD-LLC/pgsandbox-mcp --tag v0.1.0
 The CLI binary is also the MCP server process. To update both, update the
 installed `pgsandbox-mcp` binary, refresh the MCP client entry if the command,
 admin URL, or target client changed, then restart the MCP client.
+
+Homebrew can only upgrade after a newer GitHub release exists and the
+`LVTD-LLC/homebrew-tap` formula has been updated. If `brew upgrade
+LVTD-LLC/tap/pgsandbox-mcp` says the current version is already installed, the
+tap does not have a newer version yet.
 
 With Homebrew:
 
@@ -166,6 +171,24 @@ brew upgrade LVTD-LLC/tap/pgsandbox-mcp
 pgsandbox-mcp --version
 pgsandbox-mcp setup --client codex --admin-url "$PGSANDBOX_ADMIN_DATABASE_URL"
 pgsandbox-mcp doctor
+```
+
+If `pgsandbox-mcp --version` prints a Node.js stack trace or references
+`dist/index.js`, another install is shadowing the Homebrew binary. Check the
+resolution order:
+
+```bash
+which -a pgsandbox-mcp
+/opt/homebrew/bin/pgsandbox-mcp --version
+```
+
+Remove the stale npm/global install or point the MCP client at the native
+binary explicitly:
+
+```bash
+npm uninstall -g pgsandbox-mcp
+hash -r 2>/dev/null || rehash
+pgsandbox-mcp setup --client codex --command /opt/homebrew/bin/pgsandbox-mcp --admin-url "$PGSANDBOX_ADMIN_DATABASE_URL"
 ```
 
 With the GitHub install script:
@@ -197,6 +220,11 @@ Replace `v<VERSION>` with the release tag you want to install.
 Rerunning `setup` updates the local MCP client config in place and preserves
 unrelated MCP servers. Restart the MCP client after updating; in Codex, run
 `/mcp` after restart to verify the `pgsandbox` server is available.
+
+For maintainers publishing a new version: bump the package version, publish a
+GitHub release with the generated archives, wait for the `Update Homebrew tap`
+workflow to open a PR in `LVTD-LLC/homebrew-tap`, and merge that tap PR before
+telling Homebrew users to run `brew upgrade`.
 
 ## MCP Client Setup
 

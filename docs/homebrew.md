@@ -25,7 +25,7 @@ Place this in [LVTD-LLC/homebrew-tap](https://github.com/LVTD-LLC/homebrew-tap) 
 class PgsandboxMcp < Formula
   desc "MCP server for disposable Postgres experimentation databases"
   homepage "https://github.com/LVTD-LLC/pgsandbox-mcp"
-  url "https://github.com/LVTD-LLC/pgsandbox-mcp/releases/download/v0.1.0/pgsandbox-mcp-0.1.0.tar.gz"
+  url "https://github.com/LVTD-LLC/pgsandbox-mcp/releases/download/v0.1.1/pgsandbox-mcp-0.1.1.tar.gz"
   sha256 "REPLACE_WITH_RELEASE_TARBALL_SHA256"
   license "MIT"
 
@@ -56,6 +56,10 @@ the archives from `dist/` before publishing the GitHub release.
 The published release starts the `Update Homebrew tap` workflow, which opens a
 PR in `LVTD-LLC/homebrew-tap` updating `Formula/pgsandbox-mcp.rb` to the
 versioned release URL and computed SHA256.
+
+Homebrew users cannot receive a new version until that tap PR is merged. If
+`brew upgrade LVTD-LLC/tap/pgsandbox-mcp` reports that the installed version is
+already current, the tap formula still points at that version.
 
 The workflow requires a `HOMEBREW_TAP_PAT` repository secret in
 `LVTD-LLC/pgsandbox-mcp`. Use a fine-grained token with `Contents: Read and
