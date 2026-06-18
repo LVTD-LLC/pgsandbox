@@ -11,6 +11,7 @@
     "test": "cargo test",
     "typecheck": "cargo check",
     "start": "cargo run --",
+    "site:check-changelog": "node scripts/check-site-changelog.mjs",
     "site:build": "npm --prefix site run build"
   },
   "keywords": [

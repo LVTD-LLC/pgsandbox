@@ -5,7 +5,9 @@ on:
     branches:
       - main
     paths:
+      - 'CHANGELOG.md'
       - 'site/**'
+      - 'scripts/check-site-changelog.mjs'
       - '.github/workflows/deploy-site.yml'
   workflow_dispatch:
 
@@ -22,6 +24,8 @@ jobs:
       - name: Install site dependencies
         working-directory: site
         run: npm ci --include=dev
+      - name: Check site changelog fallback
+        run: node scripts/check-site-changelog.mjs
       - name: Build site
         working-directory: site
         run: npm run build
