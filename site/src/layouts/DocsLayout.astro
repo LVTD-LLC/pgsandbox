@@ -35,7 +35,7 @@ const links = [
 
   .docs-nav {
     position: sticky;
-    top: 5.75rem;
+    top: calc(5.75rem + env(safe-area-inset-top));
     display: grid;
     min-width: 0;
     gap: 0.2rem;
