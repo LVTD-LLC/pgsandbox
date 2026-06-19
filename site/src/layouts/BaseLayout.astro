@@ -5,7 +5,9 @@ const {
 } = Astro.props;
 
 const pathname = Astro.url.pathname;
+const isHome = pathname === '/';
 const isDocs = pathname.startsWith('/docs');
+const docsCurrent = isDocs ? (pathname === '/docs/' ? 'page' : 'location') : undefined;
 ---
 <!doctype html>
 <html lang="en">
@@ -212,6 +214,11 @@ const isDocs = pathname.startsWith('/docs');
         min-height: var(--target-min);
         color: var(--ink);
         font-weight: 800;
+      }
+
+      .brand:hover,
+      .brand[aria-current] {
+        color: var(--primary);
       }
 
       .brand-mark {
@@ -465,14 +472,14 @@ const isDocs = pathname.startsWith('/docs');
     <a class="skip-link" href="#content">Skip to content</a>
     <nav class="nav" aria-label="Primary">
       <div class="container nav-inner">
-        <a class="brand" href="/" aria-label="PGSandbox MCP home">
+        <a class="brand" href="/" aria-label="PGSandbox MCP home" aria-current={isHome ? 'page' : undefined}>
           <span class="brand-mark" aria-hidden="true">
             <img src="/favicon.svg" alt="" width="36" height="36" />
           </span>
           <span>PGSandbox MCP</span>
         </a>
         <div class="nav-links">
-          <a class="nav-link" href="/docs/" aria-current={isDocs ? 'page' : undefined}>Docs</a>
+          <a class="nav-link" href="/docs/" aria-current={docsCurrent}>Docs</a>
           <a class="button" href="https://github.com/LVTD-LLC/pgsandbox-mcp">View GitHub</a>
         </div>
       </div>
