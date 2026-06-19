@@ -1,6 +1,7 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 
 type ChangelogDay = {
   date: string;
@@ -95,7 +96,30 @@ function parseInline(value: string) {
   return segments;
 }
 
-const changelog = await readFile(new URL('../../../CHANGELOG.md', import.meta.url), 'utf8');
+function isMissingFileError(error: unknown) {
+  return (error as { code?: string }).code === 'ENOENT';
+}
+
+async function readChangelog() {
+  const candidates = [
+    resolve(process.cwd(), '..', 'CHANGELOG.md'),
+    resolve(process.cwd(), 'CHANGELOG.md')
+  ];
+
+  for (const candidate of candidates) {
+    try {
+      return await readFile(candidate, 'utf8');
+    } catch (error) {
+      if (!isMissingFileError(error)) {
+        throw error;
+      }
+    }
+  }
+
+  throw new Error('Could not find CHANGELOG.md in the repo root or site build context.');
+}
+
+const changelog = await readChangelog();
 const days = parseChangelog(changelog);
 
 if (days.length === 0) {
