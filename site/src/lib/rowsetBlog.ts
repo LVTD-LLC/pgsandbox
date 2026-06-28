@@ -86,6 +86,19 @@ function comparePosts(a: BlogPost, b: BlogPost): number {
   return a.sortOrder - b.sortOrder;
 }
 
+function uniquePostsBySlug(posts: BlogPost[]): BlogPost[] {
+  const seen = new Set<string>();
+
+  return posts.filter((post) => {
+    if (seen.has(post.slug)) {
+      return false;
+    }
+
+    seen.add(post.slug);
+    return true;
+  });
+}
+
 async function rowToPost(row: RowsetRow): Promise<BlogPost | null> {
   const slug = value(row, 'slug') || row.index_value;
   const title = value(row, 'title');
@@ -142,7 +155,7 @@ export async function getPublishedBlogPosts(): Promise<BlogPost[]> {
   const payload = (await response.json()) as RowsetRowsResponse;
   const posts = await Promise.all((payload.rows || []).map(rowToPost));
 
-  return posts.filter((post): post is BlogPost => post !== null).sort(comparePosts);
+  return uniquePostsBySlug(posts.filter((post): post is BlogPost => post !== null).sort(comparePosts));
 }
 
 export async function getPublishedBlogPost(slug: string): Promise<BlogPost | undefined> {
