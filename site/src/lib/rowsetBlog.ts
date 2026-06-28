@@ -2,7 +2,7 @@ import { createMarkdownProcessor } from '@astrojs/markdown-remark';
 
 const DEFAULT_ROWSET_API_BASE = 'https://rowset.lvtd.dev/api';
 const DEFAULT_BLOG_DATASET_KEY = '1e629b1a-89e5-4c56-8772-5c6ae5784753';
-const BLOG_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const BLOG_SLUG_PATTERN = /^(?=.{1,120}$)[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 type RowsetRowsResponse = {
   rows?: RowsetRow[];
