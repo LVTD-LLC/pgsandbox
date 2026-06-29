@@ -185,7 +185,7 @@ Cleanup is only safe when the server knows what it owns.
 
 A generic `DROP DATABASE` tool is too broad. A cleanup tool should delete only databases created by the workflow, preferably with metadata that records the profile, owner, task, creation time, expiry, and resource name. That makes cleanup auditable and prevents the server from guessing based on a name prefix alone.
 
-PGSandbox MCP's model is intentionally narrow: create tracked sandboxes, list tracked sandboxes, delete tracked sandboxes, and clean up expired tracked sandboxes. The destructive operation is scoped to resources PGSandbox created for the selected profile. The earlier PGSandbox post on [disposable Postgres databases for AI agent workflows](https://pgsandbox-mcp.lvtd.dev/blog/disposable-postgres-for-ai-agents/) covers the basic workflow this checklist builds on.
+PGSandbox MCP's model is intentionally narrow: create tracked sandboxes, list tracked sandboxes, delete tracked sandboxes, and clean up expired tracked sandboxes. The destructive operation is scoped to resources PGSandbox created for the selected profile.
 
 That pattern is worth copying even if you do not use PGSandbox. Before adding a destructive tool to a Postgres MCP server, ask:
 

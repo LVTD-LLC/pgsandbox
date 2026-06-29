@@ -89,5 +89,6 @@ PGSandbox Team
 ## Existing Content
 
 - Homepage: "Disposable Postgres for coding agents."
-- Published blog post: "Disposable Postgres Databases for AI Agent Workflows"
+- Published blog post: "Postgres MCP Server Safety Checklist for Coding Agents"
+- Published blog post: "Database Branching vs Disposable Postgres Sandboxes"
 - Docs: install/setup, MCP tool contract, architecture, Homebrew packaging.

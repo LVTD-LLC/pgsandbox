@@ -22,8 +22,8 @@
 | URL | Title / Target | Anchor Variants | Notes |
 | --- | --- | --- | --- |
 | /blog/ | Blog index | PGSandbox blog; database agent workflow posts; safe Postgres agent workflows | Blog hub. |
-| /blog/disposable-postgres-for-ai-agents/ | Disposable Postgres Databases for AI Agent Workflows | disposable Postgres databases; AI agent database workflows; isolated Postgres databases for agents | Existing published Rowset post; exclude duplicate topic. |
 | /blog/postgres-mcp-server-safety-checklist/ | Postgres MCP Server Safety Checklist for Coding Agents | Postgres MCP server safety checklist; safe Postgres MCP server; MCP database safety checklist; database access checklist for coding agents | Rowset row 1578; status `published`. |
+| /blog/database-branching-vs-postgres-sandboxes/ | Database Branching vs Disposable Postgres Sandboxes | database branching; database branching vs sandboxes; disposable Postgres sandboxes; agent database sandboxes | Rowset status `published`; comparison page for environment branches vs task sandboxes. |
 
 ## Changelog
 

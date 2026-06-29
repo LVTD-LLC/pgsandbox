@@ -4,8 +4,14 @@
 
 | Date | Type | Title | Slug | Target Keyword | Primary Internal Links | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| 2026-06-28 | Blog post | Disposable Postgres Databases for AI Agent Workflows | disposable-postgres-for-ai-agents | disposable Postgres databases for AI agents | /, /docs/mcp-tools/, /docs/architecture/ | Existing Rowset post; do not duplicate. |
-| 2026-06-29 | Guide / checklist | Postgres MCP Server Safety Checklist for Coding Agents | postgres-mcp-server-safety-checklist | postgres mcp server | /, /docs/mcp-tools/, /docs/architecture/, /blog/disposable-postgres-for-ai-agents/ | Rowset row 1578, status `published`. |
+| 2026-06-29 | Guide / checklist | Postgres MCP Server Safety Checklist for Coding Agents | postgres-mcp-server-safety-checklist | postgres mcp server | /, /docs/mcp-tools/, /docs/architecture/ | Rowset row 1578, status `published`. |
+| 2026-06-29 | Comparison | Database Branching vs Disposable Postgres Sandboxes | database-branching-vs-postgres-sandboxes | database branching | /, /docs/mcp-tools/, /docs/architecture/, /docs/install/, /blog/postgres-mcp-server-safety-checklist/ | Rowset row 1586, status `published`; compares environment-oriented branching with task-oriented sandboxes for agent workflows. |
+
+## Removed
+
+| Date | Title | Slug | Reason |
+| --- | --- | --- | --- |
+| 2026-06-29 | Disposable Postgres Databases for AI Agent Workflows | disposable-postgres-for-ai-agents | Rowset row removed by request. Do not link to this URL unless the post is restored. |
 
 ## Candidate Backlog
 
@@ -13,7 +19,6 @@ Last researched: 2026-06-29
 
 | Rank | Score | Proposed Type | Title | Target Keyword | Volume | KD | Intent | SERP Read | Why It Fits |
 | --- | ---: | --- | --- | --- | ---: | ---: | --- | --- | --- |
-| 2 | 21 | Comparison | Database Branching vs Disposable Postgres Sandboxes for Agent Workflows | database branching | 210 | 9 | Informational | SERP is dominated by database branching explainers and vendor pages from Xata, Supabase, Neon, SingleStore, PlanetScale, DoltHub, and Redgate. | Captures a growing category and gives PGSandbox a clear mental-model page against hosted branching tools. Strong information gain: when agents need disposable local proof rather than long-lived branch environments. |
 | 3 | 20 | How-to / tutorial | How to Clone a Postgres Database Into a Safe Disposable Sandbox | postgres clone database | 110 | 3 | Informational | SERP includes Stack Overflow, DBA StackExchange, Atlassian, pgcopydb, and practical pg_dump/pg_restore guides. | Very winnable and aligned with the next major product capability. Can use the repo's clone flow as first-hand implementation detail. |
 | 4 | 18 | Definition / guide | What Is a Database Sandbox? | database sandbox | 90 | 15 | Informational | Results skew broad and mixed across vendor docs, online sandboxes, and educational material. | Good category-creation page, but slightly less direct than Postgres/MCP queries and broader intent may dilute conversion. |
 | 5 | 16 | Tutorial | How to Create a Test Postgres Database for Agent-Generated SQL | postgres test database | 20 | 2 | Informational | Low-volume long-tail with practical developer intent. | Very winnable, but lower ceiling. Good future support piece for migration validation. |
