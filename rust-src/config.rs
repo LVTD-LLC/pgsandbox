@@ -276,6 +276,10 @@ fn validate_admin_url_policy(profile: &SandboxProfile) -> Result<(), ConfigError
         .map(|host| host.trim_matches(['[', ']']).to_ascii_lowercase())
         .collect::<Vec<_>>();
 
+    if host.is_none() {
+        return Ok(());
+    }
+
     if !normalized_allowed_hosts.is_empty() {
         let host_for_error = host.clone().unwrap_or_else(|| "(none)".to_string());
         let host_allowed = host.as_deref().is_some_and(|host| {
@@ -552,6 +556,23 @@ mod tests {
         .unwrap_err();
 
         assert!(err.to_string().contains("allowedAdminHosts"));
+    }
+
+    #[test]
+    fn allowed_admin_hosts_do_not_block_hostless_local_urls() {
+        let config = parse_config_file(
+            r#"{
+              "defaultProfile": "local-socket",
+              "profiles": [{
+                "name": "local-socket",
+                "adminUrl": "postgres:///postgres",
+                "allowedAdminHosts": ["db.example.com"]
+              }]
+            }"#,
+        )
+        .unwrap();
+
+        assert_eq!(config.profiles[0].admin_url, "postgres:///postgres");
     }
 
     #[test]

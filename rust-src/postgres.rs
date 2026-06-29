@@ -598,7 +598,7 @@ impl PostgresSandboxManager {
                 &[&record.database_id],
             )
             .await?;
-        record_audit_event(
+        let _ = record_audit_event(
             &client,
             "delete_database",
             &profile.name,
@@ -607,7 +607,7 @@ impl PostgresSandboxManager {
             Some(&record.role_name),
             json!({ "deleted": true }),
         )
-        .await?;
+        .await;
 
         drop(client);
         let _ = connection_task.await;
@@ -808,7 +808,7 @@ impl PostgresSandboxManager {
             })
             .await?;
 
-        Ok(diff_schema_digests(&before, &after))
+        diff_schema_digests(&before, &after)
     }
 
     pub async fn explain_query(
@@ -919,7 +919,7 @@ impl PostgresSandboxManager {
 
             match deletion {
                 Ok(()) => {
-                    record_audit_event(
+                    let _ = record_audit_event(
                         &client,
                         "cleanup_expired",
                         &profile.name,
@@ -928,7 +928,7 @@ impl PostgresSandboxManager {
                         Some(&record.role_name),
                         json!({ "expiresAt": record.expires_at }),
                     )
-                    .await?;
+                    .await;
                     deleted.push(record.database_id);
                 }
                 Err(error) => {
@@ -1167,6 +1167,7 @@ async fn enforce_owner_quota(
                   WHERE profile_name = $1
                     AND owner = $2
                     AND deleted_at IS NULL
+                    AND expires_at > now()
                 "#,
                 quote_ident(METADATA_TABLE)?
             ),
@@ -1377,7 +1378,15 @@ fn schema_digest_checksum(
 fn diff_schema_digests(
     before: &SchemaDigestOutput,
     after: &SchemaDigestOutput,
-) -> SchemaDiffOutput {
+) -> anyhow::Result<SchemaDiffOutput> {
+    if before.digest_version != after.digest_version {
+        anyhow::bail!(
+            "schema digest versions differ: baseDigest uses v{} but current digest uses v{}",
+            before.digest_version,
+            after.digest_version
+        );
+    }
+
     let before_tables = before
         .tables
         .iter()
@@ -1448,7 +1457,7 @@ fn diff_schema_digests(
         || !added_extensions.is_empty()
         || !removed_extensions.is_empty()
         || !changed_extensions.is_empty();
-    SchemaDiffOutput {
+    Ok(SchemaDiffOutput {
         database_id: after.database_id.clone(),
         database_name: after.database_name.clone(),
         before_checksum: before.checksum.clone(),
@@ -1460,7 +1469,7 @@ fn diff_schema_digests(
         added_extensions,
         removed_extensions,
         changed_extensions,
-    }
+    })
 }
 
 impl SchemaTableDiff {
@@ -2726,7 +2735,7 @@ mod tests {
         after.extensions[0].version = "2.0".to_string();
         after.checksum = "after-checksum".to_string();
 
-        let diff = diff_schema_digests(&before, &after);
+        let diff = diff_schema_digests(&before, &after).unwrap();
 
         assert!(diff.changed);
         assert_eq!(diff.added_tables, ["public.posts"]);
@@ -2737,9 +2746,20 @@ mod tests {
         assert_eq!(diff.changed_tables[0].changed_indexes, ["users_pkey"]);
 
         before.checksum = after.checksum.clone();
-        let unchanged = diff_schema_digests(&before, &before);
+        let unchanged = diff_schema_digests(&before, &before).unwrap();
         assert!(!unchanged.changed);
         assert!(unchanged.changed_tables.is_empty());
+    }
+
+    #[test]
+    fn schema_diff_rejects_mismatched_digest_versions() {
+        let before = test_digest("before");
+        let mut after = test_digest("after");
+        after.digest_version = 2;
+
+        let error = diff_schema_digests(&before, &after).unwrap_err();
+
+        assert!(error.to_string().contains("schema digest versions differ"));
     }
 
     #[test]
