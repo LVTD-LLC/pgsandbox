@@ -45,6 +45,28 @@ function isElement(node: HastNode, tagName: string): boolean {
   return node.type === 'element' && node.tagName === tagName;
 }
 
+function findFirstElement(node: HastNode, tagName: string): HastNode | undefined {
+  if (isElement(node, tagName)) {
+    return node;
+  }
+
+  for (const child of node.children || []) {
+    const match = findFirstElement(child, tagName);
+
+    if (match) {
+      return match;
+    }
+  }
+
+  return undefined;
+}
+
+function tableColumnCount(table: HastNode): number {
+  const firstRow = findFirstElement(table, 'tr');
+
+  return (firstRow?.children || []).filter((child) => isElement(child, 'th') || isElement(child, 'td')).length;
+}
+
 function wrapMarkdownTables(node: HastNode): void {
   if (!Array.isArray(node.children)) {
     return;
@@ -57,10 +79,16 @@ function wrapMarkdownTables(node: HastNode): void {
       return child;
     }
 
+    const frameClasses = ['markdown-table-frame'];
+
+    if (tableColumnCount(child) >= 3) {
+      frameClasses.push('markdown-table-frame-wide');
+    }
+
     return {
       type: 'element',
       tagName: 'figure',
-      properties: { className: ['markdown-table-frame'] },
+      properties: { className: frameClasses },
       children: [
         {
           type: 'element',

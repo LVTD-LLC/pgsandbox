@@ -178,12 +178,15 @@ const canonicalUrl = post.canonicalUrl || new URL(`/blog/${post.slug}/`, Astro.s
 
   .blog-content :global(table) {
     width: 100%;
-    min-width: 760px;
     border-collapse: separate;
     border-spacing: 0;
     color: var(--text);
     font-size: 0.95rem;
     line-height: 1.5;
+  }
+
+  .blog-content :global(.markdown-table-frame-wide table) {
+    min-width: 760px;
   }
 
   .blog-content :global(th),
@@ -207,17 +210,21 @@ const canonicalUrl = post.canonicalUrl || new URL(`/blog/${post.slug}/`, Astro.s
 
   .blog-content :global(th:first-child),
   .blog-content :global(td:first-child) {
+    color: var(--ink);
+  }
+
+  .blog-content :global(.markdown-table-frame-wide th:first-child),
+  .blog-content :global(.markdown-table-frame-wide td:first-child) {
     width: 9.25rem;
     min-width: 9.25rem;
-    color: var(--ink);
   }
 
   .blog-content :global(td:first-child) {
     font-weight: 760;
   }
 
-  .blog-content :global(th:not(:first-child)),
-  .blog-content :global(td:not(:first-child)) {
+  .blog-content :global(.markdown-table-frame-wide th:not(:first-child)),
+  .blog-content :global(.markdown-table-frame-wide td:not(:first-child)) {
     min-width: 15.5rem;
   }
 
@@ -254,8 +261,11 @@ const canonicalUrl = post.canonicalUrl || new URL(`/blog/${post.slug}/`, Astro.s
       line-height: 1.06;
     }
 
-    .blog-content :global(table) {
+    .blog-content :global(.markdown-table-frame-wide table) {
       min-width: 720px;
+    }
+
+    .blog-content :global(table) {
       font-size: 0.92rem;
     }
 
