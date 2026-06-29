@@ -18,15 +18,28 @@ type Props = {
 const { post } = Astro.props;
 const description = post.metaDescription || post.excerpt;
 const canonicalUrl = post.canonicalUrl || new URL(`/blog/${post.slug}/`, Astro.site || Astro.url.origin).toString();
-const publishedTime = `${post.publishedAt}T00:00:00.000Z`;
-const modifiedTime = `${post.updatedAt || post.publishedAt}T00:00:00.000Z`;
+
+function toArticleTime(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  const normalized = trimmed.includes('T') ? trimmed : `${trimmed}T00:00:00.000Z`;
+  const date = new Date(normalized);
+
+  return Number.isNaN(date.valueOf()) ? undefined : date.toISOString();
+}
+
+const publishedTime = toArticleTime(post.publishedAt);
+const modifiedTime = toArticleTime(post.updatedAt || post.publishedAt) || publishedTime;
 const structuredData = {
   '@context': 'https://schema.org',
   '@type': 'BlogPosting',
   headline: post.title,
   description,
-  datePublished: post.publishedAt,
-  dateModified: post.updatedAt || post.publishedAt,
+  ...(publishedTime ? { datePublished: publishedTime } : {}),
+  ...(modifiedTime ? { dateModified: modifiedTime } : {}),
   mainEntityOfPage: {
     '@type': 'WebPage',
     '@id': canonicalUrl

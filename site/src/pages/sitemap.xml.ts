@@ -12,6 +12,33 @@ const staticPages = [
   '/changelog/'
 ];
 
+async function getSitemapBlogPosts() {
+  try {
+    return await getPublishedBlogPosts();
+  } catch (error) {
+    console.warn(`Skipping Rowset blog posts in sitemap: ${(error as Error).message}`);
+    return [];
+  }
+}
+
+function sitemapLastmod(...values: Array<string | undefined>) {
+  for (const value of values) {
+    const trimmed = String(value || '').trim();
+    if (!trimmed) {
+      continue;
+    }
+
+    const normalized = trimmed.includes('T') ? trimmed : `${trimmed}T00:00:00.000Z`;
+    const date = new Date(normalized);
+
+    if (!Number.isNaN(date.valueOf())) {
+      return date.toISOString().slice(0, 10);
+    }
+  }
+
+  return undefined;
+}
+
 function escapeXml(value: string) {
   return value
     .replaceAll('&', '&amp;')
@@ -23,13 +50,14 @@ function escapeXml(value: string) {
 
 export const GET: APIRoute = async ({ site }) => {
   const baseUrl = site ?? new URL('https://pgsandbox-mcp.cap.gregagi.com');
-  const posts = await getPublishedBlogPosts();
+  const posts = await getSitemapBlogPosts();
   const latestPost = posts[0];
+  const latestLastmod = sitemapLastmod(latestPost?.updatedAt, latestPost?.publishedAt);
   const pages = [
-    ...staticPages.map((path) => ({ path, lastmod: latestPost?.updatedAt || latestPost?.publishedAt })),
+    ...staticPages.map((path) => ({ path, lastmod: latestLastmod })),
     ...posts.map((post) => ({
-      path: `/blog/${post.slug}/`,
-      lastmod: post.updatedAt || post.publishedAt
+      path: post.canonicalUrl || `/blog/${post.slug}/`,
+      lastmod: sitemapLastmod(post.updatedAt, post.publishedAt)
     }))
   ];
 
