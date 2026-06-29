@@ -164,8 +164,7 @@ impl LocalPostgresCluster {
         })?;
         write_postgres_runtime_config(&config)?;
         if let Err(error) = self.write_config(&config) {
-            self.restore_start_config(&original_config);
-            return Err(error);
+            return Err(self.restore_start_config_after_error(&original_config, error));
         }
 
         if let Err(error) = command_status(
@@ -179,13 +178,14 @@ impl LocalPostgresCluster {
                 .arg("start")
                 .status(),
         ) {
-            self.restore_start_config(&original_config);
-            return Err(error);
+            return Err(self.restore_start_config_after_error(&original_config, error));
         }
 
         if !self.is_running()? {
-            self.restore_start_config(&original_config);
-            anyhow::bail!("local Postgres did not report healthy after pg_ctl start");
+            return Err(self.restore_start_config_after_error(
+                &original_config,
+                anyhow::anyhow!("local Postgres did not report healthy after pg_ctl start"),
+            ));
         }
 
         Ok(config)
@@ -318,9 +318,22 @@ impl LocalPostgresCluster {
         .with_context(|| format!("failed to write local Postgres config {}", path.display()))
     }
 
-    fn restore_start_config(&self, config: &LocalClusterConfig) {
-        let _ = write_postgres_runtime_config(config);
-        let _ = self.write_config(config);
+    fn restore_start_config(&self, config: &LocalClusterConfig) -> anyhow::Result<()> {
+        self.write_config(config)?;
+        write_postgres_runtime_config(config)
+    }
+
+    fn restore_start_config_after_error(
+        &self,
+        config: &LocalClusterConfig,
+        original_error: anyhow::Error,
+    ) -> anyhow::Error {
+        match self.restore_start_config(config) {
+            Ok(()) => original_error,
+            Err(rollback_error) => anyhow::anyhow!(
+                "{original_error:#}; additionally failed to restore previous local Postgres config: {rollback_error:#}"
+            ),
+        }
     }
 
     fn is_running(&self) -> anyhow::Result<bool> {
@@ -709,12 +722,37 @@ mod tests {
         write_postgres_runtime_config(&updated).unwrap();
         cluster.write_config(&updated).unwrap();
 
-        cluster.restore_start_config(&original);
+        cluster.restore_start_config(&original).unwrap();
 
         assert_eq!(cluster.read_config().unwrap(), original);
         let postgres_conf = fs::read_to_string(cluster.data_dir().join("postgresql.conf")).unwrap();
         assert!(postgres_conf.contains("port = 65432"));
         assert!(!postgres_conf.contains("port = 65433"));
+    }
+
+    #[test]
+    fn restore_start_config_reports_saved_config_failures_without_rewriting_runtime_config() {
+        let directory = tempfile::tempdir().unwrap();
+        let cluster = LocalPostgresCluster::new(directory.path());
+        fs::create_dir_all(cluster.data_dir()).unwrap();
+
+        let original = cluster.config_for_port(65432, "secret");
+        let updated = cluster.config_for_port(65433, "secret");
+        fs::create_dir(cluster.config_path()).unwrap();
+        fs::write(
+            cluster.data_dir().join("postgresql.conf"),
+            postgres_runtime_config_block(&updated),
+        )
+        .unwrap();
+
+        let error = cluster.restore_start_config(&original).unwrap_err();
+
+        assert!(error
+            .to_string()
+            .contains("failed to write local Postgres config"));
+        let postgres_conf = fs::read_to_string(cluster.data_dir().join("postgresql.conf")).unwrap();
+        assert!(postgres_conf.contains("port = 65433"));
+        assert!(!postgres_conf.contains("port = 65432"));
     }
 
     #[test]
