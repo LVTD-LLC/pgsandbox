@@ -1,19 +1,19 @@
 ---
 import DocsLayout from '../../layouts/DocsLayout.astro';
 ---
-<DocsLayout title="Architecture" description="PGSandbox MCP architecture notes."><h1>Architecture</h1><p>PGSandbox MCP is a local Rust MCP server in front of one or more reachable Postgres admin connections. It does not install or manage Postgres versions itself. Remote Postgres profiles can require TLS with <code>sslmode=require</code>.</p><p>This local-first shape is the current deployment boundary, not the permanent product ceiling. A future hosted PGSandbox database platform should preserve the same agent workflow while adding managed compute, auth, tenancy, quotas, billing, and faster clone/fork backends.</p><h2>Flow</h2><pre><code>Agent / MCP client
+<DocsLayout title="Architecture" description="PGSandbox MCP architecture notes."><h1>Architecture</h1><p>PGSandbox MCP is a local Rust MCP server in front of a managed local Postgres cluster by default, with optional explicit external Postgres admin profiles. It does not install Postgres versions or use Docker, and the local runtime chooses a high port such as <code>65432</code> instead of binding <code>5432</code>.</p><p>This local-first shape is the current deployment boundary, not the permanent product ceiling. A future hosted PGSandbox database platform should preserve the same agent workflow while adding managed compute, auth, tenancy, quotas, billing, and faster clone/fork backends.</p><h2>Flow</h2><pre><code>Agent / MCP client
         |
         v
 PGSandbox MCP
         |
         v
-Configured Postgres profile
+Managed local cluster or explicit Postgres profile
         |
         v
 Task-specific databases and roles</code></pre><h2>Resource model</h2><p>Each experiment gets one database, one login role, credentials scoped to that database, a TTL, and optional labels for task, repo, branch, or agent. Sandbox role passwords are encrypted before being persisted in metadata.</p><h2>Profiles</h2><p>Profiles support multiple Postgres versions or hosts without changing the MCP contract.</p><pre><code>{`{
-  "defaultProfile": "local-pg17",
+  "defaultProfile": "external-pg17",
   "profiles": [
-    { "name": "local-pg17", "adminUrl": "postgres://postgres:postgres@localhost:5432/postgres" },
-    { "name": "local-pg16", "adminUrl": "postgres://postgres:postgres@localhost:5433/postgres" }
+    { "name": "external-pg17", "adminUrl": "postgres://postgres:postgres@localhost:6543/postgres" },
+    { "name": "external-pg16", "adminUrl": "postgres://postgres:postgres@localhost:6544/postgres" }
   ]
 }`}</code></pre><h2>Cloning</h2><p>The first clone backend creates an empty sandbox, runs <code>pg_dump</code> against the source database with ownership and privileges omitted, and streams the dump into <code>pg_restore</code> connected as the sandbox role. If restore fails, PGSandbox attempts to delete the destination sandbox.</p><h2>Cleanup</h2><p>Cleanup can run via the explicit <code>cleanup_expired</code> MCP tool or a scheduled process. It only deletes databases listed in the metadata table and matching the configured prefix.</p></DocsLayout>

@@ -16,7 +16,8 @@ platform.
 
 - Local-first and private-by-default.
 - Client-neutral MCP surface.
-- Existing Postgres first; no mandatory Docker or hosted service.
+- Managed local Postgres first; no mandatory Docker or hosted service, and no
+  collision with existing developer services.
 - Auditable lifecycle metadata for every created database.
 - Scoped sandbox roles rather than handing user SQL the admin credentials.
 - Explicit TTLs and cleanup paths.

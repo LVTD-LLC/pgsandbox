@@ -198,4 +198,4 @@ case ":${PATH:-}:" in
   *) warn "$INSTALL_DIR is not on PATH" ;;
 esac
 
-say "Next: run \`pgsandbox-mcp setup --client codex --admin-url \"\$PGSANDBOX_ADMIN_DATABASE_URL\"\`"
+say "Next: run \`pgsandbox-mcp setup --client codex\`, then \`pgsandbox-mcp doctor\`"

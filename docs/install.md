@@ -1,10 +1,13 @@
 # Install And Setup
 
-PGSandbox is distributed as a native Rust binary. It needs a reachable Postgres admin connection that can create databases and roles.
+PGSandbox is distributed as a native Rust binary. By default, it manages a local
+Postgres cluster under `~/.pgsandbox/` and chooses a high local port such as
+`127.0.0.1:65432`, leaving Docker or another developer database on `5432`
+untouched.
 
-The core create/query/delete workflow does not require PostgreSQL client tools.
+The managed local runtime requires `initdb`, `pg_ctl`, and `postgres` on `PATH`.
 The `clone_database` MCP tool additionally requires `pg_dump` and `pg_restore`
-on `PATH` because it streams a source database dump into a new sandbox.
+because it streams a source database dump into a new sandbox.
 
 ## Agent-Assisted Setup
 
@@ -15,8 +18,9 @@ PGSandbox MCP for you:
 Install and configure PGSandbox MCP on this machine.
 
 PGSandbox MCP is a local stdio MCP server for disposable Postgres databases. It
-needs an existing Postgres admin connection that can create databases and roles.
-It does not install Postgres and does not require Docker.
+uses a PG Sandbox-managed local Postgres cluster by default. It requires local
+Postgres server binaries such as `initdb`, `pg_ctl`, and `postgres` on `PATH`,
+but it does not use Docker or touch any existing Postgres service on port 5432.
 
 Do the following:
 1. Detect my OS, shell, available package managers, and MCP client. Supported
@@ -35,56 +39,36 @@ Do the following:
    If another pgsandbox-mcp appears earlier in PATH and is missing, broken, or a
    different version, use the absolute path to the healthy installed binary in
    the setup command with --command.
-4. Find a usable Postgres admin URL with no user interaction. Try, in order:
-   - existing PGSANDBOX_ADMIN_DATABASE_URL or PGSANDBOX_CONFIG values
-   - existing local MCP configs that already contain a pgsandbox admin URL
-   - running Docker, OrbStack, Colima, or Podman Postgres containers and exposed
-     ports; derive local URLs from container port mappings and POSTGRES_USER,
-     POSTGRES_PASSWORD, and POSTGRES_DB metadata when available
-   - passwordless local libpq candidates with psql -w over Unix sockets and
-     localhost for the current user and postgres user against postgres/template1
-   - local .pg_service.conf, .pgpass, and project env files, without printing
-     file contents. Use explicit PGSANDBOX_ADMIN_DATABASE_URL values as
-     candidates. For all other file-sourced candidates, including
-     .pg_service.conf, .pgpass, DATABASE_URL, POSTGRES_URL, and POSTGRES_*,
-     proceed without asking only when the parsed or resolved host is clearly
-     local: localhost, 127.0.0.1, ::1, a Unix socket, or a container port you
-     just discovered. Do not validate or configure non-local file-sourced
-     database credentials silently.
-   Validate candidates with `pgsandbox-mcp doctor --admin-url "$CANDIDATE_URL"`.
-   When possible, also verify the role can create databases and roles, or is a
-   superuser. If one valid explicit PGSANDBOX_* candidate or clearly local
-   candidate is found, export it as PGSANDBOX_ADMIN_DATABASE_URL for this setup
-   and continue without asking me. Tell me which source you used and the URL
-   with the password masked, for example postgres://user:***@host/db. Ask me
-   for a URL only after all discovery paths fail or the only remaining
-   candidates are non-local file-sourced database credentials, and briefly say
-   what you checked.
-5. Configure the MCP client:
-   pgsandbox-mcp setup --client <client> --admin-url "$PGSANDBOX_ADMIN_DATABASE_URL"
+4. Verify the managed local runtime:
+   pgsandbox-mcp local start
+   pgsandbox-mcp doctor
+   If `initdb`, `pg_ctl`, or `postgres` is missing, explain that local
+   PostgreSQL server binaries must be installed. Do not start Docker, stop
+   Docker containers, or bind `localhost:5432`.
+5. Configure the MCP client without an admin URL unless I explicitly gave one:
+   pgsandbox-mcp setup --client <client>
    Use --scope project for Cursor or VS Code only if I ask for project-local
    config. Otherwise use the default user scope.
 6. Verify configuration and Postgres connectivity:
-   pgsandbox-mcp doctor --admin-url "$PGSANDBOX_ADMIN_DATABASE_URL"
-   If this fails, explain whether the CLI, MCP config, or Postgres connection
-   failed.
+   pgsandbox-mcp doctor
+   If this fails, explain whether the CLI, local Postgres runtime, MCP config,
+   or explicit external Postgres connection failed.
 7. Run the disposable end-to-end check:
-   pgsandbox-mcp smoke-test --admin-url "$PGSANDBOX_ADMIN_DATABASE_URL"
+   pgsandbox-mcp smoke-test
    This should create, query, and delete a sandbox database.
 8. Tell me exactly which MCP client config was updated and that I need to restart
    the MCP client. After restart, help me verify that the pgsandbox server is
    available.
 
 Constraints:
-- Do not install, start, or modify Postgres unless I explicitly ask.
-- Default to discovery and execution. Do not ask for confirmation before using a
-  discovered explicit PGSANDBOX_* URL or local Postgres admin URL that passes
-  validation. Ask before using any non-local database credential sourced from
-  .pg_service.conf, .pgpass, DATABASE_URL, POSTGRES_URL, or POSTGRES_* values.
+- Do not run Docker commands, stop Docker containers, bind `localhost:5432`, or
+  mutate an existing developer database.
+- Use the managed local cluster by default. Use `PGSANDBOX_ADMIN_DATABASE_URL`,
+  `PGSANDBOX_CONFIG`, or `--admin-url` only when I explicitly ask for an
+  external profile.
 - Do not inline the full admin URL in commands, docs, git-tracked files, shell
-  startup files, or summaries. Use "$PGSANDBOX_ADMIN_DATABASE_URL" in commands.
-  The MCP setup command may write the admin URL only to the selected local MCP
-  client config.
+  startup files, or summaries. Local runtime output should mask the password and
+  point to `~/.pgsandbox/local-postgres.json` for the full private URL.
 - Do not leave a smoke-test database behind. If cleanup fails, report the
   database id or name so I can delete it.
 ```
@@ -93,7 +77,7 @@ Constraints:
 
 ```bash
 brew install LVTD-LLC/tap/pgsandbox-mcp
-pgsandbox-mcp setup --client codex --admin-url postgres://postgres:postgres@localhost:5432/postgres
+pgsandbox-mcp setup --client codex
 ```
 
 This uses the [LVTD-LLC/homebrew-tap](https://github.com/LVTD-LLC/homebrew-tap) repository, which Homebrew addresses as `LVTD-LLC/tap`.
@@ -104,7 +88,7 @@ For users who do not use Homebrew:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/LVTD-LLC/pgsandbox-mcp/main/scripts/install.sh | sh
-pgsandbox-mcp setup --client codex --admin-url postgres://postgres:postgres@localhost:5432/postgres
+pgsandbox-mcp setup --client codex
 ```
 
 The installer fetches the latest GitHub release for the current OS and CPU,
@@ -122,21 +106,21 @@ curl -fsSL https://raw.githubusercontent.com/LVTD-LLC/pgsandbox-mcp/main/scripts
 
 ```bash
 cargo install --path .
-pgsandbox-mcp setup --client codex --admin-url postgres://postgres:postgres@localhost:5432/postgres
+pgsandbox-mcp setup --client codex
 ```
 
 From GitHub without cloning first:
 
 ```bash
 cargo install --git https://github.com/LVTD-LLC/pgsandbox-mcp --tag v0.1.1
-pgsandbox-mcp setup --client codex --admin-url postgres://postgres:postgres@localhost:5432/postgres
+pgsandbox-mcp setup --client codex
 ```
 
 ## Update
 
 The installed CLI binary is the MCP server process that clients launch. Updating
 the CLI and restarting the MCP client updates the server. Rerun `setup` when the
-binary path, admin URL, selected client, or scope changes.
+binary path, explicit admin URL, selected client, or scope changes.
 
 Homebrew can only upgrade after a newer GitHub release exists and the
 `LVTD-LLC/homebrew-tap` formula has been updated. If `brew upgrade
@@ -149,7 +133,7 @@ With Homebrew:
 brew update
 brew upgrade LVTD-LLC/tap/pgsandbox-mcp
 pgsandbox-mcp --version
-pgsandbox-mcp setup --client codex --admin-url "$PGSANDBOX_ADMIN_DATABASE_URL"
+pgsandbox-mcp setup --client codex
 pgsandbox-mcp doctor
 ```
 
@@ -168,7 +152,7 @@ binary explicitly:
 ```bash
 npm uninstall -g pgsandbox-mcp
 hash -r 2>/dev/null || rehash
-pgsandbox-mcp setup --client codex --command /opt/homebrew/bin/pgsandbox-mcp --admin-url "$PGSANDBOX_ADMIN_DATABASE_URL"
+pgsandbox-mcp setup --client codex --command /opt/homebrew/bin/pgsandbox-mcp
 ```
 
 With the GitHub install script:
@@ -176,7 +160,7 @@ With the GitHub install script:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/LVTD-LLC/pgsandbox-mcp/main/scripts/install.sh | sh
 pgsandbox-mcp --version
-pgsandbox-mcp setup --client codex --admin-url "$PGSANDBOX_ADMIN_DATABASE_URL"
+pgsandbox-mcp setup --client codex
 pgsandbox-mcp doctor
 ```
 
@@ -185,7 +169,7 @@ at the same binary:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/LVTD-LLC/pgsandbox-mcp/main/scripts/install.sh | PGSANDBOX_INSTALL_DIR=/usr/local/bin sh
-pgsandbox-mcp setup --client codex --command /usr/local/bin/pgsandbox-mcp --admin-url "$PGSANDBOX_ADMIN_DATABASE_URL"
+pgsandbox-mcp setup --client codex --command /usr/local/bin/pgsandbox-mcp
 ```
 
 From source:
@@ -210,11 +194,11 @@ telling Homebrew users to run `brew upgrade`.
 ## Supported Clients
 
 ```bash
-pgsandbox-mcp setup --client codex --admin-url "$PGSANDBOX_ADMIN_DATABASE_URL"
-pgsandbox-mcp setup --client cursor --scope project --admin-url "$PGSANDBOX_ADMIN_DATABASE_URL"
-pgsandbox-mcp setup --client vscode --scope project --admin-url "$PGSANDBOX_ADMIN_DATABASE_URL"
-pgsandbox-mcp setup --client claude-desktop --admin-url "$PGSANDBOX_ADMIN_DATABASE_URL"
-pgsandbox-mcp setup --client all --admin-url "$PGSANDBOX_ADMIN_DATABASE_URL"
+pgsandbox-mcp setup --client codex
+pgsandbox-mcp setup --client cursor --scope project
+pgsandbox-mcp setup --client vscode --scope project
+pgsandbox-mcp setup --client claude-desktop
+pgsandbox-mcp setup --client all
 ```
 
 ## Verify

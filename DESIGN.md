@@ -11,18 +11,18 @@ output, command examples, and any future website or UI branch.
 - Prefer exact commands over abstract descriptions.
 - Keep setup paths copyable and version-aware.
 - Separate npm, npx, Homebrew, and development-from-repo flows.
-- Call out safety constraints directly: admin URL, local/private use, TTLs, and
-  cleanup behavior.
-- Avoid promising automatic Postgres installation or currently available hosted
-  infrastructure before that surface is designed and implemented.
+- Call out safety constraints directly: managed local runtime, explicit external
+  admin URLs, local/private use, TTLs, and cleanup behavior.
+- Avoid promising automatic Postgres binary installation or currently available
+  hosted infrastructure before that surface is designed and implemented.
 
 ## CLI Output Style
 
 - Use short, plain status lines.
 - Mask credentials in diagnostics.
 - Include the affected client, scope, and path when writing MCP config.
-- For failures, name the missing environment variable, config file, client, or
-  Postgres connection that needs attention.
+- For failures, name the missing Postgres binary, environment variable, config
+  file, client, or Postgres connection that needs attention.
 - Do not print full sandbox connection strings except from commands or MCP tools
   whose purpose is to return credentials.
 

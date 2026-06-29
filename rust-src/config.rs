@@ -3,14 +3,16 @@ use std::{env, fs};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+use crate::local::{LocalPostgresCluster, LOCAL_PROFILE_NAME};
+
 const DEFAULT_DATABASE_PREFIX: &str = "pgsandbox";
 const DEFAULT_TTL_MINUTES: u32 = 240;
 const DEFAULT_MAX_TTL_MINUTES: u32 = 1440;
 
 #[derive(Debug, Error)]
 pub enum ConfigError {
-    #[error("Set PGSANDBOX_ADMIN_DATABASE_URL or PGSANDBOX_CONFIG before starting pgsandbox-mcp.")]
-    MissingAdminUrl,
+    #[error("PGSANDBOX_CONFIG must contain at least one profile.")]
+    MissingProfiles,
     #[error("failed to read config file {path}: {source}")]
     ReadFile {
         path: String,
@@ -29,6 +31,8 @@ pub enum ConfigError {
     MissingDefaultProfile(String),
     #[error("Unknown Postgres profile: {0}")]
     UnknownProfile(String),
+    #[error("failed to prepare default local Postgres cluster: {0}")]
+    LocalPostgres(String),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -87,6 +91,25 @@ where
     K: Into<String>,
     V: Into<String>,
 {
+    load_config_from_env_with_local(vars, || {
+        let config = LocalPostgresCluster::from_env()
+            .map_err(|error| ConfigError::LocalPostgres(error.to_string()))?
+            .ensure_started()
+            .map_err(|error| ConfigError::LocalPostgres(error.to_string()))?;
+        Ok(config.admin_url)
+    })
+}
+
+fn load_config_from_env_with_local<I, K, V, F>(
+    vars: I,
+    local_admin_url: F,
+) -> Result<SandboxConfig, ConfigError>
+where
+    I: IntoIterator<Item = (K, V)>,
+    K: Into<String>,
+    V: Into<String>,
+    F: FnOnce() -> Result<String, ConfigError>,
+{
     let env = vars
         .into_iter()
         .map(|(key, value)| (key.into(), value.into()))
@@ -100,15 +123,21 @@ where
             })?,
         )?
     } else {
-        let admin_url = env
-            .get("PGSANDBOX_ADMIN_DATABASE_URL")
-            .ok_or(ConfigError::MissingAdminUrl)?
-            .to_string();
-
-        let name = env
-            .get("PGSANDBOX_DEFAULT_PROFILE")
-            .cloned()
-            .unwrap_or_else(|| "default".to_string());
+        let explicit_default_profile = env.get("PGSANDBOX_DEFAULT_PROFILE").cloned();
+        let (admin_url, name) = match env.get("PGSANDBOX_ADMIN_DATABASE_URL") {
+            Some(admin_url) => (
+                admin_url.to_string(),
+                explicit_default_profile.unwrap_or_else(|| "default".to_string()),
+            ),
+            None => {
+                let default_profile =
+                    explicit_default_profile.unwrap_or_else(|| LOCAL_PROFILE_NAME.to_string());
+                if default_profile != LOCAL_PROFILE_NAME {
+                    return Err(ConfigError::MissingDefaultProfile(default_profile));
+                }
+                (local_admin_url()?, LOCAL_PROFILE_NAME.to_string())
+            }
+        };
 
         normalize_config(RawConfig {
             default_profile: Some(name.clone()),
@@ -158,7 +187,7 @@ pub fn load_telemetry_config() -> TelemetryConfig {
 
 fn normalize_config(raw: RawConfig) -> Result<SandboxConfig, ConfigError> {
     if raw.profiles.is_empty() {
-        return Err(ConfigError::MissingAdminUrl);
+        return Err(ConfigError::MissingProfiles);
     }
 
     for profile in &raw.profiles {
@@ -289,6 +318,59 @@ mod tests {
         assert_eq!(config.profiles[0].database_prefix, "pgsandbox");
         assert_eq!(config.profiles[0].default_ttl_minutes, 240);
         assert!(config.telemetry.enabled);
+    }
+
+    #[test]
+    fn loads_managed_local_profile_when_no_admin_url_is_set() {
+        let mut called = false;
+        let config = load_config_from_env_with_local(std::iter::empty::<(&str, &str)>(), || {
+            called = true;
+            Ok(
+                "postgres://pgsandbox_admin:secret@127.0.0.1:65432/postgres?sslmode=disable"
+                    .to_string(),
+            )
+        })
+        .unwrap();
+
+        assert!(called);
+        assert_eq!(config.default_profile, "local");
+        assert_eq!(config.profiles[0].name, "local");
+        assert_eq!(
+            config.profiles[0].admin_url,
+            "postgres://pgsandbox_admin:secret@127.0.0.1:65432/postgres?sslmode=disable"
+        );
+        assert_eq!(config.profiles[0].database_prefix, "pgsandbox");
+        assert_eq!(config.profiles[0].default_ttl_minutes, 240);
+        assert_eq!(config.profiles[0].max_ttl_minutes, 1440);
+    }
+
+    #[test]
+    fn explicit_admin_url_skips_managed_local_profile() {
+        let config = load_config_from_env_with_local(
+            [(
+                "PGSANDBOX_ADMIN_DATABASE_URL",
+                "postgres://postgres:postgres@localhost/postgres",
+            )],
+            || panic!("local cluster should not start when an admin URL is explicit"),
+        )
+        .unwrap();
+
+        assert_eq!(config.default_profile, "default");
+        assert_eq!(
+            config.profiles[0].admin_url,
+            "postgres://postgres:postgres@localhost/postgres"
+        );
+    }
+
+    #[test]
+    fn default_profile_without_admin_url_does_not_alias_local_profile() {
+        let err =
+            load_config_from_env_with_local([("PGSANDBOX_DEFAULT_PROFILE", "staging")], || {
+                panic!("local cluster should not start for an undefined requested profile")
+            })
+            .unwrap_err();
+
+        assert!(err.to_string().contains("default profile does not exist"));
     }
 
     #[test]

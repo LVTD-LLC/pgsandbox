@@ -1,6 +1,7 @@
 pub mod cli;
 pub mod config;
 pub mod doctor;
+pub mod local;
 pub mod mcp;
 pub mod names;
 pub mod postgres;

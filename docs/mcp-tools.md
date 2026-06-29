@@ -2,6 +2,10 @@
 
 This is the v0 tool surface. Names and argument shapes may still change before a stable release.
 
+When a tool omits `profile`, PGSandbox uses the configured default profile. With
+no explicit `PGSANDBOX_ADMIN_DATABASE_URL` or `PGSANDBOX_CONFIG`, that default
+is the managed local Postgres cluster under `~/.pgsandbox/`.
+
 ## `create_database`
 
 Creates an isolated database and login role.

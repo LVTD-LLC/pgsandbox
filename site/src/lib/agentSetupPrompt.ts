@@ -1,8 +1,9 @@
 export const agentSetupPrompt = `Install and configure PGSandbox MCP on this machine.
 
 PGSandbox MCP is a local stdio MCP server for disposable Postgres databases. It
-needs an existing Postgres admin connection that can create databases and roles.
-It does not install Postgres and does not require Docker.
+uses a PG Sandbox-managed local Postgres cluster by default. It requires local
+Postgres server binaries such as initdb, pg_ctl, and postgres on PATH, but it
+does not use Docker or touch any existing Postgres service on port 5432.
 
 Do the following:
 1. Detect my OS, shell, available package managers, and MCP client. Supported
@@ -21,55 +22,35 @@ Do the following:
    If another pgsandbox-mcp appears earlier in PATH and is missing, broken, or a
    different version, use the absolute path to the healthy installed binary in
    the setup command with --command.
-4. Find a usable Postgres admin URL with no user interaction. Try, in order:
-   - existing PGSANDBOX_ADMIN_DATABASE_URL or PGSANDBOX_CONFIG values
-   - existing local MCP configs that already contain a pgsandbox admin URL
-   - running Docker, OrbStack, Colima, or Podman Postgres containers and exposed
-     ports; derive local URLs from container port mappings and POSTGRES_USER,
-     POSTGRES_PASSWORD, and POSTGRES_DB metadata when available
-   - passwordless local libpq candidates with psql -w over Unix sockets and
-     localhost for the current user and postgres user against postgres/template1
-   - local .pg_service.conf, .pgpass, and project env files, without printing
-     file contents. Use explicit PGSANDBOX_ADMIN_DATABASE_URL values as
-     candidates. For all other file-sourced candidates, including
-     .pg_service.conf, .pgpass, DATABASE_URL, POSTGRES_URL, and POSTGRES_*,
-     proceed without asking only when the parsed or resolved host is clearly
-     local: localhost, 127.0.0.1, ::1, a Unix socket, or a container port you
-     just discovered. Do not validate or configure non-local file-sourced
-     database credentials silently.
-   Validate candidates with \`pgsandbox-mcp doctor --admin-url "$CANDIDATE_URL"\`.
-   When possible, also verify the role can create databases and roles, or is a
-   superuser. If one valid explicit PGSANDBOX_* candidate or clearly local
-   candidate is found, export it as PGSANDBOX_ADMIN_DATABASE_URL for this setup
-   and continue without asking me. Tell me which source you used and the URL
-   with the password masked, for example postgres://user:***@host/db. Ask me
-   for a URL only after all discovery paths fail or the only remaining
-   candidates are non-local file-sourced database credentials, and briefly say
-   what you checked.
-5. Configure the MCP client:
-   pgsandbox-mcp setup --client <client> --admin-url "$PGSANDBOX_ADMIN_DATABASE_URL"
+4. Verify the managed local runtime:
+   pgsandbox-mcp local start
+   pgsandbox-mcp doctor
+   If initdb, pg_ctl, or postgres is missing, explain that local PostgreSQL
+   server binaries must be installed. Do not start Docker, stop Docker
+   containers, or bind localhost:5432.
+5. Configure the MCP client without an admin URL unless I explicitly gave one:
+   pgsandbox-mcp setup --client <client>
    Use --scope project for Cursor or VS Code only if I ask for project-local
    config. Otherwise use the default user scope.
 6. Verify configuration and Postgres connectivity:
-   pgsandbox-mcp doctor --admin-url "$PGSANDBOX_ADMIN_DATABASE_URL"
-   If this fails, explain whether the CLI, MCP config, or Postgres connection
-   failed.
+   pgsandbox-mcp doctor
+   If this fails, explain whether the CLI, local Postgres runtime, MCP config,
+   or explicit external Postgres connection failed.
 7. Run the disposable end-to-end check:
-   pgsandbox-mcp smoke-test --admin-url "$PGSANDBOX_ADMIN_DATABASE_URL"
+   pgsandbox-mcp smoke-test
    This should create, query, and delete a sandbox database.
 8. Tell me exactly which MCP client config was updated and that I need to restart
    the MCP client. After restart, help me verify that the pgsandbox server is
    available.
 
 Constraints:
-- Do not install, start, or modify Postgres unless I explicitly ask.
-- Default to discovery and execution. Do not ask for confirmation before using a
-  discovered explicit PGSANDBOX_* URL or local Postgres admin URL that passes
-  validation. Ask before using any non-local database credential sourced from
-  .pg_service.conf, .pgpass, DATABASE_URL, POSTGRES_URL, or POSTGRES_* values.
+- Do not run Docker commands, stop Docker containers, bind localhost:5432, or
+  mutate an existing developer database.
+- Use the managed local cluster by default. Use PGSANDBOX_ADMIN_DATABASE_URL,
+  PGSANDBOX_CONFIG, or --admin-url only when I explicitly ask for an external
+  profile.
 - Do not inline the full admin URL in commands, docs, git-tracked files, shell
-  startup files, or summaries. Use "$PGSANDBOX_ADMIN_DATABASE_URL" in commands.
-  The MCP setup command may write the admin URL only to the selected local MCP
-  client config.
+  startup files, or summaries. Local runtime output should mask the password and
+  point to ~/.pgsandbox/local-postgres.json for the full private URL.
 - Do not leave a smoke-test database behind. If cleanup fails, report the
   database id or name so I can delete it.`;
