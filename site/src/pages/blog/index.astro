@@ -1,0 +1,189 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getPublishedBlogPosts } from '../../lib/rowsetBlog';
+
+const posts = await getPublishedBlogPosts();
+const featuredPost = posts.find((post) => post.featured) || posts[0];
+const remainingPosts = featuredPost ? posts.filter((post) => post.slug !== featuredPost.slug) : posts;
+---
+<BaseLayout
+  title="Blog - PGSandbox MCP"
+  description="Notes on safe disposable Postgres databases, MCP workflows, and agent-driven backend development."
+>
+  <main id="content" class="blog-index">
+    <section class="container blog-hero">
+      <p class="section-label">blog</p>
+      <h1>Notes on safer database work for AI agents.</h1>
+      <p>
+        Practical writing about disposable Postgres databases, migration validation, SQL checks, and keeping agent
+        experiments away from shared development state.
+      </p>
+    </section>
+
+    <section class="container blog-list-section" aria-label="Published posts">
+      {featuredPost ? (
+        <article class="featured-post">
+          <div class="post-meta">
+            <span>{featuredPost.category || 'Engineering'}</span>
+            <time datetime={featuredPost.publishedAt}>{featuredPost.publishedAt}</time>
+          </div>
+          <h2>
+            <a href={`/blog/${featuredPost.slug}/`}>{featuredPost.title}</a>
+          </h2>
+          <p>{featuredPost.excerpt}</p>
+          <div class="tag-list" aria-label="Tags">
+            {featuredPost.tags.map((tag) => <span>{tag}</span>)}
+          </div>
+        </article>
+      ) : (
+        <p class="empty-blog">No posts published yet.</p>
+      )}
+
+      {remainingPosts.length > 0 && (
+        <div class="post-grid">
+          {remainingPosts.map((post) => (
+            <article class="post-card">
+              <div class="post-meta">
+                <span>{post.category || 'Engineering'}</span>
+                <time datetime={post.publishedAt}>{post.publishedAt}</time>
+              </div>
+              <h2>
+                <a href={`/blog/${post.slug}/`}>{post.title}</a>
+              </h2>
+              <p>{post.excerpt}</p>
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
+  </main>
+</BaseLayout>
+
+<style>
+  .blog-index {
+    padding-bottom: 6rem;
+  }
+
+  .blog-hero {
+    padding: 5rem 0 2.5rem;
+  }
+
+  .blog-hero h1 {
+    margin: 0 0 1rem;
+    max-width: 920px;
+    font-size: 4rem;
+    line-height: 1;
+  }
+
+  .blog-hero p:not(.section-label) {
+    max-width: 760px;
+    color: var(--muted);
+    font-size: 1.12rem;
+    line-height: 1.72;
+  }
+
+  .blog-list-section {
+    display: grid;
+    gap: 1.25rem;
+  }
+
+  .featured-post,
+  .post-card {
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    background: var(--surface);
+  }
+
+  .featured-post {
+    padding: clamp(1.4rem, 4vw, 2.4rem);
+  }
+
+  .featured-post h2,
+  .post-card h2 {
+    margin: 0.8rem 0 0.8rem;
+    line-height: 1.08;
+  }
+
+  .featured-post h2 {
+    max-width: 860px;
+    font-size: clamp(2.1rem, 5vw, 3.2rem);
+  }
+
+  .featured-post p,
+  .post-card p,
+  .empty-blog {
+    color: var(--muted);
+    line-height: 1.7;
+  }
+
+  .featured-post p {
+    max-width: 760px;
+    font-size: 1.06rem;
+  }
+
+  .post-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+    color: var(--quiet);
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    font-weight: 750;
+  }
+
+  .post-meta span {
+    color: var(--primary);
+  }
+
+  .tag-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    margin-top: 1.4rem;
+  }
+
+  .tag-list span {
+    padding: 0.32rem 0.5rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--surface-muted);
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    font-weight: 720;
+  }
+
+  .post-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+  }
+
+  .post-card {
+    padding: 1.25rem;
+  }
+
+  .post-card h2 {
+    font-size: 1.35rem;
+  }
+
+  .featured-post a:hover,
+  .post-card a:hover {
+    color: var(--primary);
+  }
+
+  @media (max-width: 760px) {
+    .blog-hero {
+      padding-top: 3.4rem;
+    }
+
+    .blog-hero h1 {
+      font-size: 2.6rem;
+      line-height: 1.06;
+    }
+
+    .post-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

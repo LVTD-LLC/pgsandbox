@@ -1,0 +1,178 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getPublishedBlogPosts, type BlogPost } from '../../lib/rowsetBlog';
+
+export async function getStaticPaths() {
+  const posts = await getPublishedBlogPosts();
+
+  return posts.map((post) => ({
+    params: { slug: post.slug },
+    props: { post }
+  }));
+}
+
+type Props = {
+  post: BlogPost;
+};
+
+const { post } = Astro.props;
+const description = post.metaDescription || post.excerpt;
+const canonicalUrl = post.canonicalUrl || new URL(`/blog/${post.slug}/`, Astro.site || Astro.url.origin).toString();
+---
+<BaseLayout
+  title={`${post.metaTitle} - PGSandbox MCP`}
+  description={description}
+  canonicalUrl={canonicalUrl}
+  imageUrl={post.heroImageUrl}
+>
+  <main id="content" class="blog-post-page">
+    <article class="container blog-post">
+      <header class="blog-post-header">
+        <a class="text-link" href="/blog/">Back to blog</a>
+        <div class="post-meta">
+          <span>{post.category || 'Engineering'}</span>
+          <time datetime={post.publishedAt}>{post.publishedAt}</time>
+          <span>{post.author}</span>
+        </div>
+        <h1>{post.title}</h1>
+        <p>{post.excerpt}</p>
+        {post.heroImageUrl && <img class="hero-image" src={post.heroImageUrl} alt="" loading="eager" />}
+        {post.tags.length > 0 && (
+          <div class="tag-list" aria-label="Tags">
+            {post.tags.map((tag) => <span>{tag}</span>)}
+          </div>
+        )}
+      </header>
+
+      <div class="blog-content" set:html={post.bodyHtml} />
+    </article>
+  </main>
+</BaseLayout>
+
+<style>
+  .blog-post-page {
+    padding: 4.8rem 0 7rem;
+  }
+
+  .blog-post {
+    max-width: 860px;
+  }
+
+  .blog-post-header {
+    padding-bottom: 2.2rem;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .blog-post-header .text-link {
+    margin: 0 0 1.6rem;
+  }
+
+  .blog-post-header h1 {
+    margin: 1rem 0;
+    font-size: clamp(2.5rem, 7vw, 4.6rem);
+    line-height: 1;
+  }
+
+  .blog-post-header p {
+    max-width: 760px;
+    color: var(--muted);
+    font-size: 1.15rem;
+    line-height: 1.72;
+  }
+
+  .post-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+    color: var(--quiet);
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    font-weight: 750;
+  }
+
+  .post-meta span:first-child {
+    color: var(--primary);
+  }
+
+  .tag-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    margin-top: 1.35rem;
+  }
+
+  .tag-list span {
+    padding: 0.32rem 0.5rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--surface-muted);
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    font-weight: 720;
+  }
+
+  .hero-image {
+    display: block;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    margin-top: 1.7rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    object-fit: cover;
+  }
+
+  .blog-content {
+    padding-top: 2rem;
+  }
+
+  .blog-content :global(h2) {
+    margin: 2.4rem 0 0.8rem;
+    font-size: 2rem;
+    line-height: 1.16;
+  }
+
+  .blog-content :global(h3) {
+    margin: 2rem 0 0.65rem;
+    font-size: 1.35rem;
+    line-height: 1.22;
+  }
+
+  .blog-content :global(p),
+  .blog-content :global(li) {
+    color: var(--text);
+    font-size: 1.04rem;
+    line-height: 1.78;
+  }
+
+  .blog-content :global(a) {
+    color: var(--primary);
+    font-weight: 760;
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 4px;
+  }
+
+  .blog-content :global(ul),
+  .blog-content :global(ol) {
+    padding-left: 1.25rem;
+  }
+
+  .blog-content :global(blockquote) {
+    margin: 1.6rem 0;
+    padding-left: 1rem;
+    border-left: 3px solid var(--primary);
+    color: var(--muted);
+  }
+
+  @media (max-width: 760px) {
+    .blog-post-page {
+      padding-top: 3.4rem;
+    }
+
+    .blog-post-header h1 {
+      font-size: 2.55rem;
+      line-height: 1.06;
+    }
+  }
+</style>

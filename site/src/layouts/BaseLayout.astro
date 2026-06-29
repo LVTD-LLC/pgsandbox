@@ -1,13 +1,17 @@
 ---
 const {
   title = 'PGSandbox MCP',
-  description = 'Agent-facing MCP server for disposable Postgres sandboxes.'
+  description = 'Agent-facing MCP server for disposable Postgres sandboxes.',
+  canonicalUrl,
+  imageUrl
 } = Astro.props;
 
 const pathname = Astro.url.pathname;
 const isHome = pathname === '/';
 const isDocs = pathname.startsWith('/docs');
+const isBlog = pathname.startsWith('/blog');
 const docsCurrent = isDocs ? (pathname === '/docs/' ? 'page' : 'location') : undefined;
+const blogCurrent = isBlog ? (pathname === '/blog/' ? 'page' : 'location') : undefined;
 ---
 <!doctype html>
 <html lang="en">
@@ -18,7 +22,11 @@ const docsCurrent = isDocs ? (pathname === '/docs/' ? 'page' : 'location') : und
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:type" content="website" />
+    {canonicalUrl && <link rel="canonical" href={canonicalUrl} />}
+    {canonicalUrl && <meta property="og:url" content={canonicalUrl} />}
+    {imageUrl && <meta property="og:image" content={imageUrl} />}
     <meta name="twitter:card" content="summary" />
+    {imageUrl && <meta name="twitter:image" content={imageUrl} />}
     <meta name="theme-color" content="#ffffff" />
     <title>{title}</title>
     <link rel="icon" href="/favicon.svg" />
@@ -479,6 +487,7 @@ const docsCurrent = isDocs ? (pathname === '/docs/' ? 'page' : 'location') : und
           <span>PGSandbox MCP</span>
         </a>
         <div class="nav-links">
+          <a class="nav-link" href="/blog/" aria-current={blogCurrent}>Blog</a>
           <a class="nav-link" href="/docs/" aria-current={docsCurrent}>Docs</a>
           <a class="button" href="https://github.com/LVTD-LLC/pgsandbox-mcp">View GitHub</a>
         </div>
