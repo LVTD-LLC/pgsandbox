@@ -34,5 +34,5 @@ function comparePosts(a: BlogPost, b: BlogPost): number {
 }
 
 export async function getPublishedBlogPosts(): Promise<BlogPost[]> {
-  return (await getCollection('blog')).sort(comparePosts);
+  return (await getCollection('blog')).filter((post) => post.data.status === 'published').sort(comparePosts);
 }

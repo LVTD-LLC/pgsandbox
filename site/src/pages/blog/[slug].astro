@@ -236,17 +236,28 @@ const structuredData = {
     padding-left: 1.25rem;
   }
 
-  .blog-content :global(table) {
-    display: block;
+  .blog-content :global(.markdown-table-frame) {
+    margin: 2rem 0 2.35rem;
+  }
+
+  .blog-content :global(.markdown-table-scroll) {
     max-width: 100%;
     overflow-x: auto;
     overflow-y: hidden;
-    width: 100%;
-    margin: 2rem 0 2.35rem;
     border: 1px solid var(--line-strong);
     border-radius: var(--radius-md);
-    border-spacing: 0;
     background: var(--surface);
+  }
+
+  .blog-content :global(.markdown-table-scroll:focus-visible) {
+    outline: 3px solid var(--focus-ring);
+    outline-offset: 4px;
+  }
+
+  .blog-content :global(table) {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
     color: var(--text);
     font-size: 0.95rem;
     line-height: 1.5;

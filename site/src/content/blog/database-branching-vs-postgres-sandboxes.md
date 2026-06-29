@@ -2,6 +2,7 @@
 title: "Database Branching vs Disposable Postgres Sandboxes"
 excerpt: "Database branching is great for preview environments and team workflows. Disposable Postgres sandboxes are better when a coding agent needs one task-scoped database it can safely prove work inside and throw away."
 author: "PGSandbox Team"
+status: "published"
 publishedAt: "2026-06-29"
 updatedAt: "2026-06-29"
 tags: ["database branching", "Postgres", "AI agents", "MCP", "sandboxes"]

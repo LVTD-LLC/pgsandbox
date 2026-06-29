@@ -2,6 +2,7 @@
 title: "Postgres MCP Server Safety Checklist for Coding Agents"
 excerpt: "A practical checklist for giving AI coding agents Postgres access through MCP without handing them shared databases, broad credentials, or unbounded SQL tools."
 author: "PGSandbox Team"
+status: "published"
 publishedAt: "2026-06-29"
 updatedAt: "2026-06-29T15:34:00Z"
 tags: ["postgres", "mcp", "ai-agents", "database-security", "developer-tools"]
