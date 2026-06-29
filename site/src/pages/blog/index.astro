@@ -7,6 +7,19 @@ const featuredPost = posts[0];
 const remainingPosts = featuredPost ? posts.slice(1) : posts;
 const canonicalUrl = new URL('/blog/', Astro.site || Astro.url.origin).toString();
 const description = 'Notes on safe disposable Postgres databases, MCP workflows, and agent-driven backend development.';
+
+function toSchemaDateTime(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  const normalized = trimmed.includes('T') ? trimmed : `${trimmed}T00:00:00.000Z`;
+  const date = new Date(normalized);
+
+  return Number.isNaN(date.valueOf()) ? undefined : date.toISOString();
+}
+
 const structuredData = {
   '@context': 'https://schema.org',
   '@type': 'Blog',
@@ -24,14 +37,19 @@ const structuredData = {
       name: 'OpenAI Codex'
     }
   ],
-  blogPost: posts.map((post) => ({
-    '@type': 'BlogPosting',
-    headline: post.title,
-    description: post.metaDescription || post.excerpt,
-    datePublished: post.publishedAt,
-    dateModified: post.updatedAt || post.publishedAt,
-    url: post.canonicalUrl || new URL(`/blog/${post.slug}/`, Astro.site || Astro.url.origin).toString()
-  }))
+  blogPost: posts.map((post) => {
+    const datePublished = toSchemaDateTime(post.publishedAt);
+    const dateModified = toSchemaDateTime(post.updatedAt || post.publishedAt) || datePublished;
+
+    return {
+      '@type': 'BlogPosting',
+      headline: post.title,
+      description: post.metaDescription || post.excerpt,
+      ...(datePublished ? { datePublished } : {}),
+      ...(dateModified ? { dateModified } : {}),
+      url: post.canonicalUrl || new URL(`/blog/${post.slug}/`, Astro.site || Astro.url.origin).toString()
+    };
+  })
 };
 ---
 <BaseLayout
