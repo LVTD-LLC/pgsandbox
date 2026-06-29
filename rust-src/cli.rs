@@ -4,7 +4,8 @@ use anyhow::Context;
 
 use crate::{
     config::{load_config, load_config_from_env},
-    doctor::run_doctor,
+    doctor::{mask_connection_string, run_doctor},
+    local::{LocalClusterConfig, LocalClusterStatus, LocalPostgresCluster},
     mcp::serve_stdio,
     postgres::{CreateDatabaseInput, DatabaseSelector, PostgresSandboxManager, RunSqlInput},
     setup::{
@@ -39,12 +40,17 @@ pub async fn run(args: Vec<String>) -> anyhow::Result<u8> {
             print_help();
             Ok(0)
         }
+        "local" if has_help_flag(&rest) => {
+            print_help();
+            Ok(0)
+        }
         "smoke-test" if has_help_flag(&rest) => {
             print_help();
             Ok(0)
         }
         "setup" => setup(&rest).await,
         "doctor" => doctor(&rest).await,
+        "local" => local(&rest).await,
         "smoke-test" => smoke_test(&rest).await,
         "" => start_server().await.map(|()| 0),
         other => anyhow::bail!("Unknown command: {other}"),
@@ -72,7 +78,7 @@ async fn setup(args: &[String]) -> anyhow::Result<u8> {
     let targets = resolve_targets(client, scope, &cwd)?;
 
     if admin_url.is_none() {
-        eprintln!("No PGSANDBOX_ADMIN_DATABASE_URL was written. The MCP client must provide it in the server environment.");
+        eprintln!("No PGSANDBOX_ADMIN_DATABASE_URL was written. The MCP server will use the managed local Postgres cluster by default.");
     }
 
     for target in targets {
@@ -138,6 +144,33 @@ async fn doctor(args: &[String]) -> anyhow::Result<u8> {
         )
         .await;
     Ok(code)
+}
+
+async fn local(args: &[String]) -> anyhow::Result<u8> {
+    let action = parse_local_action(args)?;
+    let cluster = LocalPostgresCluster::default()?;
+
+    match action {
+        LocalAction::Init => {
+            let config = cluster.init()?;
+            println!("Local Postgres: initialized");
+            print_local_config(&config, &cluster);
+        }
+        LocalAction::Start => {
+            let config = cluster.start()?;
+            println!("Local Postgres: running");
+            print_local_config(&config, &cluster);
+        }
+        LocalAction::Stop => {
+            cluster.stop()?;
+            println!("Local Postgres: stopped");
+        }
+        LocalAction::Status => {
+            print_local_status(&cluster.status()?, &cluster);
+        }
+    }
+
+    Ok(0)
 }
 
 async fn smoke_test(args: &[String]) -> anyhow::Result<u8> {
@@ -421,6 +454,32 @@ async fn smoke_test(args: &[String]) -> anyhow::Result<u8> {
     Ok(0)
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum LocalAction {
+    Init,
+    Start,
+    Stop,
+    Status,
+}
+
+fn parse_local_action(args: &[String]) -> anyhow::Result<LocalAction> {
+    let (action, rest) = args
+        .split_first()
+        .map(|(action, rest)| (action.as_str(), rest))
+        .unwrap_or(("status", &[]));
+    if !rest.is_empty() {
+        anyhow::bail!("Unexpected argument: {}", rest[0]);
+    }
+
+    match action {
+        "init" => Ok(LocalAction::Init),
+        "start" => Ok(LocalAction::Start),
+        "stop" => Ok(LocalAction::Stop),
+        "status" => Ok(LocalAction::Status),
+        other => anyhow::bail!("Unknown local command: {other}"),
+    }
+}
+
 fn parse_options(args: &[String]) -> anyhow::Result<BTreeMap<String, String>> {
     let mut options = BTreeMap::new();
     let mut index = 0;
@@ -482,8 +541,38 @@ fn client_selector_name(client: crate::setup::ClientSelector) -> &'static str {
     }
 }
 
-fn print_help() {
+fn print_local_status(status: &LocalClusterStatus, cluster: &LocalPostgresCluster) {
+    if !status.initialized {
+        println!("Local Postgres: not initialized");
+        println!("Root: {}", cluster.root().display());
+        println!("Next: pgsandbox-mcp local start");
+        return;
+    }
+
     println!(
+        "Local Postgres: {}",
+        if status.running { "running" } else { "stopped" }
+    );
+    if let Some(config) = &status.config {
+        print_local_config(config, cluster);
+    }
+}
+
+fn print_local_config(config: &LocalClusterConfig, cluster: &LocalPostgresCluster) {
+    println!("Profile: {}", config.profile_name);
+    println!("Data dir: {}", config.data_dir.display());
+    println!("Socket dir: {}", config.socket_dir.display());
+    println!("Port: {}", config.port);
+    println!("Config: {}", cluster.config_path().display());
+    println!("Admin URL: {}", mask_connection_string(&config.admin_url));
+}
+
+fn print_help() {
+    println!("{}", help_text());
+}
+
+fn help_text() -> String {
+    format!(
         r#"pgsandbox-mcp {VERSION}
 
 Usage:
@@ -491,6 +580,10 @@ Usage:
   pgsandbox-mcp stdio                Start the MCP server over stdio
   pgsandbox-mcp setup [options]      Write MCP client config
   pgsandbox-mcp doctor [options]     Check config and Postgres connectivity
+  pgsandbox-mcp local init           Initialize the managed local Postgres cluster
+  pgsandbox-mcp local start          Start the managed local Postgres cluster
+  pgsandbox-mcp local stop           Stop the managed local Postgres cluster
+  pgsandbox-mcp local status         Show managed local Postgres status
   pgsandbox-mcp smoke-test [options] Create, query, and delete a sandbox
 
 Setup options:
@@ -501,5 +594,44 @@ Setup options:
   --name <name>                      Server name in MCP config
   --dry-run                          Print config without writing
 "#
-    );
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn args(values: &[&str]) -> Vec<String> {
+        values.iter().map(|value| value.to_string()).collect()
+    }
+
+    #[test]
+    fn parses_local_runtime_actions() {
+        assert!(matches!(
+            parse_local_action(&args(&["init"])).unwrap(),
+            LocalAction::Init
+        ));
+        assert!(matches!(
+            parse_local_action(&args(&["start"])).unwrap(),
+            LocalAction::Start
+        ));
+        assert!(matches!(
+            parse_local_action(&args(&["stop"])).unwrap(),
+            LocalAction::Stop
+        ));
+        assert!(matches!(
+            parse_local_action(&args(&["status"])).unwrap(),
+            LocalAction::Status
+        ));
+    }
+
+    #[test]
+    fn help_text_lists_local_runtime_commands() {
+        let help = help_text();
+
+        assert!(help.contains("pgsandbox-mcp local init"));
+        assert!(help.contains("pgsandbox-mcp local start"));
+        assert!(help.contains("pgsandbox-mcp local stop"));
+        assert!(help.contains("pgsandbox-mcp local status"));
+    }
 }

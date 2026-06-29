@@ -44,11 +44,12 @@ cargo test
 cargo build --release
 ```
 
-Useful manual checks when Postgres is available:
+Useful manual checks with the managed local runtime:
 
 ```bash
-pgsandbox-mcp doctor --admin-url postgres://postgres:postgres@localhost:5432/postgres
-pgsandbox-mcp smoke-test --admin-url postgres://postgres:postgres@localhost:5432/postgres
+pgsandbox-mcp local status
+pgsandbox-mcp doctor
+pgsandbox-mcp smoke-test
 ```
 
 Release packaging check:
@@ -92,7 +93,8 @@ npm run package:homebrew
 - Changes to MCP client config writing belong with tests in
   `rust-src/setup.rs`.
 - For behavior that needs a live Postgres server, add the smallest practical
-  integration path and document the required `PGSANDBOX_ADMIN_DATABASE_URL`.
+  integration path and document whether it uses the managed local runtime or an
+  explicit `PGSANDBOX_ADMIN_DATABASE_URL`.
 
 ## Workflow
 

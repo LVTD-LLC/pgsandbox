@@ -22,15 +22,22 @@ Other useful commands:
 
 ```bash
 npm run package:homebrew
-pgsandbox-mcp doctor --admin-url postgres://postgres:postgres@localhost:5432/postgres
-pgsandbox-mcp smoke-test --admin-url postgres://postgres:postgres@localhost:5432/postgres
+pgsandbox-mcp local status
+pgsandbox-mcp doctor
+pgsandbox-mcp smoke-test
 ```
 
 ## Runtime Configuration
 
-Single-profile setup comes from environment variables:
+When `PGSANDBOX_ADMIN_DATABASE_URL` and `PGSANDBOX_CONFIG` are both absent,
+PGSandbox initializes and starts the managed local cluster under
+`~/.pgsandbox/postgres`, then loads a `local` profile from
+`~/.pgsandbox/local-postgres.json`.
+
+Explicit single-profile setup comes from environment variables:
 
 - `PGSANDBOX_ADMIN_DATABASE_URL`
+- `PGSANDBOX_HOME`
 - `PGSANDBOX_DATABASE_PREFIX`
 - `PGSANDBOX_DEFAULT_TTL_MINUTES`
 - `PGSANDBOX_MAX_TTL_MINUTES`
@@ -40,7 +47,9 @@ Single-profile setup comes from environment variables:
 - `DO_NOT_TRACK`
 
 Multi-profile setup comes from `PGSANDBOX_CONFIG`, which points at a JSON file
-matching the shape documented in `README.md`.
+matching the shape documented in `README.md`. `PGSANDBOX_CONFIG` and
+`PGSANDBOX_ADMIN_DATABASE_URL` are explicit opt-ins to external Postgres
+profiles.
 
 Do not introduce config sources that silently override these without documenting
 the precedence in `README.md` and tests.
@@ -52,9 +61,12 @@ JSON config files may also set `"telemetry": { "enabled": false }`.
 ## Core Modules
 
 - `rust-src/main.rs`: binary entrypoint.
-- `rust-src/cli.rs`: CLI dispatch, stdio startup, setup, doctor, and smoke-test.
+- `rust-src/cli.rs`: CLI dispatch, stdio startup, local runtime, setup, doctor,
+  and smoke-test.
 - `rust-src/mcp.rs`: MCP server and registered tool schemas.
 - `rust-src/config.rs`: env/JSON config loading and profile validation.
+- `rust-src/local.rs`: managed local Postgres cluster init/start/stop/status,
+  port selection, and runtime config persistence.
 - `rust-src/postgres.rs`: lifecycle, metadata, SQL execution, schema inspection, and
   cleanup.
 - `rust-src/names.rs`: identifier generation and SQL quoting helpers.
@@ -65,8 +77,10 @@ JSON config files may also set `"telemetry": { "enabled": false }`.
 
 ## Database Rules
 
-- The admin URL must point to a database where the configured user can create
-  databases and roles.
+- The default local runtime must not run Docker commands, stop containers, bind
+  `localhost:5432`, or mutate any existing developer database.
+- Explicit profile admin URLs must point to a database where the configured user
+  can create databases and roles.
 - Sandbox SQL should run through the generated sandbox role, not the admin role.
 - Cloned database restores should run through the generated sandbox role, not
   the admin role.
@@ -75,8 +89,10 @@ JSON config files may also set `"telemetry": { "enabled": false }`.
 - `cleanup_expired` should remain bounded; it currently selects up to 50 expired
   rows per call.
 - Readonly SQL must stay protected against transaction/session escape hatches.
-- `clone_database` may depend on `pg_dump` and `pg_restore`, but empty sandbox
-  creation must not require local PostgreSQL client tools.
+- The managed local runtime depends on `initdb`, `pg_ctl`, and `postgres`, but
+  it must not depend on Docker.
+- `clone_database` may depend on `pg_dump` and `pg_restore`; ordinary sandbox
+  create/query/delete must not require those dump/restore tools.
 
 ## Client Config Rules
 

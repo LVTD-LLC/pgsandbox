@@ -2,8 +2,12 @@
 
 ## V0 Design
 
-The first version is a local Rust MCP server in front of one or more reachable Postgres admin connections. It does not require Docker. Docker is only useful as a quick way to run Postgres locally if the developer does not already have it installed.
-For remote Postgres profiles, the configured Postgres URL can require TLS with `sslmode=require`.
+The first version is a local Rust MCP server in front of one default
+PGSandbox-managed local Postgres cluster plus optional explicit external
+Postgres admin profiles. It does not require Docker and should never bind or
+modify a developer's existing Postgres service on `localhost:5432`.
+For remote Postgres profiles, the configured Postgres URL can require TLS with
+`sslmode=require`.
 
 This local-first shape is the current deployment boundary, not the permanent
 product ceiling. A future hosted PGSandbox database platform should preserve
@@ -17,7 +21,7 @@ Agent / MCP client
 PGSandbox MCP
         |
         v
-Configured Postgres profile
+Managed local cluster or explicit Postgres profile
         |
         v
 Task-specific databases and roles
@@ -73,23 +77,37 @@ ids, SQL text, owner values, label keys or values, full local paths, or raw
 error messages. Users can disable telemetry with environment variables or with
 `"telemetry": { "enabled": false }` in `PGSANDBOX_CONFIG`.
 
+## Managed Local Runtime
+
+When no `PGSANDBOX_ADMIN_DATABASE_URL` or `PGSANDBOX_CONFIG` is set, startup
+initializes and starts a local Postgres cluster under `~/.pgsandbox/postgres`.
+The runtime stores its private config at `~/.pgsandbox/local-postgres.json`,
+including the selected port, data directory, Unix socket directory, log file,
+and admin URL. CLI output masks the admin URL password.
+
+The local runtime starts at port `65432` and scans upward for a free high port,
+so a Docker container or developer database on `5432` is not disturbed. It also
+sets `unix_socket_directories` to a PGSandbox-owned run directory for local
+socket access by Postgres tools.
+
 ## Profiles
 
-Profiles are the mechanism for supporting multiple Postgres versions or hosts without PGSandbox installing Postgres itself.
+Profiles are the opt-in mechanism for supporting external Postgres versions or
+hosts instead of the managed local default.
 
 Example:
 
 ```json
 {
-  "defaultProfile": "local-pg17",
+  "defaultProfile": "external-pg17",
   "profiles": [
     {
-      "name": "local-pg17",
-      "adminUrl": "postgres://postgres:postgres@localhost:5432/postgres"
+      "name": "external-pg17",
+      "adminUrl": "postgres://postgres:postgres@localhost:6543/postgres"
     },
     {
-      "name": "local-pg16",
-      "adminUrl": "postgres://postgres:postgres@localhost:5433/postgres"
+      "name": "external-pg16",
+      "adminUrl": "postgres://postgres:postgres@localhost:6544/postgres"
     }
   ]
 }
@@ -113,8 +131,9 @@ The first cloning backend should favor portability and clarity:
 - stream the dump into `pg_restore` connected as the sandbox role
 - delete the destination sandbox if the clone fails
 
-This requires local PostgreSQL client tools for cloning only. Normal empty
-sandbox creation should continue to work without `pg_dump` or `pg_restore`.
+This requires `pg_dump` and `pg_restore` for cloning only. Normal empty sandbox
+creation on the managed local runtime requires `initdb`, `pg_ctl`, and
+`postgres`, but it should continue to work without dump/restore tools.
 
 If `pg_dump`/`pg_restore` becomes too slow for large seeded states, evaluate a
 branching backend:

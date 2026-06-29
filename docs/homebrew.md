@@ -4,7 +4,8 @@ The target user flow is:
 
 ```bash
 brew install LVTD-LLC/tap/pgsandbox-mcp
-pgsandbox-mcp setup --client codex --admin-url postgres://postgres:postgres@localhost:5432/postgres
+pgsandbox-mcp setup --client codex
+pgsandbox-mcp doctor
 ```
 
 ## Recommended Release Shape
@@ -16,6 +17,9 @@ Use Homebrew as a thin installer for a versioned GitHub release artifact:
 3. Update `Formula/pgsandbox-mcp.rb` in [LVTD-LLC/homebrew-tap](https://github.com/LVTD-LLC/homebrew-tap) with the release URL and SHA256.
 
 This avoids asking users to install Node, npm, or a package manager runtime for a local MCP server.
+The formula installs only `pgsandbox-mcp`; users still need local PostgreSQL
+binaries such as `initdb`, `pg_ctl`, and `postgres` available on `PATH` for the
+managed local runtime.
 
 ## Formula Template
 
@@ -79,8 +83,11 @@ pgsandbox-mcp doctor
 The formula should only install the CLI. Client registration remains explicit:
 
 ```bash
-pgsandbox-mcp setup --client codex --admin-url "$PGSANDBOX_ADMIN_DATABASE_URL"
-pgsandbox-mcp setup --client cursor --scope project --admin-url "$PGSANDBOX_ADMIN_DATABASE_URL"
-pgsandbox-mcp setup --client vscode --scope project --admin-url "$PGSANDBOX_ADMIN_DATABASE_URL"
-pgsandbox-mcp setup --client claude-desktop --admin-url "$PGSANDBOX_ADMIN_DATABASE_URL"
+pgsandbox-mcp setup --client codex
+pgsandbox-mcp setup --client cursor --scope project
+pgsandbox-mcp setup --client vscode --scope project
+pgsandbox-mcp setup --client claude-desktop
 ```
+
+Use `--admin-url "$PGSANDBOX_ADMIN_DATABASE_URL"` only when intentionally
+configuring an external Postgres profile instead of the managed local default.
