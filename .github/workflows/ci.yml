@@ -31,3 +31,4 @@ jobs:
       - run: npm run site:check-changelog
       - run: npm --prefix site ci --include=dev
       - run: npm run site:build
+      - run: npm run site:check-blog-tables

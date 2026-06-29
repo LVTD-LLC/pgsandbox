@@ -12,6 +12,7 @@
     "typecheck": "cargo check",
     "start": "cargo run --",
     "site:check-changelog": "node scripts/check-site-changelog.mjs",
+    "site:check-blog-tables": "node scripts/check-site-blog-tables.mjs",
     "site:build": "npm --prefix site run build"
   },
   "keywords": [

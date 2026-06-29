@@ -2,6 +2,7 @@
 
 ## 2026-06-29
 
+- Added a site build check for accessible Markdown table scroll wrappers on blog posts.
 - Moved the two published site blog posts out of Rowset and into Astro-managed Markdown content files.
 - Added the database branching comparison brief and SEO ledger updates for the Rowset-backed blog.
 - Added the initial SEO content foundation with brand guidance, Rowset blog configuration, internal link inventory, keyword research baseline, and candidate backlog for future PGSandbox MCP blog posts.
