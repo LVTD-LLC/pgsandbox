@@ -15,6 +15,13 @@ type RowsetRow = {
   data: Record<string, string>;
 };
 
+type HastNode = {
+  type?: string;
+  tagName?: string;
+  properties?: Record<string, unknown>;
+  children?: HastNode[];
+};
+
 export type BlogPost = {
   slug: string;
   title: string;
@@ -34,8 +41,52 @@ export type BlogPost = {
   sortOrder: number;
 };
 
+function isElement(node: HastNode, tagName: string): boolean {
+  return node.type === 'element' && node.tagName === tagName;
+}
+
+function wrapMarkdownTables(node: HastNode): void {
+  if (!Array.isArray(node.children)) {
+    return;
+  }
+
+  node.children = node.children.map((child) => {
+    wrapMarkdownTables(child);
+
+    if (!isElement(child, 'table')) {
+      return child;
+    }
+
+    return {
+      type: 'element',
+      tagName: 'figure',
+      properties: { className: ['markdown-table-frame'] },
+      children: [
+        {
+          type: 'element',
+          tagName: 'div',
+          properties: {
+            className: ['markdown-table-scroll'],
+            role: 'region',
+            ariaLabel: 'Scrollable table',
+            tabIndex: 0
+          },
+          children: [child]
+        }
+      ]
+    };
+  });
+}
+
+function rehypeResponsiveTables() {
+  return function transform(tree: HastNode): void {
+    wrapMarkdownTables(tree);
+  };
+}
+
 const markdownProcessor = createMarkdownProcessor({
   syntaxHighlight: false,
+  rehypePlugins: [rehypeResponsiveTables],
   remarkRehype: {
     allowDangerousHtml: false
   }
