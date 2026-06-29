@@ -48,7 +48,7 @@ pub struct LocalClusterStatus {
 }
 
 impl LocalPostgresCluster {
-    pub fn default() -> anyhow::Result<Self> {
+    pub fn from_env() -> anyhow::Result<Self> {
         let root = match std::env::var_os("PGSANDBOX_HOME") {
             Some(path) => PathBuf::from(path),
             None => dirs::home_dir()
@@ -161,7 +161,7 @@ impl LocalPostgresCluster {
             anyhow::bail!("local Postgres did not report healthy after pg_ctl start");
         }
 
-        Ok(self.read_config()?)
+        self.read_config()
     }
 
     pub fn stop(&self) -> anyhow::Result<()> {

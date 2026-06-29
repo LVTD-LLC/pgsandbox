@@ -148,7 +148,7 @@ async fn doctor(args: &[String]) -> anyhow::Result<u8> {
 
 async fn local(args: &[String]) -> anyhow::Result<u8> {
     let action = parse_local_action(args)?;
-    let cluster = LocalPostgresCluster::default()?;
+    let cluster = LocalPostgresCluster::from_env()?;
 
     match action {
         LocalAction::Init => {
