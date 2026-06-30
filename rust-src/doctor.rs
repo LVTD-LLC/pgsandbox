@@ -21,6 +21,7 @@ pub async fn run_doctor(admin_url: Option<&str>, cwd: &Path) -> DoctorResult {
             .unwrap_or_else(|_| "pgsandbox-mcp".to_string())
     )];
     let mut ok = true;
+    let mut configured_admin_url_target = None;
 
     let mut env = std::env::vars().collect::<Vec<_>>();
     if let Some(admin_url) = admin_url {
@@ -40,6 +41,7 @@ pub async fn run_doctor(admin_url: Option<&str>, cwd: &Path) -> DoctorResult {
                 "PGSANDBOX_ADMIN_DATABASE_URL".to_string(),
                 configured_admin_url,
             ));
+            configured_admin_url_target = Some(target);
         }
     }
 
@@ -53,7 +55,23 @@ pub async fn run_doctor(admin_url: Option<&str>, cwd: &Path) -> DoctorResult {
     };
 
     if let Some(config) = config {
-        check_profiles(&config, &mut lines, &mut ok).await;
+        let postgres_ok = check_profiles(&config, &mut lines).await;
+        ok = ok && postgres_ok;
+        if !postgres_ok {
+            if let Some(target) = configured_admin_url_target {
+                lines.push(format!(
+                    "Hint: this check used an explicit admin URL from {} {} MCP config. If you want the managed local cluster instead, run `pgsandbox-mcp setup --client {}{}` without `--admin-url`, restart the MCP client, and rerun doctor.",
+                    target.client,
+                    target.scope,
+                    target.client,
+                    if target.scope == crate::setup::ConfigScope::Project {
+                        " --scope project"
+                    } else {
+                        ""
+                    }
+                ));
+            }
+        }
     }
 
     let configs = detect_existing_client_configs(cwd);
@@ -75,7 +93,8 @@ pub async fn run_doctor(admin_url: Option<&str>, cwd: &Path) -> DoctorResult {
     DoctorResult { ok, lines }
 }
 
-async fn check_profiles(config: &SandboxConfig, lines: &mut Vec<String>, ok: &mut bool) {
+async fn check_profiles(config: &SandboxConfig, lines: &mut Vec<String>) -> bool {
+    let mut ok = true;
     for profile in &config.profiles {
         lines.push(format!(
             "Profile {}: {}",
@@ -99,12 +118,13 @@ async fn check_profiles(config: &SandboxConfig, lines: &mut Vec<String>, ok: &mu
             ));
         }
         let result = check_postgres(&profile.admin_url).await;
-        *ok = *ok && result.0;
+        ok = ok && result.0;
         lines.push(format!(
             "Postgres connection ({}): {}",
             profile.name, result.1
         ));
     }
+    ok
 }
 
 async fn check_postgres(admin_url: &str) -> (bool, String) {
@@ -113,7 +133,7 @@ async fn check_postgres(admin_url: &str) -> (bool, String) {
 
     let (client, connection_task) = match connect {
         Ok(Ok(value)) => value,
-        Ok(Err(error)) => return (false, error.to_string()),
+        Ok(Err(error)) => return (false, format!("{error:#}")),
         Err(_) => return (false, "connection timed out".to_string()),
     };
 
@@ -123,7 +143,7 @@ async fn check_postgres(admin_url: &str) -> (bool, String) {
 
     match result {
         Ok(_) => (true, "ok".to_string()),
-        Err(error) => (false, error.to_string()),
+        Err(error) => (false, format!("{error:#}")),
     }
 }
 

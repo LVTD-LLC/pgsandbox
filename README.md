@@ -401,6 +401,12 @@ The service uses:
 The local runtime stores its selected port, socket directory, data directory,
 log file, and private admin URL in `~/.pgsandbox/local-postgres.json`. CLI output
 masks the password.
+PGSandbox first uses PostgreSQL server binaries on `PATH`, then checks common
+Homebrew and Postgres.app install locations such as
+`/opt/homebrew/opt/postgresql@18/bin`. If an older MCP client config still
+contains `PGSANDBOX_ADMIN_DATABASE_URL`, rerun `pgsandbox-mcp setup --client
+<client>` without `--admin-url` to return that client to the managed local
+default.
 
 The MCP server runs over stdio:
 

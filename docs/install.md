@@ -5,9 +5,11 @@ Postgres cluster under `~/.pgsandbox/` and chooses a high local port such as
 `127.0.0.1:65432`, leaving Docker or another developer database on `5432`
 untouched.
 
-The managed local runtime requires `initdb`, `pg_ctl`, and `postgres` on `PATH`.
-The `clone_database` MCP tool additionally requires `pg_dump` and `pg_restore`
-because it streams a source database dump into a new sandbox.
+The managed local runtime requires `initdb`, `pg_ctl`, and `postgres`. It first
+checks `PATH`, then common Homebrew and Postgres.app install locations such as
+`/opt/homebrew/opt/postgresql@18/bin`. The `clone_database` MCP tool
+additionally requires `pg_dump` and `pg_restore` because it streams a source
+database dump into a new sandbox.
 
 ## Agent-Assisted Setup
 
@@ -278,12 +280,14 @@ commands only when they are safe for the target sandbox.
 ## Troubleshooting
 
 - Missing `initdb`, `pg_ctl`, or `postgres`: install local PostgreSQL server
-  binaries and make sure they are on `PATH`; PGSandbox will not install or run
-  Docker for you.
+  binaries. PGSandbox checks `PATH`, common Homebrew locations, and Postgres.app
+  before failing; it will not install or run Docker for you.
 - Missing `pg_dump` or `pg_restore`: install PostgreSQL client tools before
   using `clone_database` or template tools.
 - Occupied local ports: run `pgsandbox-mcp local start`; the managed runtime
   scans upward from `65432` and does not take over `5432`.
+- Stale MCP admin URL: rerun `pgsandbox-mcp setup --client <client>` without
+  `--admin-url`, restart the MCP client, and rerun `pgsandbox-mcp doctor`.
 - Permissions under `~/.pgsandbox`: check ownership of the directory or set
   `PGSANDBOX_HOME` to a writable local path.
 - Stale sandboxes: call `list_databases`, then `delete_database` for specific

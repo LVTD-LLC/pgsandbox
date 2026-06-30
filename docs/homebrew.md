@@ -18,8 +18,10 @@ Use Homebrew as a thin installer for a versioned GitHub release artifact:
 
 This avoids asking users to install Node, npm, or a package manager runtime for a local MCP server.
 The formula installs only `pgsandbox-mcp`; users still need local PostgreSQL
-binaries such as `initdb`, `pg_ctl`, and `postgres` available on `PATH` for the
-managed local runtime.
+server binaries such as `initdb`, `pg_ctl`, and `postgres` for the managed local
+runtime. PGSandbox checks `PATH` plus common Homebrew and Postgres.app install
+locations, so a keg-only `postgresql@18` install can still work without a
+shell-specific PATH edit.
 
 ## Formula Template
 

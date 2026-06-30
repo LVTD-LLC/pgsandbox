@@ -621,6 +621,55 @@ mod tests {
     }
 
     #[test]
+    fn setup_without_admin_url_removes_stale_codex_env() {
+        let dir = tempdir().unwrap();
+        let target = resolve_targets(ClientSelector::Codex, ConfigScope::Project, dir.path())
+            .unwrap()
+            .remove(0);
+        let external_launch = build_launch_config(
+            None,
+            None,
+            Some("postgres://postgres:secret@localhost:5432/postgres"),
+        );
+        write_client_config(&target, &external_launch, false).unwrap();
+
+        let local_launch = build_launch_config(None, None, None);
+        write_client_config(&target, &local_launch, false).unwrap();
+        let content = fs::read_to_string(&target.path).unwrap();
+
+        assert!(content.contains("[mcp_servers.pgsandbox]"));
+        assert!(!content.contains(ADMIN_DATABASE_URL_ENV));
+        assert!(admin_url_from_codex_toml(&content, "pgsandbox").is_none());
+    }
+
+    #[test]
+    fn setup_without_admin_url_removes_stale_json_env() {
+        let dir = tempdir().unwrap();
+        let target = resolve_targets(ClientSelector::Cursor, ConfigScope::Project, dir.path())
+            .unwrap()
+            .remove(0);
+        let external_launch = build_launch_config(
+            None,
+            None,
+            Some("postgres://postgres:secret@localhost:5432/postgres"),
+        );
+        write_client_config(&target, &external_launch, false).unwrap();
+
+        let local_launch = build_launch_config(None, None, None);
+        write_client_config(&target, &local_launch, false).unwrap();
+        let parsed =
+            serde_json::from_str::<Value>(&fs::read_to_string(&target.path).unwrap()).unwrap();
+
+        assert!(parsed["mcpServers"]["pgsandbox"]["env"].is_null());
+        assert!(admin_url_from_json_config(
+            &fs::read_to_string(&target.path).unwrap(),
+            target.format,
+            "pgsandbox"
+        )
+        .is_none());
+    }
+
+    #[test]
     fn finds_admin_url_from_generated_codex_config() {
         let dir = tempdir().unwrap();
         let target = resolve_targets(ClientSelector::Codex, ConfigScope::Project, dir.path())
