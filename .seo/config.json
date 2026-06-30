@@ -1,21 +1,18 @@
 {
   "domain": "https://pgsandbox-mcp.lvtd.dev",
   "stack": "astro",
-  "language": "markdown_in_rowset",
-  "content_dir": null,
+  "language": "markdown",
+  "content_dir": "site/src/content/blog",
   "content_layout": "site/src/pages/blog/[slug].astro",
   "output_url_prefix": "/blog",
   "keyword_tool": "dfs",
   "ahrefs_project_id": null,
   "content_store": {
-    "type": "rowset",
-    "dataset_key": "1e629b1a-89e5-4c56-8772-5c6ae5784753",
-    "api_base": "https://rowset.lvtd.dev/api",
-    "index_column": "slug",
-    "draft_status": "draft",
-    "review_status": "review",
-    "published_status": "published",
-    "body_field": "body_markdown",
+    "type": "files",
+    "platform": "astro",
+    "read_method": "git",
+    "write_method": "file",
+    "body_format": "markdown",
     "render_path": "/blog/:slug/"
   }
 }

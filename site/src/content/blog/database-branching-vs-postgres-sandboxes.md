@@ -155,6 +155,8 @@ That clone path is useful when an agent needs realistic database shape. It is no
 
 The safe rule is simple: choose the smallest data shape that proves the task.
 
+If the task does need realistic source state, use a clone workflow that keeps the source read-only and restores into a disposable destination. The [Postgres clone database sandbox guide](https://pgsandbox-mcp.lvtd.dev/blog/how-to-clone-postgres-database-sandbox/) walks through that safer path for agent workflows.
+
 ## A Decision Checklist
 
 Use this before you wire a coding agent to a database workflow.

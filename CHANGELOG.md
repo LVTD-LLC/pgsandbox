@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-06-30
+
+- Added the Astro Markdown blog post "How to Clone a Postgres Database Into a Safe Sandbox" with SEO ledger, link inventory, and inbound blog links.
+- Updated the SEO foundation to reflect Astro Markdown blog files as the current source of truth.
+
 ## 2026-06-29
 
 - Added a site build check for accessible Markdown table scroll wrappers on blog posts.

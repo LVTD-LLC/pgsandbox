@@ -162,6 +162,8 @@ Do not let a coding agent mutate the source database as part of "cloning." If th
 
 PGSandbox's clone direction follows that mental model: the source is read, the destination is a tracked PGSandbox-owned database, and restore failure should clean up the destination rather than leaving a broken half-sandbox behind.
 
+For a step-by-step version of that workflow, see [how to clone a Postgres database into a safe sandbox](https://pgsandbox-mcp.lvtd.dev/blog/how-to-clone-postgres-database-sandbox/). It covers the dump/restore flags, schema-only option, source-data boundary, and cleanup rule in one agent-focused flow.
+
 ## 8. A practical approval rule
 
 Use this rule for day-to-day work:
