@@ -120,7 +120,7 @@ pgsandbox-mcp doctor
 
 The installer downloads a platform-specific release archive, verifies the
 checksum when the release includes `pgsandbox-mcp-<version>-checksums.txt`, and
-installs to `~/.local/bin` by default. Use `PGSANDBOX_VERSION=0.1.2` to pin a
+installs to `~/.local/bin` by default. Use `PGSANDBOX_VERSION=0.1.3` to pin a
 release or `PGSANDBOX_INSTALL_DIR=/usr/local/bin` to choose a different install
 directory.
 
@@ -135,7 +135,7 @@ cargo run -- smoke-test
 Rust users can also install directly from GitHub:
 
 ```bash
-cargo install --git https://github.com/LVTD-LLC/pgsandbox-mcp --tag v0.1.2
+cargo install --git https://github.com/LVTD-LLC/pgsandbox-mcp --tag v0.1.3
 ```
 
 ## Update

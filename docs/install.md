@@ -98,7 +98,7 @@ release includes `pgsandbox-mcp-<version>-checksums.txt`.
 Pin a version or install somewhere else with environment variables:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/LVTD-LLC/pgsandbox-mcp/main/scripts/install.sh | PGSANDBOX_VERSION=0.1.2 sh
+curl -fsSL https://raw.githubusercontent.com/LVTD-LLC/pgsandbox-mcp/main/scripts/install.sh | PGSANDBOX_VERSION=0.1.3 sh
 curl -fsSL https://raw.githubusercontent.com/LVTD-LLC/pgsandbox-mcp/main/scripts/install.sh | PGSANDBOX_INSTALL_DIR=/usr/local/bin sh
 ```
 
@@ -112,7 +112,7 @@ pgsandbox-mcp setup --client codex
 From GitHub without cloning first:
 
 ```bash
-cargo install --git https://github.com/LVTD-LLC/pgsandbox-mcp --tag v0.1.2
+cargo install --git https://github.com/LVTD-LLC/pgsandbox-mcp --tag v0.1.3
 pgsandbox-mcp setup --client codex
 ```
 

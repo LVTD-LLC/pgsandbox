@@ -29,7 +29,7 @@ Place this in [LVTD-LLC/homebrew-tap](https://github.com/LVTD-LLC/homebrew-tap) 
 class PgsandboxMcp < Formula
   desc "MCP server for disposable Postgres experimentation databases"
   homepage "https://github.com/LVTD-LLC/pgsandbox-mcp"
-  url "https://github.com/LVTD-LLC/pgsandbox-mcp/releases/download/v0.1.2/pgsandbox-mcp-0.1.2.tar.gz"
+  url "https://github.com/LVTD-LLC/pgsandbox-mcp/releases/download/v0.1.3/pgsandbox-mcp-0.1.3.tar.gz"
   sha256 "REPLACE_WITH_RELEASE_TARBALL_SHA256"
   license "MIT"
 
