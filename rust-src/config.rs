@@ -90,7 +90,7 @@ pub struct SandboxProfile {
     pub managed_local: bool,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct ManagedLocalConfig {
     #[serde(default)]
@@ -118,12 +118,6 @@ impl Default for TelemetryConfig {
         Self {
             enabled: default_telemetry_enabled(),
         }
-    }
-}
-
-impl Default for ManagedLocalConfig {
-    fn default() -> Self {
-        Self { enabled: false }
     }
 }
 
