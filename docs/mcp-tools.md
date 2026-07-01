@@ -6,6 +6,12 @@ When a tool omits `profile`, PGSandbox uses the configured default profile. With
 no explicit `PGSANDBOX_ADMIN_DATABASE_URL` or `PGSANDBOX_CONFIG`, that default
 is the managed local Postgres cluster under `~/.pgsandbox/`.
 
+Tools that accept `profile` also accept `postgresVersion`. If both are supplied,
+the selected profile must carry matching `postgresVersion` metadata. On the
+managed local default, requesting a version such as `"18"` starts or reuses the
+isolated `local-pg18` cluster when matching local Postgres binaries are
+installed.
+
 Workflow-oriented tools return a compact result envelope:
 
 - `ok`: whether the requested workflow completed
@@ -23,6 +29,7 @@ Creates an isolated database and login role.
 Inputs:
 
 - `profile`: optional Postgres profile name
+- `postgresVersion`: optional Postgres major version, for example `"16"`
 - `nameHint`: short human-readable purpose
 - `ttlMinutes`: optional TTL, capped by server config
 - `owner`: optional agent/session identifier
@@ -35,6 +42,19 @@ Returns:
 - `roleName`
 - `expiresAt`
 - `connectionString`
+
+## `list_profiles`
+
+Lists configured profiles and discoverable local Postgres installations.
+
+Inputs:
+
+- `includeDiscoveredLocal`: optional boolean, defaults to true
+
+Returns:
+
+- `profiles`: profile summaries with `name`, `postgresVersion`, `managedLocal`,
+  masked `adminUrl`, and `source`
 
 ## `clone_database`
 
@@ -49,6 +69,7 @@ sandbox role where possible.
 Inputs:
 
 - `profile`: optional target Postgres profile name
+- `postgresVersion`: optional target Postgres major version
 - `sourceDatabaseUrl`: source Postgres connection string
 - `nameHint`: short human-readable purpose
 - `ttlMinutes`: optional TTL, capped by server config
@@ -252,12 +273,16 @@ injected through `DATABASE_URL`, `PGSANDBOX_DATABASE_URL`, and libpq-style
 Detects a Django repo from `manage.py` and settings patterns, then writes a
 secret-free `.pgsandbox/project.json` with a default Django migration command.
 If detection is uncertain, the tool returns `ok: false` with an action-needed
-message instead of guessing.
+message instead of guessing. If `postgresVersion` is omitted, PGSandbox checks
+existing `.pgsandbox/project.json`, then Compose/devcontainer image references
+such as `postgres:16` or `postgis/postgis:16-3.4`, and records the inferred
+version when found.
 
 Inputs:
 
 - `repoPath`
 - `profile`: optional Postgres profile name
+- `postgresVersion`: optional Postgres major version
 - `databaseId` or `databaseName`: optional sandbox to report as the masked target
 
 ### `run_migrations`
@@ -268,6 +293,8 @@ Inputs:
 
 - `repoPath`
 - `profile`: optional Postgres profile name
+- `postgresVersion`: optional Postgres major version; defaults from
+  `.pgsandbox/project.json` when present
 - `databaseId` or `databaseName`
 - `command`: optional argv array; defaults to `.pgsandbox/project.json`
 - `timeoutSeconds`: optional timeout, capped by the server
@@ -282,6 +309,8 @@ Inputs:
 
 - `repoPath`
 - `profile`: optional Postgres profile name
+- `postgresVersion`: optional Postgres major version; defaults from explicit
+  input, `.pgsandbox/project.json`, or repo inference when creating a sandbox
 - `databaseId` or `databaseName`: optional; omitted creates a fresh sandbox
 - `command`: optional argv array; defaults to `.pgsandbox/project.json`
 - `timeoutSeconds`
@@ -296,6 +325,8 @@ Inputs:
 
 - `repoPath`
 - `profile`: optional Postgres profile name
+- `postgresVersion`: optional Postgres major version; defaults from
+  `.pgsandbox/project.json` when present
 - `databaseId` or `databaseName`
 - `command`: optional argv array; defaults to `.pgsandbox/project.json` `seedCommand`
 - `timeoutSeconds`

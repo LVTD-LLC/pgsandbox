@@ -258,6 +258,25 @@ pgsandbox-mcp setup --client vscode --scope project
 Only pass `--admin-url` when intentionally opting into an external Postgres
 profile. The default setup uses the managed local cluster.
 
+To make the MCP client default to a specific installed local Postgres major
+version, pass `--postgres-version` during setup:
+
+```bash
+pgsandbox-mcp setup --client codex --postgres-version 18
+```
+
+You can also start or inspect a versioned local cluster directly:
+
+```bash
+pgsandbox-mcp local start --postgres-version 18
+pgsandbox-mcp local status --postgres-version 18
+```
+
+PGSandbox keeps each requested major version in separate local state, such as
+`~/.pgsandbox/postgres/versions/18/`, and uses profile names like `local-pg18`.
+It discovers binaries from `PATH`, common package-manager locations,
+`PGSANDBOX_POSTGRES_BIN_DIR`, or `PGSANDBOX_POSTGRES_18_BIN_DIR`.
+
 ## Django Recipe
 
 After installation and MCP restart, an agent can validate a Django migration
@@ -272,7 +291,9 @@ without using the developer's real database:
 
 `prepare_for_repo` writes `.pgsandbox/project.json` without secrets. Migration
 and seed tools run commands without a shell, inject the sandbox URL through
-environment variables, and return bounded stdout/stderr.
+environment variables, and return bounded stdout/stderr. If the repo has a
+Compose or devcontainer Postgres image such as `postgres:16`, `prepare_for_repo`
+records that version so later workflow calls can use the matching local profile.
 
 Prisma, Rails, and Alembic adapters are future work. For now, use explicit
 commands only when they are safe for the target sandbox.
@@ -282,6 +303,9 @@ commands only when they are safe for the target sandbox.
 - Missing `initdb`, `pg_ctl`, or `postgres`: install local PostgreSQL server
   binaries. PGSandbox checks `PATH`, common Homebrew locations, and Postgres.app
   before failing; it will not install or run Docker for you.
+- Missing a requested Postgres version: install that version locally or set
+  `PGSANDBOX_POSTGRES_<major>_BIN_DIR`, for example
+  `PGSANDBOX_POSTGRES_18_BIN_DIR=/opt/homebrew/opt/postgresql@18/bin`.
 - Missing `pg_dump` or `pg_restore`: install PostgreSQL client tools before
   using `clone_database` or template tools.
 - Occupied local ports: run `pgsandbox-mcp local start`; the managed runtime

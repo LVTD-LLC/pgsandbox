@@ -33,7 +33,8 @@ use url::Url;
 use uuid::Uuid;
 
 use crate::{
-    config::{find_profile, SandboxConfig, SandboxProfile},
+    config::{find_profile, find_profile_for_request, ConfigError, SandboxConfig, SandboxProfile},
+    local::{discover_local_postgres_installations, LocalClusterConfig, LocalPostgresCluster},
     names::{make_sandbox_names, quote_ident, quote_literal},
 };
 
@@ -69,6 +70,7 @@ pub struct PostgresSandboxManager {
 #[serde(rename_all = "camelCase")]
 pub struct CreateDatabaseInput {
     pub profile: Option<String>,
+    pub postgres_version: Option<String>,
     pub name_hint: Option<String>,
     pub ttl_minutes: Option<u32>,
     pub owner: Option<String>,
@@ -79,6 +81,7 @@ pub struct CreateDatabaseInput {
 #[serde(rename_all = "camelCase")]
 pub struct CloneDatabaseInput {
     pub profile: Option<String>,
+    pub postgres_version: Option<String>,
     pub source_database_url: String,
     pub name_hint: Option<String>,
     pub ttl_minutes: Option<u32>,
@@ -91,6 +94,7 @@ pub struct CloneDatabaseInput {
 #[serde(rename_all = "camelCase")]
 pub struct DatabaseSelector {
     pub profile: Option<String>,
+    pub postgres_version: Option<String>,
     pub database_id: Option<String>,
     pub database_name: Option<String>,
 }
@@ -99,6 +103,7 @@ pub struct DatabaseSelector {
 #[serde(rename_all = "camelCase")]
 pub struct RunSqlInput {
     pub profile: Option<String>,
+    pub postgres_version: Option<String>,
     pub database_id: Option<String>,
     pub database_name: Option<String>,
     pub sql: String,
@@ -110,6 +115,7 @@ pub struct RunSqlInput {
 #[serde(rename_all = "camelCase")]
 pub struct ListDatabasesInput {
     pub profile: Option<String>,
+    pub postgres_version: Option<String>,
     pub owner: Option<String>,
 }
 
@@ -117,6 +123,7 @@ pub struct ListDatabasesInput {
 #[serde(rename_all = "camelCase")]
 pub struct CleanupExpiredInput {
     pub profile: Option<String>,
+    pub postgres_version: Option<String>,
     pub dry_run: Option<bool>,
 }
 
@@ -124,6 +131,7 @@ pub struct CleanupExpiredInput {
 #[serde(rename_all = "camelCase")]
 pub struct SchemaDiffInput {
     pub profile: Option<String>,
+    pub postgres_version: Option<String>,
     pub database_id: Option<String>,
     pub database_name: Option<String>,
     pub base_digest: Value,
@@ -133,6 +141,7 @@ pub struct SchemaDiffInput {
 #[serde(rename_all = "camelCase")]
 pub struct ExplainQueryInput {
     pub profile: Option<String>,
+    pub postgres_version: Option<String>,
     pub database_id: Option<String>,
     pub database_name: Option<String>,
     pub sql: String,
@@ -142,6 +151,7 @@ pub struct ExplainQueryInput {
 #[serde(rename_all = "camelCase")]
 pub struct CreateSchemaSnapshotInput {
     pub profile: Option<String>,
+    pub postgres_version: Option<String>,
     pub database_id: Option<String>,
     pub database_name: Option<String>,
     pub snapshot_name: String,
@@ -152,6 +162,7 @@ pub struct CreateSchemaSnapshotInput {
 #[serde(rename_all = "camelCase")]
 pub struct ListSchemaSnapshotsInput {
     pub profile: Option<String>,
+    pub postgres_version: Option<String>,
     pub database_id: Option<String>,
     pub database_name: Option<String>,
 }
@@ -160,6 +171,7 @@ pub struct ListSchemaSnapshotsInput {
 #[serde(rename_all = "camelCase")]
 pub struct DeleteSchemaSnapshotInput {
     pub profile: Option<String>,
+    pub postgres_version: Option<String>,
     pub database_id: Option<String>,
     pub database_name: Option<String>,
     pub snapshot_name: String,
@@ -169,6 +181,7 @@ pub struct DeleteSchemaSnapshotInput {
 #[serde(rename_all = "camelCase")]
 pub struct DiffSchemaSnapshotInput {
     pub profile: Option<String>,
+    pub postgres_version: Option<String>,
     pub database_id: Option<String>,
     pub database_name: Option<String>,
     pub snapshot_name: String,
@@ -179,6 +192,7 @@ pub struct DiffSchemaSnapshotInput {
 pub struct PrepareForRepoInput {
     pub repo_path: String,
     pub profile: Option<String>,
+    pub postgres_version: Option<String>,
     pub database_id: Option<String>,
     pub database_name: Option<String>,
 }
@@ -188,6 +202,7 @@ pub struct PrepareForRepoInput {
 pub struct RunMigrationsInput {
     pub repo_path: String,
     pub profile: Option<String>,
+    pub postgres_version: Option<String>,
     pub database_id: Option<String>,
     pub database_name: Option<String>,
     pub command: Option<Vec<String>>,
@@ -199,6 +214,7 @@ pub struct RunMigrationsInput {
 pub struct ValidateMigrationInput {
     pub repo_path: String,
     pub profile: Option<String>,
+    pub postgres_version: Option<String>,
     pub database_id: Option<String>,
     pub database_name: Option<String>,
     pub command: Option<Vec<String>>,
@@ -214,6 +230,7 @@ pub struct ValidateMigrationInput {
 pub struct SeedDatabaseInput {
     pub repo_path: String,
     pub profile: Option<String>,
+    pub postgres_version: Option<String>,
     pub database_id: Option<String>,
     pub database_name: Option<String>,
     pub command: Option<Vec<String>>,
@@ -224,6 +241,7 @@ pub struct SeedDatabaseInput {
 #[serde(rename_all = "camelCase")]
 pub struct CreateTemplateFromSandboxInput {
     pub profile: Option<String>,
+    pub postgres_version: Option<String>,
     pub database_id: Option<String>,
     pub database_name: Option<String>,
     pub template_name: String,
@@ -235,6 +253,7 @@ pub struct CreateTemplateFromSandboxInput {
 #[serde(rename_all = "camelCase")]
 pub struct CreateSandboxFromTemplateInput {
     pub profile: Option<String>,
+    pub postgres_version: Option<String>,
     pub template_name: String,
     pub name_hint: Option<String>,
     pub ttl_minutes: Option<u32>,
@@ -246,13 +265,21 @@ pub struct CreateSandboxFromTemplateInput {
 #[serde(rename_all = "camelCase")]
 pub struct ListTemplatesInput {
     pub profile: Option<String>,
+    pub postgres_version: Option<String>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct DeleteTemplateInput {
     pub profile: Option<String>,
+    pub postgres_version: Option<String>,
     pub template_name: String,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ListProfilesInput {
+    pub include_discovered_local: Option<bool>,
 }
 
 #[derive(Debug, Serialize)]
@@ -260,6 +287,23 @@ pub struct DeleteTemplateInput {
 pub struct ListDatabasesOutput {
     pub databases: Vec<Value>,
     pub truncated: bool,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ListProfilesOutput {
+    pub profiles: Vec<ProfileSummary>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProfileSummary {
+    pub name: String,
+    pub default: bool,
+    pub postgres_version: Option<String>,
+    pub managed_local: bool,
+    pub admin_url: String,
+    pub source: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -549,6 +593,8 @@ pub struct SchemaSnapshotSummary {
 pub struct PrepareForRepoOutput {
     pub repo_path: String,
     pub detected_framework: Option<String>,
+    pub postgres_version: Option<String>,
+    pub postgres_version_source: Option<String>,
     pub config_path: Option<String>,
     pub sandbox_target: Option<String>,
     pub action_needed: Option<String>,
@@ -653,7 +699,21 @@ struct RepoProjectConfig {
     migration_command: Vec<String>,
     seed_command: Option<Vec<String>>,
     database_url_env: String,
+    #[serde(default)]
+    postgres_version: Option<String>,
     prepared_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct RepoPostgresVersionInference {
+    version: String,
+    source: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct RepoPostgresVersionResolution {
+    version: Option<String>,
+    source: Option<String>,
 }
 
 #[derive(Debug)]
@@ -728,17 +788,118 @@ impl PostgresSandboxManager {
         Self { config }
     }
 
+    fn resolve_profile(
+        &self,
+        profile_name: Option<&str>,
+        postgres_version: Option<&str>,
+    ) -> anyhow::Result<SandboxProfile> {
+        match find_profile_for_request(&self.config, profile_name, postgres_version) {
+            Ok(profile) => Ok(profile.clone()),
+            Err(ConfigError::UnknownPostgresVersion(version))
+                if self.config.managed_local.enabled && profile_name.is_none() =>
+            {
+                self.ensure_managed_local_profile(Some(&version))
+            }
+            Err(ConfigError::UnknownProfile(profile))
+                if self.config.managed_local.enabled
+                    && postgres_version.is_none()
+                    && profile_name == Some(profile.as_str()) =>
+            {
+                let Some(version) = profile.strip_prefix("local-pg") else {
+                    return Err(ConfigError::UnknownProfile(profile).into());
+                };
+                self.ensure_managed_local_profile(Some(version))
+            }
+            Err(error) => Err(error.into()),
+        }
+    }
+
+    fn ensure_managed_local_profile(
+        &self,
+        postgres_version: Option<&str>,
+    ) -> anyhow::Result<SandboxProfile> {
+        let local_config = LocalPostgresCluster::from_env_for_version(postgres_version)?
+            .ensure_started()
+            .context("failed to prepare requested local Postgres version")?;
+        Ok(self.profile_from_local_config(local_config))
+    }
+
+    fn profile_from_local_config(&self, local_config: LocalClusterConfig) -> SandboxProfile {
+        let base = self
+            .config
+            .profiles
+            .iter()
+            .find(|profile| profile.managed_local)
+            .or_else(|| find_profile(&self.config, None).ok());
+        SandboxProfile {
+            name: local_config.profile_name,
+            admin_url: local_config.admin_url,
+            database_prefix: base
+                .map(|profile| profile.database_prefix.clone())
+                .unwrap_or_else(|| "pgsandbox".to_string()),
+            default_ttl_minutes: base.map_or(240, |profile| profile.default_ttl_minutes),
+            max_ttl_minutes: base.map_or(1440, |profile| profile.max_ttl_minutes),
+            allow_external_admin_url: false,
+            allowed_admin_hosts: Vec::new(),
+            max_active_databases_per_owner: base
+                .and_then(|profile| profile.max_active_databases_per_owner),
+            postgres_version: local_config.postgres_version,
+            managed_local: true,
+        }
+    }
+
+    pub fn list_profiles(&self, input: ListProfilesInput) -> anyhow::Result<ListProfilesOutput> {
+        let mut profiles = self
+            .config
+            .profiles
+            .iter()
+            .map(|profile| ProfileSummary {
+                name: profile.name.clone(),
+                default: profile.name == self.config.default_profile,
+                postgres_version: profile.postgres_version.clone(),
+                managed_local: profile.managed_local,
+                admin_url: mask_connection_string(&profile.admin_url),
+                source: "configured".to_string(),
+            })
+            .collect::<Vec<_>>();
+
+        if self.config.managed_local.enabled && input.include_discovered_local.unwrap_or(true) {
+            for installation in discover_local_postgres_installations() {
+                if profiles.iter().any(|profile| {
+                    profile.managed_local
+                        && profile.postgres_version.as_deref()
+                            == Some(installation.postgres_version.as_str())
+                }) {
+                    continue;
+                }
+                let name = format!("local-pg{}", installation.postgres_version);
+                profiles.push(ProfileSummary {
+                    name,
+                    default: false,
+                    postgres_version: Some(installation.postgres_version),
+                    managed_local: true,
+                    admin_url: "(managed local; starts on demand)".to_string(),
+                    source: installation.source,
+                });
+            }
+        }
+
+        Ok(ListProfilesOutput { profiles })
+    }
+
     async fn get_owned_record(
         &self,
         profile_name: Option<String>,
+        postgres_version: Option<String>,
         database_id: Option<String>,
         database_name: Option<String>,
     ) -> anyhow::Result<(SandboxProfile, SandboxRecord)> {
-        let profile = find_profile(&self.config, profile_name.as_deref())?.clone();
+        let profile = self.resolve_profile(profile_name.as_deref(), postgres_version.as_deref())?;
         let (client, connection_task) = connect_admin(&profile).await?;
         ensure_metadata_table(&client).await?;
         let selector = DatabaseSelector {
             profile: None,
+            postgres_version: None,
             database_id,
             database_name,
         };
@@ -754,7 +915,8 @@ impl PostgresSandboxManager {
         &self,
         input: CreateDatabaseInput,
     ) -> anyhow::Result<CreateDatabaseOutput> {
-        let profile = find_profile(&self.config, input.profile.as_deref())?.clone();
+        let profile =
+            self.resolve_profile(input.profile.as_deref(), input.postgres_version.as_deref())?;
         let ttl_minutes = clamp_ttl(input.ttl_minutes, &profile)?;
         let names = make_sandbox_names(&profile.database_prefix, input.name_hint.as_deref());
         let role_password = format!("{}{}", Uuid::new_v4().simple(), Uuid::new_v4().simple());
@@ -894,6 +1056,7 @@ impl PostgresSandboxManager {
     ) -> anyhow::Result<CloneDatabaseOutput> {
         let CloneDatabaseInput {
             profile,
+            postgres_version,
             source_database_url,
             name_hint,
             ttl_minutes,
@@ -905,6 +1068,7 @@ impl PostgresSandboxManager {
         let created = self
             .create_database(CreateDatabaseInput {
                 profile,
+                postgres_version,
                 name_hint,
                 ttl_minutes,
                 owner,
@@ -923,6 +1087,7 @@ impl PostgresSandboxManager {
             let cleanup_result = self
                 .delete_database(DatabaseSelector {
                     profile: Some(created.profile.clone()),
+                    postgres_version: None,
                     database_id: Some(created.database_id.clone()),
                     database_name: None,
                 })
@@ -954,7 +1119,8 @@ impl PostgresSandboxManager {
         &self,
         input: DatabaseSelector,
     ) -> anyhow::Result<DeleteDatabaseOutput> {
-        let profile = find_profile(&self.config, input.profile.as_deref())?.clone();
+        let profile =
+            self.resolve_profile(input.profile.as_deref(), input.postgres_version.as_deref())?;
         let (client, connection_task) = connect_admin(&profile).await?;
         ensure_metadata_table(&client).await?;
         let record = find_record(&client, &profile.name, &input)
@@ -1008,7 +1174,8 @@ impl PostgresSandboxManager {
         &self,
         input: DatabaseSelector,
     ) -> anyhow::Result<ConnectionStringOutput> {
-        let profile = find_profile(&self.config, input.profile.as_deref())?.clone();
+        let profile =
+            self.resolve_profile(input.profile.as_deref(), input.postgres_version.as_deref())?;
         let (client, connection_task) = connect_admin(&profile).await?;
         ensure_metadata_table(&client).await?;
         let record = find_record(&client, &profile.name, &input)
@@ -1034,7 +1201,8 @@ impl PostgresSandboxManager {
         &self,
         input: ListDatabasesInput,
     ) -> anyhow::Result<ListDatabasesOutput> {
-        let profile = find_profile(&self.config, input.profile.as_deref())?.clone();
+        let profile =
+            self.resolve_profile(input.profile.as_deref(), input.postgres_version.as_deref())?;
         let (client, connection_task) = connect_admin(&profile).await?;
         ensure_metadata_table(&client).await?;
         let rows = client
@@ -1074,6 +1242,7 @@ impl PostgresSandboxManager {
         let connection = self
             .get_connection_string(DatabaseSelector {
                 profile: input.profile.clone(),
+                postgres_version: input.postgres_version.clone(),
                 database_id: input.database_id.clone(),
                 database_name: input.database_name.clone(),
             })
@@ -1188,6 +1357,7 @@ impl PostgresSandboxManager {
         let after = self
             .schema_digest(DatabaseSelector {
                 profile: input.profile,
+                postgres_version: input.postgres_version,
                 database_id: input.database_id,
                 database_name: input.database_name,
             })
@@ -1203,6 +1373,7 @@ impl PostgresSandboxManager {
         let connection = self
             .get_connection_string(DatabaseSelector {
                 profile: input.profile,
+                postgres_version: input.postgres_version,
                 database_id: input.database_id,
                 database_name: input.database_name,
             })
@@ -1247,7 +1418,12 @@ impl PostgresSandboxManager {
             }
         };
         let (profile, record) = self
-            .get_owned_record(input.profile, input.database_id, input.database_name)
+            .get_owned_record(
+                input.profile,
+                input.postgres_version,
+                input.database_id,
+                input.database_name,
+            )
             .await?;
         let connection_string = build_connection_string(
             &profile.admin_url,
@@ -1298,7 +1474,12 @@ impl PostgresSandboxManager {
         input: ListSchemaSnapshotsInput,
     ) -> anyhow::Result<WorkflowEnvelope<Vec<SchemaSnapshotSummary>>> {
         let (profile, record) = self
-            .get_owned_record(input.profile, input.database_id, input.database_name)
+            .get_owned_record(
+                input.profile,
+                input.postgres_version,
+                input.database_id,
+                input.database_name,
+            )
             .await?;
         let snapshots = read_schema_snapshots(&profile.name, &record.database_id)?;
 
@@ -1333,7 +1514,12 @@ impl PostgresSandboxManager {
             }
         };
         let (profile, record) = self
-            .get_owned_record(input.profile, input.database_id, input.database_name)
+            .get_owned_record(
+                input.profile,
+                input.postgres_version,
+                input.database_id,
+                input.database_name,
+            )
             .await?;
         let paths = snapshot_paths(&profile.name, &record.database_id, &snapshot_name)?;
         let deleted = remove_file_if_exists(&paths.metadata_path)?;
@@ -1370,7 +1556,12 @@ impl PostgresSandboxManager {
             }
         };
         let (profile, record) = self
-            .get_owned_record(input.profile, input.database_id, input.database_name)
+            .get_owned_record(
+                input.profile,
+                input.postgres_version,
+                input.database_id,
+                input.database_name,
+            )
             .await?;
         let snapshot =
             match read_schema_snapshot(&profile.name, &record.database_id, &snapshot_name)? {
@@ -1428,11 +1619,14 @@ impl PostgresSandboxManager {
             ));
         }
 
+        let postgres_version =
+            resolve_repo_postgres_version(&repo_path, input.postgres_version.clone())?;
         let detection = detect_django_repo(&repo_path)?;
         let sandbox_target = if selector_has_database(&input.database_id, &input.database_name) {
             let connection = self
                 .get_connection_string(DatabaseSelector {
                     profile: input.profile.clone(),
+                    postgres_version: input.postgres_version.clone(),
                     database_id: input.database_id.clone(),
                     database_name: input.database_name.clone(),
                 })
@@ -1453,6 +1647,8 @@ impl PostgresSandboxManager {
                 Some(PrepareForRepoOutput {
                     repo_path: repo_path.display().to_string(),
                     detected_framework: None,
+                    postgres_version: postgres_version.version.clone(),
+                    postgres_version_source: postgres_version.source.clone(),
                     config_path: None,
                     sandbox_target,
                     action_needed: Some("Add manage.py plus a Django settings module, or provide explicit commands to the workflow tools.".to_string()),
@@ -1465,12 +1661,15 @@ impl PostgresSandboxManager {
             migration_command: default_django_migration_command(),
             seed_command: None,
             database_url_env: "DATABASE_URL".to_string(),
+            postgres_version: postgres_version.version.clone(),
             prepared_at: Utc::now(),
         };
         let config_path = write_repo_project_config(&repo_path, &project_config)?;
         let output = PrepareForRepoOutput {
             repo_path: repo_path.display().to_string(),
             detected_framework: Some("django".to_string()),
+            postgres_version: postgres_version.version,
+            postgres_version_source: postgres_version.source,
             config_path: Some(config_path.display().to_string()),
             sandbox_target,
             action_needed: None,
@@ -1516,9 +1715,12 @@ impl PostgresSandboxManager {
             Err(error) => return Ok(workflow_failure("Migrations were not run.", error, None)),
         };
         let timeout = workflow_timeout(input.timeout_seconds);
+        let postgres_version =
+            resolve_repo_postgres_version(&repo_path, input.postgres_version.clone())?;
         let connection = self
             .get_connection_string(DatabaseSelector {
                 profile: input.profile,
+                postgres_version: postgres_version.version,
                 database_id: input.database_id,
                 database_name: input.database_name,
             })
@@ -1582,12 +1784,15 @@ impl PostgresSandboxManager {
             }
         };
         let timeout = workflow_timeout(input.timeout_seconds);
+        let postgres_version =
+            resolve_repo_postgres_version(&repo_path, input.postgres_version.clone())?;
         let created_sandbox = !selector_has_database(&input.database_id, &input.database_name);
         let mut created_profile = None;
         let connection = if created_sandbox {
             let created = self
                 .create_database(CreateDatabaseInput {
                     profile: input.profile,
+                    postgres_version: postgres_version.version.clone(),
                     name_hint: Some(
                         input
                             .name_hint
@@ -1608,6 +1813,7 @@ impl PostgresSandboxManager {
         } else {
             self.get_connection_string(DatabaseSelector {
                 profile: input.profile,
+                postgres_version: postgres_version.version.clone(),
                 database_id: input.database_id,
                 database_name: input.database_name,
             })
@@ -1629,6 +1835,7 @@ impl PostgresSandboxManager {
                 let cleanup = self
                     .delete_database(DatabaseSelector {
                         profile: created_profile.clone(),
+                        postgres_version: None,
                         database_id: Some(connection.database_id.clone()),
                         database_name: None,
                     })
@@ -1678,6 +1885,7 @@ impl PostgresSandboxManager {
             let cleanup = self
                 .delete_database(DatabaseSelector {
                     profile: created_profile,
+                    postgres_version: None,
                     database_id: Some(connection.database_id.clone()),
                     database_name: None,
                 })
@@ -1746,9 +1954,12 @@ impl PostgresSandboxManager {
             Err(error) => return Ok(workflow_failure("Seed command was not run.", error, None)),
         };
         let timeout = workflow_timeout(input.timeout_seconds);
+        let postgres_version =
+            resolve_repo_postgres_version(&repo_path, input.postgres_version.clone())?;
         let connection = self
             .get_connection_string(DatabaseSelector {
                 profile: input.profile,
+                postgres_version: postgres_version.version,
                 database_id: input.database_id,
                 database_name: input.database_name,
             })
@@ -1794,7 +2005,12 @@ impl PostgresSandboxManager {
             Err(error) => return Ok(workflow_failure("Template was not created.", error, None)),
         };
         let (profile, record) = self
-            .get_owned_record(input.profile, input.database_id, input.database_name)
+            .get_owned_record(
+                input.profile,
+                input.postgres_version,
+                input.database_id,
+                input.database_name,
+            )
             .await?;
         let connection_string = build_connection_string(
             &profile.admin_url,
@@ -1850,7 +2066,8 @@ impl PostgresSandboxManager {
                 ))
             }
         };
-        let profile = find_profile(&self.config, input.profile.as_deref())?.clone();
+        let profile =
+            self.resolve_profile(input.profile.as_deref(), input.postgres_version.as_deref())?;
         let paths = template_paths(&profile.name, &template_name)?;
         let metadata = match read_json_file::<TemplateMetadata>(&paths.metadata_path)? {
             Some(metadata) => metadata,
@@ -1869,6 +2086,7 @@ impl PostgresSandboxManager {
         let created = self
             .create_database(CreateDatabaseInput {
                 profile: Some(profile.name.clone()),
+                postgres_version: None,
                 name_hint: input.name_hint.or_else(|| Some(template_name.clone())),
                 ttl_minutes: input.ttl_minutes,
                 owner: input.owner,
@@ -1881,6 +2099,7 @@ impl PostgresSandboxManager {
             let cleanup_result = self
                 .delete_database(DatabaseSelector {
                     profile: Some(created.profile.clone()),
+                    postgres_version: None,
                     database_id: Some(created.database_id.clone()),
                     database_name: None,
                 })
@@ -1926,7 +2145,8 @@ impl PostgresSandboxManager {
         &self,
         input: ListTemplatesInput,
     ) -> anyhow::Result<WorkflowEnvelope<Vec<TemplateMetadata>>> {
-        let profile = find_profile(&self.config, input.profile.as_deref())?.clone();
+        let profile =
+            self.resolve_profile(input.profile.as_deref(), input.postgres_version.as_deref())?;
         let templates = read_templates(&profile.name)?;
 
         Ok(workflow_success(
@@ -1949,7 +2169,8 @@ impl PostgresSandboxManager {
             Ok(value) => value,
             Err(error) => return Ok(workflow_failure("Template was not deleted.", error, None)),
         };
-        let profile = find_profile(&self.config, input.profile.as_deref())?.clone();
+        let profile =
+            self.resolve_profile(input.profile.as_deref(), input.postgres_version.as_deref())?;
         let paths = template_paths(&profile.name, &template_name)?;
         let deleted_dump = remove_file_if_exists(&paths.dump_path)?;
         let deleted_metadata = remove_file_if_exists(&paths.metadata_path)?;
@@ -1975,7 +2196,8 @@ impl PostgresSandboxManager {
         &self,
         input: CleanupExpiredInput,
     ) -> anyhow::Result<CleanupExpiredOutput> {
-        let profile = find_profile(&self.config, input.profile.as_deref())?.clone();
+        let profile =
+            self.resolve_profile(input.profile.as_deref(), input.postgres_version.as_deref())?;
         let (client, connection_task) = connect_admin(&profile).await?;
         ensure_metadata_table(&client).await?;
         let expired = client
@@ -2443,6 +2665,183 @@ fn detect_django_repo(repo_path: &Path) -> anyhow::Result<bool> {
         }
     }
     Ok(false)
+}
+
+fn infer_repo_postgres_version(
+    repo_path: &Path,
+) -> anyhow::Result<Option<RepoPostgresVersionInference>> {
+    for file_name in [
+        "compose.yaml",
+        "compose.yml",
+        "docker-compose.yaml",
+        "docker-compose.yml",
+    ] {
+        let path = repo_path.join(file_name);
+        if path.is_file() {
+            let raw = fs::read_to_string(&path)
+                .with_context(|| format!("failed to read {}", path.display()))?;
+            let value = serde_yaml::from_str::<serde_yaml::Value>(&raw)
+                .with_context(|| format!("failed to parse {}", path.display()))?;
+            if let Some(inference) = find_postgres_version_in_yaml(&value, file_name, Vec::new()) {
+                return Ok(Some(inference));
+            }
+        }
+    }
+
+    let devcontainer_path = repo_path.join(".devcontainer").join("devcontainer.json");
+    if devcontainer_path.is_file() {
+        let raw = fs::read_to_string(&devcontainer_path)
+            .with_context(|| format!("failed to read {}", devcontainer_path.display()))?;
+        let value = serde_json::from_str::<Value>(&raw)
+            .with_context(|| format!("failed to parse {}", devcontainer_path.display()))?;
+        if let Some(inference) =
+            find_postgres_version_in_json(&value, ".devcontainer/devcontainer.json", Vec::new())
+        {
+            return Ok(Some(inference));
+        }
+    }
+
+    Ok(None)
+}
+
+fn resolve_repo_postgres_version(
+    repo_path: &Path,
+    explicit: Option<String>,
+) -> anyhow::Result<RepoPostgresVersionResolution> {
+    if let Some(version) = explicit {
+        return Ok(RepoPostgresVersionResolution {
+            version: Some(version),
+            source: Some("input postgresVersion".to_string()),
+        });
+    }
+
+    if let Some(config) = read_repo_project_config(repo_path)? {
+        if let Some(version) = config.postgres_version {
+            return Ok(RepoPostgresVersionResolution {
+                version: Some(version),
+                source: Some(".pgsandbox/project.json postgresVersion".to_string()),
+            });
+        }
+    }
+
+    if let Some(inference) = infer_repo_postgres_version(repo_path)? {
+        return Ok(RepoPostgresVersionResolution {
+            version: Some(inference.version),
+            source: Some(inference.source),
+        });
+    }
+
+    Ok(RepoPostgresVersionResolution {
+        version: None,
+        source: None,
+    })
+}
+
+fn find_postgres_version_in_yaml(
+    value: &serde_yaml::Value,
+    file_name: &str,
+    path: Vec<String>,
+) -> Option<RepoPostgresVersionInference> {
+    match value {
+        serde_yaml::Value::Mapping(mapping) => {
+            for (key, child) in mapping {
+                let Some(key) = key.as_str() else {
+                    continue;
+                };
+                let mut child_path = path.clone();
+                child_path.push(key.to_string());
+                if key == "image" {
+                    if let Some(image) = child.as_str() {
+                        if let Some(version) = postgres_version_from_image(image) {
+                            return Some(RepoPostgresVersionInference {
+                                version,
+                                source: format!("{file_name} {}", child_path.join(".")),
+                            });
+                        }
+                    }
+                }
+                if let Some(inference) = find_postgres_version_in_yaml(child, file_name, child_path)
+                {
+                    return Some(inference);
+                }
+            }
+            None
+        }
+        serde_yaml::Value::Sequence(items) => {
+            for (index, child) in items.iter().enumerate() {
+                let mut child_path = path.clone();
+                child_path.push(index.to_string());
+                if let Some(inference) = find_postgres_version_in_yaml(child, file_name, child_path)
+                {
+                    return Some(inference);
+                }
+            }
+            None
+        }
+        _ => None,
+    }
+}
+
+fn find_postgres_version_in_json(
+    value: &Value,
+    file_name: &str,
+    path: Vec<String>,
+) -> Option<RepoPostgresVersionInference> {
+    match value {
+        Value::Object(object) => {
+            for (key, child) in object {
+                let mut child_path = path.clone();
+                child_path.push(key.to_string());
+                if key == "image" {
+                    if let Some(image) = child.as_str() {
+                        if let Some(version) = postgres_version_from_image(image) {
+                            return Some(RepoPostgresVersionInference {
+                                version,
+                                source: format!("{file_name} {}", child_path.join(".")),
+                            });
+                        }
+                    }
+                }
+                if let Some(inference) = find_postgres_version_in_json(child, file_name, child_path)
+                {
+                    return Some(inference);
+                }
+            }
+            None
+        }
+        Value::Array(items) => {
+            for (index, child) in items.iter().enumerate() {
+                let mut child_path = path.clone();
+                child_path.push(index.to_string());
+                if let Some(inference) = find_postgres_version_in_json(child, file_name, child_path)
+                {
+                    return Some(inference);
+                }
+            }
+            None
+        }
+        _ => None,
+    }
+}
+
+fn postgres_version_from_image(image: &str) -> Option<String> {
+    let image = image.trim().to_ascii_lowercase();
+    if !(image.contains("postgres") || image.contains("postgis") || image.contains("timescaledb")) {
+        return None;
+    }
+    let tag = image.rsplit_once(':')?.1;
+    leading_digits(tag).or_else(|| {
+        tag.split(['-', '_', '.'])
+            .find_map(|part| part.strip_prefix("pg").and_then(leading_digits))
+    })
+}
+
+fn leading_digits(value: &str) -> Option<String> {
+    let digits = value
+        .chars()
+        .take_while(|character| character.is_ascii_digit())
+        .collect::<String>();
+    (!digits.is_empty()).then_some(digits)
 }
 
 fn repo_project_config_path(repo_path: &Path) -> PathBuf {
@@ -4962,6 +5361,8 @@ mod tests {
             allow_external_admin_url: false,
             allowed_admin_hosts: Vec::new(),
             max_active_databases_per_owner: None,
+            postgres_version: None,
+            managed_local: false,
         };
         let stored = protect_role_password("sandbox-secret", &profile).unwrap();
 
@@ -5127,6 +5528,7 @@ mod tests {
             migration_command: default_django_migration_command(),
             seed_command: None,
             database_url_env: "DATABASE_URL".to_string(),
+            postgres_version: None,
             prepared_at: Utc::now(),
         };
         let path = write_repo_project_config(repo, &config).unwrap();
@@ -5136,6 +5538,85 @@ mod tests {
         assert!(raw.contains("\"manage.py\""));
         assert!(!raw.contains("postgres://"));
         assert!(!raw.contains("secret"));
+    }
+
+    #[test]
+    fn infers_postgres_version_from_compose_postgres_image() {
+        let directory = tempfile::tempdir().unwrap();
+        let repo = directory.path();
+        std::fs::write(
+            repo.join("compose.yaml"),
+            r#"
+services:
+  db:
+    image: postgres:17.2
+"#,
+        )
+        .unwrap();
+
+        let inference = infer_repo_postgres_version(repo).unwrap().unwrap();
+
+        assert_eq!(inference.version, "17");
+        assert_eq!(inference.source, "compose.yaml services.db.image");
+    }
+
+    #[test]
+    fn infers_postgres_version_from_devcontainer_compose_image() {
+        let directory = tempfile::tempdir().unwrap();
+        let repo = directory.path();
+        let devcontainer = repo.join(".devcontainer");
+        std::fs::create_dir_all(&devcontainer).unwrap();
+        std::fs::write(
+            devcontainer.join("devcontainer.json"),
+            r#"
+{
+  "name": "app",
+  "features": {},
+  "customizations": {},
+  "image": "mcr.microsoft.com/devcontainers/rust:1",
+  "services": {
+    "db": {
+      "image": "postgis/postgis:16-3.4"
+    }
+  }
+}
+"#,
+        )
+        .unwrap();
+
+        let inference = infer_repo_postgres_version(repo).unwrap().unwrap();
+
+        assert_eq!(inference.version, "16");
+        assert_eq!(
+            inference.source,
+            ".devcontainer/devcontainer.json services.db.image"
+        );
+    }
+
+    #[test]
+    fn repo_postgres_version_prefers_explicit_input_then_project_config() {
+        let directory = tempfile::tempdir().unwrap();
+        let repo = directory.path();
+        let config = RepoProjectConfig {
+            framework: "django".to_string(),
+            migration_command: default_django_migration_command(),
+            seed_command: None,
+            database_url_env: "DATABASE_URL".to_string(),
+            postgres_version: Some("16".to_string()),
+            prepared_at: Utc::now(),
+        };
+        write_repo_project_config(repo, &config).unwrap();
+
+        let explicit = resolve_repo_postgres_version(repo, Some("17".to_string())).unwrap();
+        let configured = resolve_repo_postgres_version(repo, None).unwrap();
+
+        assert_eq!(explicit.version.as_deref(), Some("17"));
+        assert_eq!(explicit.source.as_deref(), Some("input postgresVersion"));
+        assert_eq!(configured.version.as_deref(), Some("16"));
+        assert_eq!(
+            configured.source.as_deref(),
+            Some(".pgsandbox/project.json postgresVersion")
+        );
     }
 
     #[test]

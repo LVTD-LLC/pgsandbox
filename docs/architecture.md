@@ -89,6 +89,15 @@ The runtime stores its private config at `~/.pgsandbox/local-postgres.json`,
 including the selected port, data directory, Unix socket directory, log file,
 and admin URL. CLI output masks the admin URL password.
 
+When `PGSANDBOX_POSTGRES_VERSION`, `--postgres-version`, or an MCP
+`postgresVersion` request selects a local major version, the runtime uses a
+separate profile and state root. Postgres 18, for example, uses profile
+`local-pg18`, config `~/.pgsandbox/local-postgres-18.json`, and data under
+`~/.pgsandbox/postgres/versions/18/`. PGSandbox discovers installed binaries
+from a version-specific bin dir env var such as `PGSANDBOX_POSTGRES_18_BIN_DIR`,
+the generic `PGSANDBOX_POSTGRES_BIN_DIR`, common package-manager locations, or
+`PATH`.
+
 The local runtime starts at port `65432` and scans upward for a free high port,
 so a Docker container or developer database on `5432` is not disturbed. It also
 sets `unix_socket_directories` to a PGSandbox-owned run directory for local
@@ -100,7 +109,8 @@ Profiles are the opt-in mechanism for supporting external Postgres versions or
 hosts instead of the managed local default. Local loopback profiles are allowed
 by default. A non-local admin URL requires an explicit opt-in through
 `allowExternalAdminUrl` or an `allowedAdminHosts` entry, and profiles can cap
-active databases per owner.
+active databases per owner. Profiles may include `postgresVersion` metadata so
+agents can request a version without knowing the profile name.
 
 Example:
 
@@ -111,11 +121,13 @@ Example:
     {
       "name": "external-pg17",
       "adminUrl": "postgres://postgres:postgres@localhost:6543/postgres",
+      "postgresVersion": "17",
       "maxActiveDatabasesPerOwner": 3
     },
     {
       "name": "external-pg16",
-      "adminUrl": "postgres://postgres:postgres@localhost:6544/postgres"
+      "adminUrl": "postgres://postgres:postgres@localhost:6544/postgres",
+      "postgresVersion": "16"
     }
   ]
 }

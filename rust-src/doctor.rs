@@ -13,7 +13,11 @@ pub struct DoctorResult {
     pub lines: Vec<String>,
 }
 
-pub async fn run_doctor(admin_url: Option<&str>, cwd: &Path) -> DoctorResult {
+pub async fn run_doctor(
+    admin_url: Option<&str>,
+    postgres_version: Option<&str>,
+    cwd: &Path,
+) -> DoctorResult {
     let mut lines = vec![format!(
         "CLI: {}",
         std::env::current_exe()
@@ -43,6 +47,12 @@ pub async fn run_doctor(admin_url: Option<&str>, cwd: &Path) -> DoctorResult {
             ));
             configured_admin_url_target = Some(target);
         }
+    }
+    if let Some(postgres_version) = postgres_version {
+        env.push((
+            "PGSANDBOX_POSTGRES_VERSION".to_string(),
+            postgres_version.to_string(),
+        ));
     }
 
     let config = match load_config_from_env(env) {

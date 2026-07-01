@@ -252,6 +252,22 @@ pgsandbox-mcp
 Set `PGSANDBOX_HOME` only when you want that managed local state somewhere other
 than `~/.pgsandbox`.
 
+To use a specific installed local Postgres major version, pass
+`--postgres-version` or set `PGSANDBOX_POSTGRES_VERSION`:
+
+```bash
+pgsandbox-mcp local start --postgres-version 18
+pgsandbox-mcp setup --client codex --postgres-version 18
+```
+
+Versioned local clusters use separate profiles and state. For example,
+Postgres 18 uses profile `local-pg18`, private config
+`~/.pgsandbox/local-postgres-18.json`, and data under
+`~/.pgsandbox/postgres/versions/18/`. PGSandbox still does not install
+Postgres; it selects an installed toolchain from `PATH`, common package-manager
+locations such as Homebrew `postgresql@18`, `PGSANDBOX_POSTGRES_BIN_DIR`, or
+`PGSANDBOX_POSTGRES_18_BIN_DIR`.
+
 For an explicit external Postgres admin connection, set a single URL:
 
 ```bash
@@ -268,6 +284,7 @@ For multiple external Postgres versions or hosts, use profiles:
     {
       "name": "external-pg17",
       "adminUrl": "postgres://postgres:postgres@localhost:6543/postgres",
+      "postgresVersion": "17",
       "databasePrefix": "pgsandbox",
       "defaultTtlMinutes": 240,
       "maxTtlMinutes": 1440,
@@ -275,7 +292,8 @@ For multiple external Postgres versions or hosts, use profiles:
     },
     {
       "name": "external-pg16",
-      "adminUrl": "postgres://postgres:postgres@localhost:6544/postgres"
+      "adminUrl": "postgres://postgres:postgres@localhost:6544/postgres",
+      "postgresVersion": "16"
     }
   ]
 }
@@ -287,6 +305,11 @@ Then run:
 export PGSANDBOX_CONFIG="./pgsandbox.config.json"
 pgsandbox-mcp
 ```
+
+MCP tools can select profiles by `profile` or by `postgresVersion` when profile
+metadata is present. On the managed local default, requesting `postgresVersion`
+starts the corresponding `local-pg<major>` cluster on demand when matching
+binaries are installed.
 
 Profiles default to local admin URLs only: `localhost`, `127.0.0.1`, `::1`, or
 a URL without a host. To use a private remote Postgres host, opt in explicitly
@@ -342,6 +365,7 @@ When using `PGSANDBOX_CONFIG`, telemetry can also be disabled in JSON:
 V0 supports:
 
 - `create_database`
+- `list_profiles`
 - `clone_database`
 - `delete_database`
 - `get_connection_string`
@@ -373,7 +397,9 @@ For a Django repo, an agent can:
 
 1. Create or select a sandbox with `create_database`.
 2. Call `prepare_for_repo` with the repo path. This writes a secret-free
-   `.pgsandbox/project.json` when Django is detected.
+   `.pgsandbox/project.json` when Django is detected. If the repo has a
+   `postgres:<major>` or compatible Compose/devcontainer image, PGSandbox records
+   that version for later workflow calls.
 3. Call `validate_migration` to run `python manage.py migrate --noinput`
    against the sandbox and receive a before/after schema diff.
 4. Optionally call `seed_database` with an explicit seed command.
@@ -392,15 +418,17 @@ The service uses:
 - Rust native binary
 - `rmcp` stdio MCP server
 - PG Sandbox-managed local Postgres cluster under `~/.pgsandbox/postgres` by default
-- local `initdb`, `pg_ctl`, and `postgres` binaries on `PATH` for the managed local runtime
+- versioned local clusters under `~/.pgsandbox/postgres/versions/<major>` when requested
+- local `initdb`, `pg_ctl`, and `postgres` binaries on `PATH` or in a configured bin dir for the managed local runtime
 - optional explicit Postgres admin profiles with permission to create databases and roles
 - metadata and audit tables for ownership, TTL, encrypted sandbox credentials,
   cleanup state, and lifecycle events
 - optional `pg_dump` and `pg_restore` on `PATH` for `clone_database` and template tools
 
 The local runtime stores its selected port, socket directory, data directory,
-log file, and private admin URL in `~/.pgsandbox/local-postgres.json`. CLI output
-masks the password.
+log file, selected Postgres version, binary directory, and private admin URL in
+`~/.pgsandbox/local-postgres.json` or `~/.pgsandbox/local-postgres-<major>.json`.
+CLI output masks the password.
 PGSandbox first uses PostgreSQL server binaries on `PATH`, then checks common
 Homebrew and Postgres.app install locations such as
 `/opt/homebrew/opt/postgresql@18/bin`. If an older MCP client config still

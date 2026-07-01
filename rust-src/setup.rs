@@ -137,16 +137,24 @@ pub fn build_launch_config(
     name: Option<&str>,
     command: Option<&str>,
     admin_url: Option<&str>,
+    postgres_version: Option<&str>,
 ) -> McpLaunchConfig {
-    let env = admin_url.map(|admin_url| {
-        BTreeMap::from([(ADMIN_DATABASE_URL_ENV.to_string(), admin_url.to_string())])
-    });
+    let mut env = BTreeMap::new();
+    if let Some(admin_url) = admin_url {
+        env.insert(ADMIN_DATABASE_URL_ENV.to_string(), admin_url.to_string());
+    }
+    if let Some(postgres_version) = postgres_version {
+        env.insert(
+            "PGSANDBOX_POSTGRES_VERSION".to_string(),
+            postgres_version.to_string(),
+        );
+    }
 
     McpLaunchConfig {
         name: name.unwrap_or("pgsandbox").to_string(),
         command: command.unwrap_or("pgsandbox-mcp").to_string(),
         args: vec!["stdio".to_string()],
-        env,
+        env: (!env.is_empty()).then_some(env),
     }
 }
 
@@ -555,6 +563,7 @@ mod tests {
             None,
             None,
             Some("postgres://postgres:secret@localhost:5432/postgres"),
+            None,
         );
 
         write_client_config(&target, &launch, false).unwrap();
@@ -576,12 +585,30 @@ mod tests {
     }
 
     #[test]
+    fn writes_requested_postgres_version_env() {
+        let dir = tempdir().unwrap();
+        let target = resolve_targets(ClientSelector::Cursor, ConfigScope::Project, dir.path())
+            .unwrap()
+            .remove(0);
+        let launch = build_launch_config(None, None, None, Some("18"));
+
+        write_client_config(&target, &launch, false).unwrap();
+        let parsed =
+            serde_json::from_str::<Value>(&fs::read_to_string(&target.path).unwrap()).unwrap();
+
+        assert_eq!(
+            parsed["mcpServers"]["pgsandbox"]["env"]["PGSANDBOX_POSTGRES_VERSION"],
+            "18"
+        );
+    }
+
+    #[test]
     fn reports_created_for_new_config_files() {
         let dir = tempdir().unwrap();
         let target = resolve_targets(ClientSelector::Cursor, ConfigScope::Project, dir.path())
             .unwrap()
             .remove(0);
-        let launch = build_launch_config(None, None, None);
+        let launch = build_launch_config(None, None, None, None);
 
         assert_eq!(
             write_client_config(&target, &launch, true).unwrap().action,
@@ -610,7 +637,7 @@ mod tests {
         )
         .unwrap();
 
-        let launch = build_launch_config(None, Some("/opt/bin/pgsandbox-mcp"), None);
+        let launch = build_launch_config(None, Some("/opt/bin/pgsandbox-mcp"), None, None);
         write_client_config(&target, &launch, false).unwrap();
         let content = fs::read_to_string(target.path).unwrap();
 
@@ -630,10 +657,11 @@ mod tests {
             None,
             None,
             Some("postgres://postgres:secret@localhost:5432/postgres"),
+            None,
         );
         write_client_config(&target, &external_launch, false).unwrap();
 
-        let local_launch = build_launch_config(None, None, None);
+        let local_launch = build_launch_config(None, None, None, None);
         write_client_config(&target, &local_launch, false).unwrap();
         let content = fs::read_to_string(&target.path).unwrap();
 
@@ -652,10 +680,11 @@ mod tests {
             None,
             None,
             Some("postgres://postgres:secret@localhost:5432/postgres"),
+            None,
         );
         write_client_config(&target, &external_launch, false).unwrap();
 
-        let local_launch = build_launch_config(None, None, None);
+        let local_launch = build_launch_config(None, None, None, None);
         write_client_config(&target, &local_launch, false).unwrap();
         let parsed =
             serde_json::from_str::<Value>(&fs::read_to_string(&target.path).unwrap()).unwrap();
@@ -679,6 +708,7 @@ mod tests {
             None,
             None,
             Some("postgres://postgres:secret@localhost:5432/postgres"),
+            None,
         );
         write_client_config(&target, &launch, false).unwrap();
 

@@ -12,9 +12,9 @@ use crate::{
         CleanupExpiredInput, CloneDatabaseInput, CreateDatabaseInput,
         CreateSandboxFromTemplateInput, CreateSchemaSnapshotInput, CreateTemplateFromSandboxInput,
         DatabaseSelector, DeleteSchemaSnapshotInput, DeleteTemplateInput, DiffSchemaSnapshotInput,
-        ExplainQueryInput, ListDatabasesInput, ListSchemaSnapshotsInput, ListTemplatesInput,
-        PostgresSandboxManager, PrepareForRepoInput, RunMigrationsInput, RunSqlInput,
-        SchemaDiffInput, SeedDatabaseInput, ValidateMigrationInput,
+        ExplainQueryInput, ListDatabasesInput, ListProfilesInput, ListSchemaSnapshotsInput,
+        ListTemplatesInput, PostgresSandboxManager, PrepareForRepoInput, RunMigrationsInput,
+        RunSqlInput, SchemaDiffInput, SeedDatabaseInput, ValidateMigrationInput,
     },
     telemetry::{properties, Telemetry, EVENT_MCP_SERVER_STARTED, EVENT_MCP_TOOL_COMPLETED},
 };
@@ -60,6 +60,21 @@ impl PgsandboxServer {
 
 #[tool_router(server_handler)]
 impl PgsandboxServer {
+    #[tool(description = "List configured and discoverable Postgres profiles.")]
+    async fn list_profiles(
+        &self,
+        Parameters(input): Parameters<ListProfilesInput>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let event_properties = properties([(
+            "includeDiscoveredLocal",
+            json!(input.include_discovered_local.unwrap_or(true)),
+        )]);
+        self.tracked_tool("list_profiles", event_properties, async {
+            self.manager.list_profiles(input)
+        })
+        .await
+    }
+
     #[tool(description = "Create an isolated Postgres sandbox database and login role.")]
     async fn create_database(
         &self,
@@ -67,6 +82,10 @@ impl PgsandboxServer {
     ) -> Result<CallToolResult, ErrorData> {
         let event_properties = properties([
             ("hasProfile", json!(input.profile.is_some())),
+            (
+                "hasPostgresVersion",
+                json!(input.postgres_version.is_some()),
+            ),
             ("hasNameHint", json!(input.name_hint.is_some())),
             ("hasOwner", json!(input.owner.is_some())),
             ("hasTtlMinutes", json!(input.ttl_minutes.is_some())),
@@ -90,6 +109,10 @@ impl PgsandboxServer {
     ) -> Result<CallToolResult, ErrorData> {
         let event_properties = properties([
             ("hasProfile", json!(input.profile.is_some())),
+            (
+                "hasPostgresVersion",
+                json!(input.postgres_version.is_some()),
+            ),
             ("hasNameHint", json!(input.name_hint.is_some())),
             ("hasOwner", json!(input.owner.is_some())),
             ("hasTtlMinutes", json!(input.ttl_minutes.is_some())),
@@ -423,7 +446,13 @@ impl PgsandboxServer {
         &self,
         Parameters(input): Parameters<ListTemplatesInput>,
     ) -> Result<CallToolResult, ErrorData> {
-        let event_properties = properties([("hasProfile", json!(input.profile.is_some()))]);
+        let event_properties = properties([
+            ("hasProfile", json!(input.profile.is_some())),
+            (
+                "hasPostgresVersion",
+                json!(input.postgres_version.is_some()),
+            ),
+        ]);
         self.tracked_tool(
             "list_templates",
             event_properties,
@@ -437,7 +466,13 @@ impl PgsandboxServer {
         &self,
         Parameters(input): Parameters<DeleteTemplateInput>,
     ) -> Result<CallToolResult, ErrorData> {
-        let event_properties = properties([("hasProfile", json!(input.profile.is_some()))]);
+        let event_properties = properties([
+            ("hasProfile", json!(input.profile.is_some())),
+            (
+                "hasPostgresVersion",
+                json!(input.postgres_version.is_some()),
+            ),
+        ]);
         self.tracked_tool(
             "delete_template",
             event_properties,
@@ -453,6 +488,10 @@ impl PgsandboxServer {
     ) -> Result<CallToolResult, ErrorData> {
         let event_properties = properties([
             ("hasProfile", json!(input.profile.is_some())),
+            (
+                "hasPostgresVersion",
+                json!(input.postgres_version.is_some()),
+            ),
             ("hasOwnerFilter", json!(input.owner.is_some())),
         ]);
         self.tracked_tool(
@@ -470,6 +509,10 @@ impl PgsandboxServer {
     ) -> Result<CallToolResult, ErrorData> {
         let event_properties = properties([
             ("hasProfile", json!(input.profile.is_some())),
+            (
+                "hasPostgresVersion",
+                json!(input.postgres_version.is_some()),
+            ),
             ("dryRun", json!(input.dry_run.unwrap_or(false))),
         ]);
         self.tracked_tool(
@@ -497,6 +540,10 @@ pub async fn serve_stdio(config: SandboxConfig) -> anyhow::Result<()> {
 fn selector_properties(input: &DatabaseSelector) -> Map<String, Value> {
     properties([
         ("hasProfile", json!(input.profile.is_some())),
+        (
+            "hasPostgresVersion",
+            json!(input.postgres_version.is_some()),
+        ),
         ("hasDatabaseId", json!(input.database_id.is_some())),
         ("hasDatabaseName", json!(input.database_name.is_some())),
     ])

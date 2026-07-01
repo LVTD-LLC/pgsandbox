@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use url::Url;
 
-use crate::local::{LocalPostgresCluster, LOCAL_PROFILE_NAME};
+use crate::local::{LocalClusterConfig, LocalPostgresCluster, LOCAL_PROFILE_NAME};
 
 const DEFAULT_DATABASE_PREFIX: &str = "pgsandbox";
 const DEFAULT_TTL_MINUTES: u32 = 240;
@@ -42,6 +42,16 @@ pub enum ConfigError {
     MissingDefaultProfile(String),
     #[error("Unknown Postgres profile: {0}")]
     UnknownProfile(String),
+    #[error("Unknown Postgres version: {0}")]
+    UnknownPostgresVersion(String),
+    #[error("Postgres version {version} matches multiple profiles: {profiles}")]
+    AmbiguousPostgresVersion { version: String, profiles: String },
+    #[error("profile {profile} postgresVersion {profile_version} does not match requested postgresVersion {requested_version}")]
+    PostgresVersionConflict {
+        profile: String,
+        profile_version: String,
+        requested_version: String,
+    },
     #[error("failed to prepare default local Postgres cluster: {0}")]
     LocalPostgres(String),
 }
@@ -53,6 +63,8 @@ pub struct SandboxConfig {
     pub profiles: Vec<SandboxProfile>,
     #[serde(default)]
     pub telemetry: TelemetryConfig,
+    #[serde(default)]
+    pub managed_local: ManagedLocalConfig,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -72,6 +84,17 @@ pub struct SandboxProfile {
     pub allowed_admin_hosts: Vec<String>,
     #[serde(default)]
     pub max_active_databases_per_owner: Option<u32>,
+    #[serde(default)]
+    pub postgres_version: Option<String>,
+    #[serde(default)]
+    pub managed_local: bool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ManagedLocalConfig {
+    #[serde(default)]
+    pub enabled: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -98,6 +121,12 @@ impl Default for TelemetryConfig {
     }
 }
 
+impl Default for ManagedLocalConfig {
+    fn default() -> Self {
+        Self { enabled: false }
+    }
+}
+
 pub fn load_config() -> Result<SandboxConfig, ConfigError> {
     load_config_from_env(env::vars())
 }
@@ -108,12 +137,16 @@ where
     K: Into<String>,
     V: Into<String>,
 {
-    load_config_from_env_with_local(vars, || {
+    load_config_from_env_with_local(vars, |postgres_version| {
         let config = LocalPostgresCluster::from_env()
+            .and_then(|cluster| match postgres_version {
+                Some(version) => LocalPostgresCluster::from_env_for_version(Some(version)),
+                None => Ok(cluster),
+            })
             .map_err(|error| ConfigError::LocalPostgres(error.to_string()))?
             .ensure_started()
             .map_err(|error| ConfigError::LocalPostgres(error.to_string()))?;
-        Ok(config.admin_url)
+        Ok(config)
     })
 }
 
@@ -125,7 +158,7 @@ where
     I: IntoIterator<Item = (K, V)>,
     K: Into<String>,
     V: Into<String>,
-    F: FnOnce() -> Result<String, ConfigError>,
+    F: FnOnce(Option<&str>) -> Result<LocalClusterConfig, ConfigError>,
 {
     let env = vars
         .into_iter()
@@ -140,23 +173,33 @@ where
             })?,
         )?
     } else {
+        let requested_postgres_version = env.get("PGSANDBOX_POSTGRES_VERSION").map(String::as_str);
         let explicit_default_profile = env.get("PGSANDBOX_DEFAULT_PROFILE").cloned();
-        let (admin_url, name) = match env.get("PGSANDBOX_ADMIN_DATABASE_URL") {
-            Some(admin_url) => (
-                admin_url.to_string(),
-                explicit_default_profile.unwrap_or_else(|| "default".to_string()),
-            ),
-            None => {
-                let default_profile =
-                    explicit_default_profile.unwrap_or_else(|| LOCAL_PROFILE_NAME.to_string());
-                if default_profile != LOCAL_PROFILE_NAME {
-                    return Err(ConfigError::MissingDefaultProfile(default_profile));
+        let (admin_url, name, postgres_version, managed_local_profile) =
+            match env.get("PGSANDBOX_ADMIN_DATABASE_URL") {
+                Some(admin_url) => (
+                    admin_url.to_string(),
+                    explicit_default_profile.unwrap_or_else(|| "default".to_string()),
+                    requested_postgres_version.map(ToString::to_string),
+                    false,
+                ),
+                None => {
+                    let default_profile =
+                        explicit_default_profile.unwrap_or_else(|| LOCAL_PROFILE_NAME.to_string());
+                    if default_profile != LOCAL_PROFILE_NAME {
+                        return Err(ConfigError::MissingDefaultProfile(default_profile));
+                    }
+                    let local = local_admin_url(requested_postgres_version)?;
+                    (
+                        local.admin_url,
+                        local.profile_name,
+                        local.postgres_version,
+                        true,
+                    )
                 }
-                (local_admin_url()?, LOCAL_PROFILE_NAME.to_string())
-            }
-        };
+            };
 
-        normalize_config(RawConfig {
+        let mut config = normalize_config(RawConfig {
             default_profile: Some(name.clone()),
             profiles: vec![SandboxProfile {
                 name,
@@ -184,9 +227,15 @@ where
                 max_active_databases_per_owner: env
                     .get("PGSANDBOX_MAX_ACTIVE_DATABASES_PER_OWNER")
                     .and_then(|value| value.parse().ok()),
+                postgres_version,
+                managed_local: managed_local_profile,
             }],
             telemetry: TelemetryConfig::default(),
-        })?
+        })?;
+        if managed_local_profile {
+            config.managed_local.enabled = true;
+        }
+        config
     };
 
     apply_telemetry_env_overrides(&mut config.telemetry, &env);
@@ -207,6 +256,73 @@ pub fn find_profile<'a>(
         .iter()
         .find(|profile| profile.name == name)
         .ok_or_else(|| ConfigError::UnknownProfile(name.to_string()))
+}
+
+pub fn find_profile_for_request<'a>(
+    config: &'a SandboxConfig,
+    profile_name: Option<&str>,
+    postgres_version: Option<&str>,
+) -> Result<&'a SandboxProfile, ConfigError> {
+    let postgres_version = postgres_version.map(normalize_postgres_version);
+    let profile = match profile_name {
+        Some(profile_name) => Some(
+            config
+                .profiles
+                .iter()
+                .find(|profile| profile.name == profile_name)
+                .ok_or_else(|| ConfigError::UnknownProfile(profile_name.to_string()))?,
+        ),
+        None => None,
+    };
+
+    match (profile, postgres_version) {
+        (Some(profile), Some(requested_version)) => {
+            let profile_version = profile
+                .postgres_version
+                .as_deref()
+                .map(normalize_postgres_version);
+            if profile_version.as_deref() == Some(requested_version.as_str()) {
+                Ok(profile)
+            } else {
+                Err(ConfigError::PostgresVersionConflict {
+                    profile: profile.name.clone(),
+                    profile_version: profile
+                        .postgres_version
+                        .clone()
+                        .unwrap_or_else(|| "(unspecified)".to_string()),
+                    requested_version,
+                })
+            }
+        }
+        (Some(profile), None) => Ok(profile),
+        (None, Some(requested_version)) => {
+            let matches = config
+                .profiles
+                .iter()
+                .filter(|profile| {
+                    profile
+                        .postgres_version
+                        .as_deref()
+                        .map(normalize_postgres_version)
+                        .as_deref()
+                        == Some(requested_version.as_str())
+                })
+                .collect::<Vec<_>>();
+            match matches.as_slice() {
+                [profile] => Ok(profile),
+                [] => Err(ConfigError::UnknownPostgresVersion(requested_version)),
+                profiles => Err(ConfigError::AmbiguousPostgresVersion {
+                    version: requested_version,
+                    profiles: profiles
+                        .iter()
+                        .map(|profile| profile.name.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                }),
+            }
+        }
+        (None, None) => find_profile(config, None),
+    }
 }
 
 pub fn load_telemetry_config() -> TelemetryConfig {
@@ -248,7 +364,16 @@ fn normalize_config(raw: RawConfig) -> Result<SandboxConfig, ConfigError> {
         default_profile,
         profiles: raw.profiles,
         telemetry: raw.telemetry,
+        managed_local: ManagedLocalConfig::default(),
     })
+}
+
+pub fn normalize_postgres_version(value: &str) -> String {
+    value
+        .trim()
+        .chars()
+        .take_while(|character| character.is_ascii_digit())
+        .collect()
 }
 
 pub fn admin_url_host(admin_url: &str) -> Result<Option<String>, url::ParseError> {
@@ -422,12 +547,21 @@ mod tests {
     #[test]
     fn loads_managed_local_profile_when_no_admin_url_is_set() {
         let mut called = false;
-        let config = load_config_from_env_with_local(std::iter::empty::<(&str, &str)>(), || {
+        let config = load_config_from_env_with_local(std::iter::empty::<(&str, &str)>(), |_| {
             called = true;
-            Ok(
-                "postgres://pgsandbox_admin:secret@127.0.0.1:65432/postgres?sslmode=disable"
-                    .to_string(),
-            )
+            Ok(crate::local::LocalClusterConfig {
+                profile_name: "local".to_string(),
+                admin_url:
+                    "postgres://pgsandbox_admin:secret@127.0.0.1:65432/postgres?sslmode=disable"
+                        .to_string(),
+                host: "127.0.0.1".to_string(),
+                port: 65432,
+                data_dir: "/tmp/pgsandbox/postgres/data".into(),
+                socket_dir: "/tmp/pgsandbox/postgres/run".into(),
+                log_file: "/tmp/pgsandbox/postgres/postgres.log".into(),
+                postgres_version: Some("16".to_string()),
+                postgres_bin_dir: None,
+            })
         })
         .unwrap();
 
@@ -441,6 +575,87 @@ mod tests {
         assert_eq!(config.profiles[0].database_prefix, "pgsandbox");
         assert_eq!(config.profiles[0].default_ttl_minutes, 240);
         assert_eq!(config.profiles[0].max_ttl_minutes, 1440);
+        assert_eq!(config.profiles[0].postgres_version.as_deref(), Some("16"));
+        assert!(config.profiles[0].managed_local);
+        assert!(config.managed_local.enabled);
+    }
+
+    #[test]
+    fn loads_requested_managed_local_postgres_version_from_env() {
+        let mut requested_version = None;
+        let config =
+            load_config_from_env_with_local([("PGSANDBOX_POSTGRES_VERSION", "17")], |version| {
+                requested_version = version.map(ToString::to_string);
+                Ok(crate::local::LocalClusterConfig {
+                    profile_name: "local-pg17".to_string(),
+                    admin_url:
+                        "postgres://pgsandbox_admin:secret@127.0.0.1:65433/postgres?sslmode=disable"
+                            .to_string(),
+                    host: "127.0.0.1".to_string(),
+                    port: 65433,
+                    data_dir: "/tmp/pgsandbox/postgres/versions/17/data".into(),
+                    socket_dir: "/tmp/pgsandbox/postgres/versions/17/run".into(),
+                    log_file: "/tmp/pgsandbox/postgres/versions/17/postgres.log".into(),
+                    postgres_version: Some("17".to_string()),
+                    postgres_bin_dir: Some("/opt/postgresql@17/bin".into()),
+                })
+            })
+            .unwrap();
+
+        assert_eq!(requested_version.as_deref(), Some("17"));
+        assert_eq!(config.default_profile, "local-pg17");
+        assert_eq!(config.profiles[0].name, "local-pg17");
+        assert_eq!(config.profiles[0].postgres_version.as_deref(), Some("17"));
+        assert!(config.profiles[0].managed_local);
+    }
+
+    #[test]
+    fn resolves_profile_by_requested_postgres_version() {
+        let config = parse_config_file(
+            r#"{
+              "defaultProfile": "pg16",
+              "profiles": [
+                {
+                  "name": "pg16",
+                  "adminUrl": "postgres://postgres:postgres@localhost:5416/postgres",
+                  "postgresVersion": "16"
+                },
+                {
+                  "name": "pg17",
+                  "adminUrl": "postgres://postgres:postgres@localhost:5417/postgres",
+                  "postgresVersion": "17"
+                }
+              ]
+            }"#,
+        )
+        .unwrap();
+
+        let profile = find_profile_for_request(&config, None, Some("17")).unwrap();
+
+        assert_eq!(profile.name, "pg17");
+    }
+
+    #[test]
+    fn rejects_profile_and_postgres_version_conflict() {
+        let config = parse_config_file(
+            r#"{
+              "defaultProfile": "pg16",
+              "profiles": [
+                {
+                  "name": "pg16",
+                  "adminUrl": "postgres://postgres:postgres@localhost:5416/postgres",
+                  "postgresVersion": "16"
+                }
+              ]
+            }"#,
+        )
+        .unwrap();
+
+        let err = find_profile_for_request(&config, Some("pg16"), Some("17")).unwrap_err();
+
+        assert!(err
+            .to_string()
+            .contains("does not match requested postgresVersion"));
     }
 
     #[test]
@@ -450,7 +665,7 @@ mod tests {
                 "PGSANDBOX_ADMIN_DATABASE_URL",
                 "postgres://postgres:postgres@localhost/postgres",
             )],
-            || panic!("local cluster should not start when an admin URL is explicit"),
+            |_| panic!("local cluster should not start when an admin URL is explicit"),
         )
         .unwrap();
 
@@ -464,7 +679,7 @@ mod tests {
     #[test]
     fn default_profile_without_admin_url_does_not_alias_local_profile() {
         let err =
-            load_config_from_env_with_local([("PGSANDBOX_DEFAULT_PROFILE", "staging")], || {
+            load_config_from_env_with_local([("PGSANDBOX_DEFAULT_PROFILE", "staging")], |_| {
                 panic!("local cluster should not start for an undefined requested profile")
             })
             .unwrap_err();

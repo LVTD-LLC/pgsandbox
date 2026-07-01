@@ -4,6 +4,8 @@
 
 - Added the Astro Markdown blog post "What Is a Database Sandbox?" with SEO ledger, link inventory, and inbound blog links.
 - Updated existing blog posts to link to the new database sandbox definition page.
+- Added managed local multi-version Postgres runtime support with `--postgres-version`, `PGSANDBOX_POSTGRES_VERSION`, versioned `local-pg<major>` profiles, isolated data directories, and version-specific binary discovery.
+- Added MCP `postgresVersion` selectors, `list_profiles`, and repo workflow inference from `.pgsandbox/project.json`, Compose, and devcontainer Postgres image tags.
 
 ## 2026-06-30
 

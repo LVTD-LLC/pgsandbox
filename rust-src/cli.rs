@@ -72,6 +72,7 @@ async fn setup(args: &[String]) -> anyhow::Result<u8> {
         options.get("name").map(String::as_str),
         options.get("command").map(String::as_str),
         admin_url,
+        options.get("postgres-version").map(String::as_str),
     );
     let dry_run = options.contains_key("dry-run");
     let cwd = std::env::current_dir()?;
@@ -121,7 +122,12 @@ async fn doctor(args: &[String]) -> anyhow::Result<u8> {
     let telemetry = Telemetry::new(crate::config::load_telemetry_config());
     let options = parse_options(args)?;
     let cwd = std::env::current_dir()?;
-    let result = run_doctor(options.get("admin-url").map(String::as_str), &cwd).await;
+    let result = run_doctor(
+        options.get("admin-url").map(String::as_str),
+        options.get("postgres-version").map(String::as_str),
+        &cwd,
+    )
+    .await;
     for line in result.lines {
         println!("{line}");
     }
@@ -147,10 +153,10 @@ async fn doctor(args: &[String]) -> anyhow::Result<u8> {
 }
 
 async fn local(args: &[String]) -> anyhow::Result<u8> {
-    let action = parse_local_action(args)?;
-    let cluster = LocalPostgresCluster::from_env()?;
+    let command = parse_local_command(args)?;
+    let cluster = LocalPostgresCluster::from_env_for_version(command.postgres_version.as_deref())?;
 
-    match action {
+    match command.action {
         LocalAction::Init => {
             let config = cluster.init()?;
             println!("Local Postgres: initialized");
@@ -176,12 +182,20 @@ async fn local(args: &[String]) -> anyhow::Result<u8> {
 async fn smoke_test(args: &[String]) -> anyhow::Result<u8> {
     let started = std::time::Instant::now();
     let options = parse_options(args)?;
-    let env = if let Some(admin_url) = options.get("admin-url") {
+    let env = if options.contains_key("admin-url") || options.contains_key("postgres-version") {
         let mut env = std::env::vars().collect::<Vec<_>>();
-        env.push((
-            "PGSANDBOX_ADMIN_DATABASE_URL".to_string(),
-            admin_url.to_string(),
-        ));
+        if let Some(admin_url) = options.get("admin-url") {
+            env.push((
+                "PGSANDBOX_ADMIN_DATABASE_URL".to_string(),
+                admin_url.to_string(),
+            ));
+        }
+        if let Some(postgres_version) = options.get("postgres-version") {
+            env.push((
+                "PGSANDBOX_POSTGRES_VERSION".to_string(),
+                postgres_version.to_string(),
+            ));
+        }
         Some(env)
     } else {
         None
@@ -198,6 +212,7 @@ async fn smoke_test(args: &[String]) -> anyhow::Result<u8> {
         let created = manager
             .create_database(CreateDatabaseInput {
                 profile: None,
+                postgres_version: None,
                 name_hint: Some("smoke test".to_string()),
                 ttl_minutes: Some(15),
                 owner: Some("smoke".to_string()),
@@ -210,6 +225,7 @@ async fn smoke_test(args: &[String]) -> anyhow::Result<u8> {
         manager
             .run_sql(RunSqlInput {
                 profile: None,
+                postgres_version: None,
                 database_id: database_id.clone(),
                 database_name: None,
                 sql: "create table items(id serial primary key, name text not null, price numeric(10,2) not null, ratio numeric(12,8) not null, payload bytea not null, starts_at time not null, starts_at_tz timetz not null)".to_string(),
@@ -222,6 +238,7 @@ async fn smoke_test(args: &[String]) -> anyhow::Result<u8> {
         let inserted = manager
             .run_sql(RunSqlInput {
                 profile: None,
+                postgres_version: None,
                 database_id: database_id.clone(),
                 database_name: None,
                 sql: "insert into items(name, price, ratio, payload, starts_at, starts_at_tz) values ('alpha', 12.34, 0.00000012, decode('cafe', 'hex'), time '12:34:56', timetz '12:34:56-05') returning id, name, price, ratio, payload, starts_at, starts_at_tz".to_string(),
@@ -288,6 +305,7 @@ async fn smoke_test(args: &[String]) -> anyhow::Result<u8> {
         let inserted_with_comment = manager
             .run_sql(RunSqlInput {
                 profile: None,
+                postgres_version: None,
                 database_id: database_id.clone(),
                 database_name: None,
                 sql: "insert into items(name, price, ratio, payload, starts_at, starts_at_tz) values ('beta', 45.67, 0.00000034, decode('beef', 'hex'), time '01:02:03', timetz '01:02:03+02') returning id, name -- agent note".to_string(),
@@ -309,6 +327,7 @@ async fn smoke_test(args: &[String]) -> anyhow::Result<u8> {
         let updated = manager
             .run_sql(RunSqlInput {
                 profile: None,
+                postgres_version: None,
                 database_id: database_id.clone(),
                 database_name: None,
                 sql: "update items set name = 'not returning' where id = 1".to_string(),
@@ -325,6 +344,7 @@ async fn smoke_test(args: &[String]) -> anyhow::Result<u8> {
         let query = manager
             .run_sql(RunSqlInput {
                 profile: None,
+                postgres_version: None,
                 database_id: database_id.clone(),
                 database_name: None,
                 sql: "select * from items where id = 1".to_string(),
@@ -391,6 +411,7 @@ async fn smoke_test(args: &[String]) -> anyhow::Result<u8> {
         let readonly_literal = manager
             .run_sql(RunSqlInput {
                 profile: None,
+                postgres_version: None,
                 database_id: database_id.clone(),
                 database_name: None,
                 sql: "select 'rollback' as stage".to_string(),
@@ -412,6 +433,7 @@ async fn smoke_test(args: &[String]) -> anyhow::Result<u8> {
         manager
             .delete_database(DatabaseSelector {
                 profile: None,
+                postgres_version: None,
                 database_id: database_id.clone(),
                 database_name: None,
             })
@@ -426,6 +448,7 @@ async fn smoke_test(args: &[String]) -> anyhow::Result<u8> {
         let _ = manager
             .delete_database(DatabaseSelector {
                 profile: None,
+                postgres_version: None,
                 database_id: Some(database_id),
                 database_name: None,
             })
@@ -462,22 +485,31 @@ enum LocalAction {
     Status,
 }
 
-fn parse_local_action(args: &[String]) -> anyhow::Result<LocalAction> {
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct LocalCommand {
+    action: LocalAction,
+    postgres_version: Option<String>,
+}
+
+fn parse_local_command(args: &[String]) -> anyhow::Result<LocalCommand> {
     let (action, rest) = args
         .split_first()
         .map(|(action, rest)| (action.as_str(), rest))
         .unwrap_or(("status", &[]));
-    if !rest.is_empty() {
-        anyhow::bail!("Unexpected argument: {}", rest[0]);
-    }
 
-    match action {
-        "init" => Ok(LocalAction::Init),
-        "start" => Ok(LocalAction::Start),
-        "stop" => Ok(LocalAction::Stop),
-        "status" => Ok(LocalAction::Status),
+    let action = match action {
+        "init" => LocalAction::Init,
+        "start" => LocalAction::Start,
+        "stop" => LocalAction::Stop,
+        "status" => LocalAction::Status,
         other => anyhow::bail!("Unknown local command: {other}"),
-    }
+    };
+    let options = parse_options(rest)?;
+
+    Ok(LocalCommand {
+        action,
+        postgres_version: options.get("postgres-version").cloned(),
+    })
 }
 
 fn parse_options(args: &[String]) -> anyhow::Result<BTreeMap<String, String>> {
@@ -580,16 +612,17 @@ Usage:
   pgsandbox-mcp stdio                Start the MCP server over stdio
   pgsandbox-mcp setup [options]      Write MCP client config
   pgsandbox-mcp doctor [options]     Check config and Postgres connectivity
-  pgsandbox-mcp local init           Initialize the managed local Postgres cluster
-  pgsandbox-mcp local start          Start the managed local Postgres cluster
-  pgsandbox-mcp local stop           Stop the managed local Postgres cluster
-  pgsandbox-mcp local status         Show managed local Postgres status
+  pgsandbox-mcp local init [options] Initialize the managed local Postgres cluster
+  pgsandbox-mcp local start [options] Start the managed local Postgres cluster
+  pgsandbox-mcp local stop [options] Stop the managed local Postgres cluster
+  pgsandbox-mcp local status [options] Show managed local Postgres status
   pgsandbox-mcp smoke-test [options] Create, query, and delete a sandbox
 
 Setup options:
   --client <client>                  codex, cursor, vscode, claude-desktop, all
   --scope <scope>                    user or project
   --admin-url <url>                  Admin Postgres URL to write into config
+  --postgres-version <major>          Managed local Postgres version, for example 16
   --command <command>                Command MCP clients should run
   --name <name>                      Server name in MCP config
   --dry-run                          Print config without writing
@@ -608,21 +641,29 @@ mod tests {
     #[test]
     fn parses_local_runtime_actions() {
         assert!(matches!(
-            parse_local_action(&args(&["init"])).unwrap(),
+            parse_local_command(&args(&["init"])).unwrap().action,
             LocalAction::Init
         ));
         assert!(matches!(
-            parse_local_action(&args(&["start"])).unwrap(),
+            parse_local_command(&args(&["start"])).unwrap().action,
             LocalAction::Start
         ));
         assert!(matches!(
-            parse_local_action(&args(&["stop"])).unwrap(),
+            parse_local_command(&args(&["stop"])).unwrap().action,
             LocalAction::Stop
         ));
         assert!(matches!(
-            parse_local_action(&args(&["status"])).unwrap(),
+            parse_local_command(&args(&["status"])).unwrap().action,
             LocalAction::Status
         ));
+    }
+
+    #[test]
+    fn parses_local_runtime_postgres_version_option() {
+        let command = parse_local_command(&args(&["start", "--postgres-version", "17"])).unwrap();
+
+        assert!(matches!(command.action, LocalAction::Start));
+        assert_eq!(command.postgres_version.as_deref(), Some("17"));
     }
 
     #[test]
