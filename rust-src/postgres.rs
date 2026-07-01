@@ -835,7 +835,7 @@ impl PostgresSandboxManager {
                 self.ensure_managed_local_profile(Some(&version))
             }
             Err(ConfigError::UnknownPostgresVersion(version)) => {
-                Err(unknown_postgres_version_error(&self.config, &version).into())
+                Err(unknown_postgres_version_error(&self.config, &version))
             }
             Err(ConfigError::UnknownProfile(profile))
                 if self.config.managed_local.enabled
