@@ -2,6 +2,7 @@
 
 ## 2026-07-01
 
+- Released `pgsandbox-mcp` v0.3.0 with agent-safe cross-profile databaseId lookup, all-version list/cleanup modes, clone downgrade preflight, structured version diagnostics, and regression coverage for the agent-facing version contract.
 - Released `pgsandbox-mcp` v0.2.1 with managed-local diagnostics, deferred MCP startup, short Unix socket paths, structured tool errors, and updated agent-facing docs.
 - Released `pgsandbox-mcp` v0.2.0 with managed local multi-version Postgres support.
 - Added the Astro Markdown blog post "What Is a Database Sandbox?" with SEO ledger, link inventory, and inbound blog links.
