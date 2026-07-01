@@ -26,6 +26,7 @@ use tokio::{
     time,
 };
 use tokio_postgres::{
+    error::SqlState,
     types::{FromSql, ToSql, Type},
     Client, NoTls, Row, SimpleQueryMessage,
 };
@@ -47,7 +48,7 @@ const AUDIT_TABLE: &str = "pgsandbox_events";
 const DEFAULT_ROW_LIMIT: usize = 100;
 const LIST_DATABASES_LIMIT: usize = 100;
 const ENCRYPTED_PASSWORD_PREFIX: &str = "v1";
-const SCHEMA_DIGEST_VERSION: u32 = 1;
+const SCHEMA_DIGEST_VERSION: u32 = 2;
 const MAX_SCHEMA_DIFF_ITEMS: usize = 50;
 const DEFAULT_WORKFLOW_TIMEOUT_SECONDS: u64 = 120;
 const MAX_WORKFLOW_TIMEOUT_SECONDS: u64 = 600;
@@ -379,9 +380,12 @@ pub struct RunSqlOutput {
 pub struct DescribeSchemaOutput {
     pub database_id: String,
     pub database_name: String,
+    pub relation_counts: SchemaRelationCounts,
     pub tables: Vec<Value>,
     pub columns: Vec<Value>,
+    pub constraints: Vec<Value>,
     pub indexes: Vec<Value>,
+    pub views: Vec<Value>,
     pub extensions: Vec<Value>,
 }
 
@@ -406,11 +410,42 @@ pub struct SchemaDigestOutput {
     pub digest_version: u32,
     pub checksum: String,
     pub table_count: usize,
+    #[serde(default)]
+    pub relation_counts: SchemaRelationCounts,
     pub column_count: usize,
+    #[serde(default)]
+    pub constraint_count: usize,
     pub index_count: usize,
     pub extension_count: usize,
     pub tables: Vec<SchemaDigestTable>,
     pub extensions: Vec<SchemaDigestExtension>,
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema, Clone, Default, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SchemaRelationCounts {
+    pub tables: usize,
+    #[serde(default)]
+    pub partitioned_tables: usize,
+    #[serde(default)]
+    pub views: usize,
+    #[serde(default)]
+    pub materialized_views: usize,
+    #[serde(default)]
+    pub foreign_tables: usize,
+    #[serde(default)]
+    pub other: usize,
+}
+
+impl SchemaRelationCounts {
+    pub fn total(&self) -> usize {
+        self.tables
+            + self.partitioned_tables
+            + self.views
+            + self.materialized_views
+            + self.foreign_tables
+            + self.other
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, JsonSchema, Clone, PartialEq, Eq)]
@@ -418,8 +453,14 @@ pub struct SchemaDigestOutput {
 pub struct SchemaDigestTable {
     pub schema: String,
     pub name: String,
+    #[serde(default = "default_relation_kind")]
+    pub relation_kind: String,
     pub columns: Vec<SchemaDigestColumn>,
+    #[serde(default)]
+    pub constraints: Vec<SchemaDigestConstraint>,
     pub indexes: Vec<SchemaDigestIndex>,
+    #[serde(default)]
+    pub view_definition_hash: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, JsonSchema, Clone, PartialEq, Eq)]
@@ -428,6 +469,22 @@ pub struct SchemaDigestColumn {
     pub name: String,
     pub data_type: String,
     pub nullable: bool,
+    #[serde(default)]
+    pub default_expression: Option<String>,
+    #[serde(default)]
+    pub generated_expression: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema, Clone, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SchemaDigestConstraint {
+    pub name: String,
+    pub constraint_type: String,
+    pub definition_hash: String,
+    #[serde(default)]
+    pub update_action: Option<String>,
+    #[serde(default)]
+    pub delete_action: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, JsonSchema, Clone, PartialEq, Eq)]
@@ -523,6 +580,8 @@ pub struct WorkflowSchemaDigest {
     pub object_counts: SchemaObjectCounts,
     pub tables: Vec<SchemaObjectDigest>,
     pub columns: Vec<SchemaObjectDigest>,
+    #[serde(default)]
+    pub constraints: Vec<SchemaObjectDigest>,
     pub indexes: Vec<SchemaObjectDigest>,
     pub extensions: Vec<SchemaObjectDigest>,
 }
@@ -531,7 +590,17 @@ pub struct WorkflowSchemaDigest {
 #[serde(rename_all = "camelCase")]
 pub struct SchemaObjectCounts {
     pub tables: usize,
+    #[serde(default)]
+    pub partitioned_tables: usize,
+    #[serde(default)]
+    pub views: usize,
+    #[serde(default)]
+    pub materialized_views: usize,
+    #[serde(default)]
+    pub foreign_tables: usize,
     pub columns: usize,
+    #[serde(default)]
+    pub constraints: usize,
     pub indexes: usize,
     pub extensions: usize,
 }
@@ -785,6 +854,20 @@ enum QueryMode {
     Cursor,
     TypedRows,
     Simple,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ArrayCellKind {
+    Text,
+    Bool,
+    Int2,
+    Int4,
+    Int8,
+    Float4,
+    Float8,
+    Json,
+    TimestampTz,
+    Uuid,
 }
 
 #[derive(Debug)]
@@ -1491,13 +1574,31 @@ impl PostgresSandboxManager {
         let tables = client
             .query(
                 r#"
-                  SELECT table_schema,
-                         table_name,
-                         table_schema AS "tableSchema",
-                         table_name AS "tableName"
-                  FROM information_schema.tables
-                  WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
-                  ORDER BY table_schema, table_name
+                  SELECT n.nspname AS table_schema,
+                         c.relname AS table_name,
+                         CASE c.relkind
+                           WHEN 'r' THEN 'table'
+                           WHEN 'p' THEN 'partitioned_table'
+                           WHEN 'v' THEN 'view'
+                           WHEN 'm' THEN 'materialized_view'
+                           WHEN 'f' THEN 'foreign_table'
+                           ELSE c.relkind::text
+                         END AS relation_kind,
+                         n.nspname AS "tableSchema",
+                         c.relname AS "tableName",
+                         CASE c.relkind
+                           WHEN 'r' THEN 'table'
+                           WHEN 'p' THEN 'partitioned_table'
+                           WHEN 'v' THEN 'view'
+                           WHEN 'm' THEN 'materialized_view'
+                           WHEN 'f' THEN 'foreign_table'
+                           ELSE c.relkind::text
+                         END AS "relationKind"
+                  FROM pg_class c
+                  JOIN pg_namespace n ON n.oid = c.relnamespace
+                  WHERE c.relkind IN ('r', 'p', 'v', 'm', 'f')
+                    AND n.nspname NOT IN ('pg_catalog', 'information_schema')
+                  ORDER BY n.nspname, c.relname
                 "#,
                 &[],
             )
@@ -1505,19 +1606,100 @@ impl PostgresSandboxManager {
         let columns = client
             .query(
                 r#"
-                  SELECT table_schema,
-                         table_name,
-                         column_name,
-                         data_type,
-                         is_nullable,
-                         table_schema AS "tableSchema",
-                         table_name AS "tableName",
-                         column_name AS "columnName",
-                         data_type AS "dataType",
-                         is_nullable AS "isNullable"
-                  FROM information_schema.columns
-                  WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
-                  ORDER BY table_schema, table_name, ordinal_position
+                  SELECT n.nspname AS table_schema,
+                         c.relname AS table_name,
+                         a.attname AS column_name,
+                         pg_catalog.format_type(a.atttypid, a.atttypmod) AS data_type,
+                         CASE WHEN a.attnotnull THEN 'NO' ELSE 'YES' END AS is_nullable,
+                         pg_get_expr(ad.adbin, ad.adrelid) AS column_default,
+                         CASE WHEN a.attgenerated = '' THEN NULL ELSE a.attgenerated::text END AS generated_kind,
+                         CASE WHEN a.attgenerated = '' THEN NULL ELSE pg_get_expr(ad.adbin, ad.adrelid) END AS generation_expression,
+                         n.nspname AS "tableSchema",
+                         c.relname AS "tableName",
+                         a.attname AS "columnName",
+                         pg_catalog.format_type(a.atttypid, a.atttypmod) AS "dataType",
+                         CASE WHEN a.attnotnull THEN 'NO' ELSE 'YES' END AS "isNullable",
+                         pg_get_expr(ad.adbin, ad.adrelid) AS "columnDefault",
+                         CASE WHEN a.attgenerated = '' THEN NULL ELSE a.attgenerated::text END AS "generatedKind",
+                         CASE WHEN a.attgenerated = '' THEN NULL ELSE pg_get_expr(ad.adbin, ad.adrelid) END AS "generationExpression"
+                  FROM pg_attribute a
+                  JOIN pg_class c ON c.oid = a.attrelid
+                  JOIN pg_namespace n ON n.oid = c.relnamespace
+                  LEFT JOIN pg_attrdef ad ON ad.adrelid = a.attrelid AND ad.adnum = a.attnum
+                  WHERE c.relkind IN ('r', 'p', 'v', 'm', 'f')
+                    AND a.attnum > 0
+                    AND NOT a.attisdropped
+                    AND n.nspname NOT IN ('pg_catalog', 'information_schema')
+                  ORDER BY n.nspname, c.relname, a.attnum
+                "#,
+                &[],
+            )
+            .await?;
+        let constraints = client
+            .query(
+                r#"
+                  SELECT n.nspname AS table_schema,
+                         c.relname AS table_name,
+                         con.conname AS constraint_name,
+                         CASE con.contype
+                           WHEN 'p' THEN 'primary_key'
+                           WHEN 'u' THEN 'unique'
+                           WHEN 'f' THEN 'foreign_key'
+                           WHEN 'c' THEN 'check'
+                           WHEN 'x' THEN 'exclusion'
+                           ELSE con.contype::text
+                         END AS constraint_type,
+                         pg_get_constraintdef(con.oid, true) AS definition,
+                         CASE con.confupdtype
+                           WHEN 'a' THEN 'no_action'
+                           WHEN 'r' THEN 'restrict'
+                           WHEN 'c' THEN 'cascade'
+                           WHEN 'n' THEN 'set_null'
+                           WHEN 'd' THEN 'set_default'
+                           ELSE NULL
+                         END AS update_action,
+                         CASE con.confdeltype
+                           WHEN 'a' THEN 'no_action'
+                           WHEN 'r' THEN 'restrict'
+                           WHEN 'c' THEN 'cascade'
+                           WHEN 'n' THEN 'set_null'
+                           WHEN 'd' THEN 'set_default'
+                           ELSE NULL
+                         END AS delete_action,
+                         n.nspname AS "tableSchema",
+                         c.relname AS "tableName",
+                         con.conname AS "constraintName",
+                         CASE con.contype
+                           WHEN 'p' THEN 'primary_key'
+                           WHEN 'u' THEN 'unique'
+                           WHEN 'f' THEN 'foreign_key'
+                           WHEN 'c' THEN 'check'
+                           WHEN 'x' THEN 'exclusion'
+                           ELSE con.contype::text
+                         END AS "constraintType",
+                         pg_get_constraintdef(con.oid, true) AS "definition",
+                         CASE con.confupdtype
+                           WHEN 'a' THEN 'no_action'
+                           WHEN 'r' THEN 'restrict'
+                           WHEN 'c' THEN 'cascade'
+                           WHEN 'n' THEN 'set_null'
+                           WHEN 'd' THEN 'set_default'
+                           ELSE NULL
+                         END AS "updateAction",
+                         CASE con.confdeltype
+                           WHEN 'a' THEN 'no_action'
+                           WHEN 'r' THEN 'restrict'
+                           WHEN 'c' THEN 'cascade'
+                           WHEN 'n' THEN 'set_null'
+                           WHEN 'd' THEN 'set_default'
+                           ELSE NULL
+                         END AS "deleteAction"
+                  FROM pg_constraint con
+                  JOIN pg_class c ON c.oid = con.conrelid
+                  JOIN pg_namespace n ON n.oid = c.relnamespace
+                  WHERE c.relkind IN ('r', 'p')
+                    AND n.nspname NOT IN ('pg_catalog', 'information_schema')
+                  ORDER BY n.nspname, c.relname, con.conname
                 "#,
                 &[],
             )
@@ -1540,6 +1722,32 @@ impl PostgresSandboxManager {
                 &[],
             )
             .await?;
+        let views = client
+            .query(
+                r#"
+                  SELECT n.nspname AS table_schema,
+                         c.relname AS table_name,
+                         CASE c.relkind
+                           WHEN 'v' THEN 'view'
+                           WHEN 'm' THEN 'materialized_view'
+                         END AS relation_kind,
+                         pg_get_viewdef(c.oid, true) AS definition,
+                         n.nspname AS "tableSchema",
+                         c.relname AS "tableName",
+                         CASE c.relkind
+                           WHEN 'v' THEN 'view'
+                           WHEN 'm' THEN 'materialized_view'
+                         END AS "relationKind",
+                         pg_get_viewdef(c.oid, true) AS "definition"
+                  FROM pg_class c
+                  JOIN pg_namespace n ON n.oid = c.relnamespace
+                  WHERE c.relkind IN ('v', 'm')
+                    AND n.nspname NOT IN ('pg_catalog', 'information_schema')
+                  ORDER BY n.nspname, c.relname
+                "#,
+                &[],
+            )
+            .await?;
         let extensions = client
             .query(
                 r#"
@@ -1554,15 +1762,19 @@ impl PostgresSandboxManager {
             )
             .await?;
 
+        let relation_counts = relation_counts_from_rows(&tables);
         drop(client);
         let _ = connection_task.await;
 
         Ok(DescribeSchemaOutput {
             database_id: connection.database_id,
             database_name: connection.database_name,
+            relation_counts,
             tables: rows_to_json(tables)?,
             columns: rows_to_json(columns)?,
+            constraints: rows_to_json(constraints)?,
             indexes: rows_to_json(indexes)?,
+            views: rows_to_json(views)?,
             extensions: rows_to_json(extensions)?,
         })
     }
@@ -2864,10 +3076,22 @@ async fn collect_schema_digest(client: &Client) -> anyhow::Result<WorkflowSchema
     let table_rows = client
         .query(
             r#"
-              SELECT table_schema, table_name, table_type
-              FROM information_schema.tables
-              WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
-              ORDER BY table_schema, table_name
+              SELECT n.nspname AS table_schema,
+                     c.relname AS table_name,
+                     CASE c.relkind
+                       WHEN 'r' THEN 'table'
+                       WHEN 'p' THEN 'partitioned_table'
+                       WHEN 'v' THEN 'view'
+                       WHEN 'm' THEN 'materialized_view'
+                       WHEN 'f' THEN 'foreign_table'
+                       ELSE c.relkind::text
+                     END AS relation_kind,
+                     CASE WHEN c.relkind IN ('v', 'm') THEN pg_get_viewdef(c.oid, true) ELSE NULL END AS view_definition
+              FROM pg_class c
+              JOIN pg_namespace n ON n.oid = c.relnamespace
+              WHERE c.relkind IN ('r', 'p', 'v', 'm', 'f')
+                AND n.nspname NOT IN ('pg_catalog', 'information_schema')
+              ORDER BY n.nspname, c.relname
             "#,
             &[],
         )
@@ -2875,11 +3099,67 @@ async fn collect_schema_digest(client: &Client) -> anyhow::Result<WorkflowSchema
     let column_rows = client
         .query(
             r#"
-              SELECT table_schema, table_name, column_name, ordinal_position,
-                     data_type, udt_name, is_nullable, column_default
-              FROM information_schema.columns
-              WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
-              ORDER BY table_schema, table_name, ordinal_position
+              SELECT n.nspname AS table_schema,
+                     c.relname AS table_name,
+                     a.attname AS column_name,
+                     a.attnum AS ordinal_position,
+                     pg_catalog.format_type(a.atttypid, a.atttypmod) AS data_type,
+                     t.typname AS udt_name,
+                     CASE WHEN a.attnotnull THEN 'NO' ELSE 'YES' END AS is_nullable,
+                     pg_get_expr(ad.adbin, ad.adrelid) AS column_default,
+                     CASE WHEN a.attgenerated = '' THEN NULL ELSE a.attgenerated::text END AS generated_kind,
+                     CASE WHEN a.attgenerated = '' THEN NULL ELSE pg_get_expr(ad.adbin, ad.adrelid) END AS generation_expression
+              FROM pg_attribute a
+              JOIN pg_class c ON c.oid = a.attrelid
+              JOIN pg_namespace n ON n.oid = c.relnamespace
+              JOIN pg_type t ON t.oid = a.atttypid
+              LEFT JOIN pg_attrdef ad ON ad.adrelid = a.attrelid AND ad.adnum = a.attnum
+              WHERE c.relkind IN ('r', 'p', 'v', 'm', 'f')
+                AND a.attnum > 0
+                AND NOT a.attisdropped
+                AND n.nspname NOT IN ('pg_catalog', 'information_schema')
+              ORDER BY n.nspname, c.relname, a.attnum
+            "#,
+            &[],
+        )
+        .await?;
+    let constraint_rows = client
+        .query(
+            r#"
+              SELECT n.nspname AS table_schema,
+                     c.relname AS table_name,
+                     con.conname AS constraint_name,
+                     CASE con.contype
+                       WHEN 'p' THEN 'primary_key'
+                       WHEN 'u' THEN 'unique'
+                       WHEN 'f' THEN 'foreign_key'
+                       WHEN 'c' THEN 'check'
+                       WHEN 'x' THEN 'exclusion'
+                       ELSE con.contype::text
+                     END AS constraint_type,
+                     pg_get_constraintdef(con.oid, true) AS definition,
+                     CASE con.confupdtype
+                       WHEN 'a' THEN 'no_action'
+                       WHEN 'r' THEN 'restrict'
+                       WHEN 'c' THEN 'cascade'
+                       WHEN 'n' THEN 'set_null'
+                       WHEN 'd' THEN 'set_default'
+                       ELSE NULL
+                     END AS update_action,
+                     CASE con.confdeltype
+                       WHEN 'a' THEN 'no_action'
+                       WHEN 'r' THEN 'restrict'
+                       WHEN 'c' THEN 'cascade'
+                       WHEN 'n' THEN 'set_null'
+                       WHEN 'd' THEN 'set_default'
+                       ELSE NULL
+                     END AS delete_action
+              FROM pg_constraint con
+              JOIN pg_class c ON c.oid = con.conrelid
+              JOIN pg_namespace n ON n.oid = c.relnamespace
+              WHERE c.relkind IN ('r', 'p')
+                AND n.nspname NOT IN ('pg_catalog', 'information_schema')
+              ORDER BY n.nspname, c.relname, con.conname
             "#,
             &[],
         )
@@ -2906,14 +3186,18 @@ async fn collect_schema_digest(client: &Client) -> anyhow::Result<WorkflowSchema
     for row in table_rows {
         let schema: String = row.get("table_schema");
         let name: String = row.get("table_name");
-        let table_type: String = row.get("table_type");
+        let relation_kind: String = row.get("relation_kind");
+        let view_definition: Option<String> = row.get("view_definition");
         tables.push(schema_object_digest(
-            "table",
+            relation_kind.clone(),
             format!("{schema}.{name}"),
             json!({
                 "schema": schema,
                 "name": name,
-                "tableType": table_type
+                "relationKind": relation_kind,
+                "viewDefinitionHash": view_definition
+                    .as_deref()
+                    .map(|definition| sha256_hex(definition.as_bytes()))
             }),
         )?);
     }
@@ -2928,6 +3212,8 @@ async fn collect_schema_digest(client: &Client) -> anyhow::Result<WorkflowSchema
         let udt_name: String = row.get("udt_name");
         let is_nullable: String = row.get("is_nullable");
         let column_default: Option<String> = row.get("column_default");
+        let generated_kind: Option<String> = row.get("generated_kind");
+        let generation_expression: Option<String> = row.get("generation_expression");
         columns.push(schema_object_digest(
             "column",
             format!("{schema}.{table}.{name}"),
@@ -2939,7 +3225,33 @@ async fn collect_schema_digest(client: &Client) -> anyhow::Result<WorkflowSchema
                 "dataType": data_type,
                 "udtName": udt_name,
                 "isNullable": is_nullable,
-                "columnDefault": column_default
+                "columnDefault": column_default,
+                "generatedKind": generated_kind,
+                "generationExpression": generation_expression
+            }),
+        )?);
+    }
+
+    let mut constraints = Vec::new();
+    for row in constraint_rows {
+        let schema: String = row.get("table_schema");
+        let table: String = row.get("table_name");
+        let name: String = row.get("constraint_name");
+        let constraint_type: String = row.get("constraint_type");
+        let definition: String = row.get("definition");
+        let update_action: Option<String> = row.get("update_action");
+        let delete_action: Option<String> = row.get("delete_action");
+        constraints.push(schema_object_digest(
+            "constraint",
+            format!("{schema}.{table}.{name}"),
+            json!({
+                "schema": schema,
+                "table": table,
+                "name": name,
+                "constraintType": constraint_type,
+                "definitionHash": sha256_hex(definition.as_bytes()),
+                "updateAction": update_action,
+                "deleteAction": delete_action
             }),
         )?);
     }
@@ -2976,9 +3288,15 @@ async fn collect_schema_digest(client: &Client) -> anyhow::Result<WorkflowSchema
         )?);
     }
 
+    let relation_counts = relation_counts_for_schema_objects(&tables);
     let object_counts = SchemaObjectCounts {
-        tables: tables.len(),
+        tables: relation_counts.tables,
+        partitioned_tables: relation_counts.partitioned_tables,
+        views: relation_counts.views,
+        materialized_views: relation_counts.materialized_views,
+        foreign_tables: relation_counts.foreign_tables,
         columns: columns.len(),
+        constraints: constraints.len(),
         indexes: indexes.len(),
         extensions: extensions.len(),
     };
@@ -2987,6 +3305,7 @@ async fn collect_schema_digest(client: &Client) -> anyhow::Result<WorkflowSchema
         "objectCounts": object_counts.clone(),
         "tables": tables.clone(),
         "columns": columns.clone(),
+        "constraints": constraints.clone(),
         "indexes": indexes.clone(),
         "extensions": extensions.clone()
     });
@@ -2998,6 +3317,7 @@ async fn collect_schema_digest(client: &Client) -> anyhow::Result<WorkflowSchema
         object_counts,
         tables,
         columns,
+        constraints,
         indexes,
         extensions,
     })
@@ -3090,6 +3410,7 @@ fn schema_object_map(digest: &WorkflowSchemaDigest) -> BTreeMap<String, SchemaOb
         .tables
         .iter()
         .chain(digest.columns.iter())
+        .chain(digest.constraints.iter())
         .chain(digest.indexes.iter())
         .chain(digest.extensions.iter())
         .map(|object| (format!("{}\0{}", object.kind, object.key), object.clone()))
@@ -4300,10 +4621,20 @@ async fn schema_digest_for_connection(
     let table_rows = client
         .query(
             r#"
-              SELECT n.nspname AS table_schema, c.relname AS table_name
+              SELECT n.nspname AS table_schema,
+                     c.relname AS table_name,
+                     CASE c.relkind
+                       WHEN 'r' THEN 'table'
+                       WHEN 'p' THEN 'partitioned_table'
+                       WHEN 'v' THEN 'view'
+                       WHEN 'm' THEN 'materialized_view'
+                       WHEN 'f' THEN 'foreign_table'
+                       ELSE c.relkind::text
+                     END AS relation_kind,
+                     CASE WHEN c.relkind IN ('v', 'm') THEN pg_get_viewdef(c.oid, true) ELSE NULL END AS view_definition
               FROM pg_class c
               JOIN pg_namespace n ON n.oid = c.relnamespace
-              WHERE c.relkind IN ('r', 'p')
+              WHERE c.relkind IN ('r', 'p', 'v', 'm', 'f')
                 AND n.nspname NOT IN ('pg_catalog', 'information_schema')
               ORDER BY n.nspname, c.relname
             "#,
@@ -4317,15 +4648,59 @@ async fn schema_digest_for_connection(
                      c.relname AS table_name,
                      a.attname AS column_name,
                      pg_catalog.format_type(a.atttypid, a.atttypmod) AS data_type,
-                     NOT a.attnotnull AS nullable
+                     NOT a.attnotnull AS nullable,
+                     pg_get_expr(ad.adbin, ad.adrelid) AS default_expression,
+                     CASE WHEN a.attgenerated = '' THEN NULL ELSE pg_get_expr(ad.adbin, ad.adrelid) END AS generated_expression
               FROM pg_attribute a
               JOIN pg_class c ON c.oid = a.attrelid
               JOIN pg_namespace n ON n.oid = c.relnamespace
-              WHERE c.relkind IN ('r', 'p')
+              LEFT JOIN pg_attrdef ad ON ad.adrelid = a.attrelid AND ad.adnum = a.attnum
+              WHERE c.relkind IN ('r', 'p', 'v', 'm', 'f')
                 AND a.attnum > 0
                 AND NOT a.attisdropped
                 AND n.nspname NOT IN ('pg_catalog', 'information_schema')
               ORDER BY n.nspname, c.relname, a.attnum
+            "#,
+            &[],
+        )
+        .await?;
+    let constraint_rows = client
+        .query(
+            r#"
+              SELECT n.nspname AS table_schema,
+                     c.relname AS table_name,
+                     con.conname AS constraint_name,
+                     CASE con.contype
+                       WHEN 'p' THEN 'primary_key'
+                       WHEN 'u' THEN 'unique'
+                       WHEN 'f' THEN 'foreign_key'
+                       WHEN 'c' THEN 'check'
+                       WHEN 'x' THEN 'exclusion'
+                       ELSE con.contype::text
+                     END AS constraint_type,
+                     pg_get_constraintdef(con.oid, true) AS definition,
+                     CASE con.confupdtype
+                       WHEN 'a' THEN 'no_action'
+                       WHEN 'r' THEN 'restrict'
+                       WHEN 'c' THEN 'cascade'
+                       WHEN 'n' THEN 'set_null'
+                       WHEN 'd' THEN 'set_default'
+                       ELSE NULL
+                     END AS update_action,
+                     CASE con.confdeltype
+                       WHEN 'a' THEN 'no_action'
+                       WHEN 'r' THEN 'restrict'
+                       WHEN 'c' THEN 'cascade'
+                       WHEN 'n' THEN 'set_null'
+                       WHEN 'd' THEN 'set_default'
+                       ELSE NULL
+                     END AS delete_action
+              FROM pg_constraint con
+              JOIN pg_class c ON c.oid = con.conrelid
+              JOIN pg_namespace n ON n.oid = c.relnamespace
+              WHERE c.relkind IN ('r', 'p')
+                AND n.nspname NOT IN ('pg_catalog', 'information_schema')
+              ORDER BY n.nspname, c.relname, con.conname
             "#,
             &[],
         )
@@ -4352,13 +4727,19 @@ async fn schema_digest_for_connection(
     for row in table_rows {
         let schema = row.get::<_, String>("table_schema");
         let name = row.get::<_, String>("table_name");
+        let view_definition = row.get::<_, Option<String>>("view_definition");
         tables.insert(
             (schema.clone(), name.clone()),
             SchemaDigestTable {
                 schema,
                 name,
+                relation_kind: row.get("relation_kind"),
                 columns: Vec::new(),
+                constraints: Vec::new(),
                 indexes: Vec::new(),
+                view_definition_hash: view_definition
+                    .as_deref()
+                    .map(|definition| sha256_hex(definition.as_bytes())),
             },
         );
     }
@@ -4371,13 +4752,42 @@ async fn schema_digest_for_connection(
             .or_insert_with(|| SchemaDigestTable {
                 schema,
                 name,
+                relation_kind: "table".to_string(),
                 columns: Vec::new(),
+                constraints: Vec::new(),
                 indexes: Vec::new(),
+                view_definition_hash: None,
             });
         table.columns.push(SchemaDigestColumn {
             name: row.get("column_name"),
             data_type: row.get("data_type"),
             nullable: row.get("nullable"),
+            default_expression: row.get("default_expression"),
+            generated_expression: row.get("generated_expression"),
+        });
+    }
+
+    for row in constraint_rows {
+        let schema = row.get::<_, String>("table_schema");
+        let name = row.get::<_, String>("table_name");
+        let definition = row.get::<_, String>("definition");
+        let table = tables
+            .entry((schema.clone(), name.clone()))
+            .or_insert_with(|| SchemaDigestTable {
+                schema,
+                name,
+                relation_kind: "table".to_string(),
+                columns: Vec::new(),
+                constraints: Vec::new(),
+                indexes: Vec::new(),
+                view_definition_hash: None,
+            });
+        table.constraints.push(SchemaDigestConstraint {
+            name: row.get("constraint_name"),
+            constraint_type: row.get("constraint_type"),
+            definition_hash: sha256_hex(definition.as_bytes()),
+            update_action: row.get("update_action"),
+            delete_action: row.get("delete_action"),
         });
     }
 
@@ -4394,6 +4804,7 @@ async fn schema_digest_for_connection(
     }
 
     let tables = tables.into_values().collect::<Vec<_>>();
+    let relation_counts = relation_counts_for_digest_tables(&tables);
     let extensions = extension_rows
         .into_iter()
         .map(|row| SchemaDigestExtension {
@@ -4402,8 +4813,9 @@ async fn schema_digest_for_connection(
         })
         .collect::<Vec<_>>();
 
-    let table_count = tables.len();
+    let table_count = relation_counts.tables + relation_counts.partitioned_tables;
     let column_count = tables.iter().map(|table| table.columns.len()).sum();
+    let constraint_count = tables.iter().map(|table| table.constraints.len()).sum();
     let index_count = tables.iter().map(|table| table.indexes.len()).sum();
     let extension_count = extensions.len();
     let checksum = schema_digest_checksum(&tables, &extensions)?;
@@ -4411,10 +4823,12 @@ async fn schema_digest_for_connection(
     Ok(SchemaDigestOutput {
         database_id,
         database_name,
-        digest_version: 1,
+        digest_version: SCHEMA_DIGEST_VERSION,
         checksum,
         table_count,
+        relation_counts,
         column_count,
+        constraint_count,
         index_count,
         extension_count,
         tables,
@@ -4427,11 +4841,50 @@ fn schema_digest_checksum(
     extensions: &[SchemaDigestExtension],
 ) -> anyhow::Result<String> {
     let content = SchemaDigestContent {
-        digest_version: 1,
+        digest_version: SCHEMA_DIGEST_VERSION,
         tables,
         extensions,
     };
     Ok(sha256_hex(&serde_json::to_vec(&content)?))
+}
+
+fn default_relation_kind() -> String {
+    "table".to_string()
+}
+
+fn relation_counts_from_rows(rows: &[Row]) -> SchemaRelationCounts {
+    let mut counts = SchemaRelationCounts::default();
+    for row in rows {
+        increment_relation_count(&mut counts, row.get::<_, String>("relation_kind").as_str());
+    }
+    counts
+}
+
+fn relation_counts_for_digest_tables(tables: &[SchemaDigestTable]) -> SchemaRelationCounts {
+    let mut counts = SchemaRelationCounts::default();
+    for table in tables {
+        increment_relation_count(&mut counts, &table.relation_kind);
+    }
+    counts
+}
+
+fn relation_counts_for_schema_objects(objects: &[SchemaObjectDigest]) -> SchemaRelationCounts {
+    let mut counts = SchemaRelationCounts::default();
+    for object in objects {
+        increment_relation_count(&mut counts, &object.kind);
+    }
+    counts
+}
+
+fn increment_relation_count(counts: &mut SchemaRelationCounts, relation_kind: &str) {
+    match relation_kind {
+        "table" => counts.tables += 1,
+        "partitioned_table" => counts.partitioned_tables += 1,
+        "view" => counts.views += 1,
+        "materialized_view" => counts.materialized_views += 1,
+        "foreign_table" => counts.foreign_tables += 1,
+        _ => counts.other += 1,
+    }
 }
 
 fn diff_schema_digests(
@@ -4993,7 +5446,12 @@ async fn run_readonly_query(
 
     match (result, rollback) {
         (Ok(result), Ok(())) => Ok(result),
-        (Err(error), _) => Err(error),
+        (Err(error), _) => {
+            if let Some(message) = readonly_violation_message(sql, &error) {
+                anyhow::bail!("{message}");
+            }
+            Err(error)
+        }
         (Ok(_), Err(error)) => Err(error.into()),
     }
 }
@@ -5111,6 +5569,36 @@ fn dml_returning_limit_sql(sql: &str, row_limit: usize) -> Option<String> {
         "WITH {alias} AS (\n{trimmed}\n) SELECT * FROM {alias} LIMIT {}",
         row_limit + 1
     ))
+}
+
+fn readonly_violation_message(sql: &str, error: &anyhow::Error) -> Option<String> {
+    if !is_readonly_violation_error(error) {
+        return None;
+    }
+    let statement = first_sql_keyword(sql)
+        .map(|keyword| keyword.to_ascii_uppercase())
+        .unwrap_or_else(|| "SQL".to_string());
+    Some(format!(
+        "readonly=true blocked {statement} statement; readonly=true runs SQL in a read-only transaction. Database detail: {}",
+        format!("{error:#}")
+    ))
+}
+
+fn is_readonly_violation_error(error: &anyhow::Error) -> bool {
+    if let Some(pg_error) = error.downcast_ref::<tokio_postgres::Error>() {
+        if pg_error
+            .as_db_error()
+            .is_some_and(|db_error| db_error.code() == &SqlState::READ_ONLY_SQL_TRANSACTION)
+        {
+            return true;
+        }
+    }
+    error.chain().any(|cause| {
+        cause
+            .to_string()
+            .to_ascii_lowercase()
+            .contains("read-only transaction")
+    })
 }
 
 fn returning_limit_alias(sql: &str) -> String {
@@ -5448,6 +5936,10 @@ fn cell_to_json(row: &Row, index: usize, value_type: &Type) -> anyhow::Result<Va
             .unwrap_or(Value::Null));
     }
 
+    if let Some(kind) = array_cell_kind(value_type) {
+        return Ok(array_cell_to_json(row, index, kind));
+    }
+
     let value = match *value_type {
         Type::BOOL => row
             .try_get::<_, Option<bool>>(index)
@@ -5550,6 +6042,94 @@ fn cell_to_json(row: &Row, index: usize, value_type: &Type) -> anyhow::Result<Va
         }
     };
     Ok(value)
+}
+
+fn array_cell_kind(value_type: &Type) -> Option<ArrayCellKind> {
+    match *value_type {
+        Type::TEXT_ARRAY | Type::VARCHAR_ARRAY | Type::BPCHAR_ARRAY | Type::NAME_ARRAY => {
+            Some(ArrayCellKind::Text)
+        }
+        Type::BOOL_ARRAY => Some(ArrayCellKind::Bool),
+        Type::INT2_ARRAY => Some(ArrayCellKind::Int2),
+        Type::INT4_ARRAY => Some(ArrayCellKind::Int4),
+        Type::INT8_ARRAY => Some(ArrayCellKind::Int8),
+        Type::FLOAT4_ARRAY => Some(ArrayCellKind::Float4),
+        Type::FLOAT8_ARRAY => Some(ArrayCellKind::Float8),
+        Type::JSON_ARRAY | Type::JSONB_ARRAY => Some(ArrayCellKind::Json),
+        Type::TIMESTAMPTZ_ARRAY => Some(ArrayCellKind::TimestampTz),
+        Type::UUID_ARRAY => Some(ArrayCellKind::Uuid),
+        _ => None,
+    }
+}
+
+fn array_cell_to_json(row: &Row, index: usize, kind: ArrayCellKind) -> Value {
+    match kind {
+        ArrayCellKind::Text => row
+            .try_get::<_, Option<Vec<Option<String>>>>(index)
+            .ok()
+            .map(|value| optional_array_to_json(value, Value::String))
+            .unwrap_or(Value::Null),
+        ArrayCellKind::Bool => row
+            .try_get::<_, Option<Vec<Option<bool>>>>(index)
+            .ok()
+            .map(|value| optional_array_to_json(value, Value::Bool))
+            .unwrap_or(Value::Null),
+        ArrayCellKind::Int2 => row
+            .try_get::<_, Option<Vec<Option<i16>>>>(index)
+            .ok()
+            .map(|value| optional_array_to_json(value, |value| json!(value)))
+            .unwrap_or(Value::Null),
+        ArrayCellKind::Int4 => row
+            .try_get::<_, Option<Vec<Option<i32>>>>(index)
+            .ok()
+            .map(|value| optional_array_to_json(value, |value| json!(value)))
+            .unwrap_or(Value::Null),
+        ArrayCellKind::Int8 => row
+            .try_get::<_, Option<Vec<Option<i64>>>>(index)
+            .ok()
+            .map(|value| optional_array_to_json(value, |value| json!(value)))
+            .unwrap_or(Value::Null),
+        ArrayCellKind::Float4 => row
+            .try_get::<_, Option<Vec<Option<f32>>>>(index)
+            .ok()
+            .map(|value| optional_array_to_json(value, |value| json!(value)))
+            .unwrap_or(Value::Null),
+        ArrayCellKind::Float8 => row
+            .try_get::<_, Option<Vec<Option<f64>>>>(index)
+            .ok()
+            .map(|value| optional_array_to_json(value, |value| json!(value)))
+            .unwrap_or(Value::Null),
+        ArrayCellKind::Json => row
+            .try_get::<_, Option<Vec<Option<Value>>>>(index)
+            .ok()
+            .map(|value| optional_array_to_json(value, |value| value))
+            .unwrap_or(Value::Null),
+        ArrayCellKind::TimestampTz => row
+            .try_get::<_, Option<Vec<Option<DateTime<Utc>>>>>(index)
+            .ok()
+            .map(|value| optional_array_to_json(value, |value| Value::String(value.to_rfc3339())))
+            .unwrap_or(Value::Null),
+        ArrayCellKind::Uuid => row
+            .try_get::<_, Option<Vec<Option<Uuid>>>>(index)
+            .ok()
+            .map(|value| optional_array_to_json(value, |value| Value::String(value.to_string())))
+            .unwrap_or(Value::Null),
+    }
+}
+
+fn optional_array_to_json<T, F>(value: Option<Vec<Option<T>>>, mapper: F) -> Value
+where
+    F: Fn(T) -> Value,
+{
+    match value {
+        Some(items) => Value::Array(
+            items
+                .into_iter()
+                .map(|item| item.map(&mapper).unwrap_or(Value::Null))
+                .collect(),
+        ),
+        None => Value::Null,
+    }
 }
 
 fn bytes_to_hex(bytes: &[u8]) -> String {
@@ -5766,15 +6346,20 @@ mod tests {
         let tables = vec![SchemaDigestTable {
             schema: "public".to_string(),
             name: "users".to_string(),
+            relation_kind: "table".to_string(),
             columns: vec![SchemaDigestColumn {
                 name: "id".to_string(),
                 data_type: "integer".to_string(),
                 nullable: false,
+                default_expression: None,
+                generated_expression: None,
             }],
+            constraints: Vec::new(),
             indexes: vec![SchemaDigestIndex {
                 name: "users_pkey".to_string(),
                 definition_hash: "abc123".to_string(),
             }],
+            view_definition_hash: None,
         }];
         let extensions = vec![SchemaDigestExtension {
             name: "plpgsql".to_string(),
@@ -5784,10 +6369,12 @@ mod tests {
         let first = SchemaDigestOutput {
             database_id: "db_a".to_string(),
             database_name: "sandbox_a".to_string(),
-            digest_version: 1,
+            digest_version: SCHEMA_DIGEST_VERSION,
             checksum: schema_digest_checksum(&tables, &extensions).unwrap(),
             table_count: 1,
+            relation_counts: relation_counts_for_digest_tables(&tables),
             column_count: 1,
+            constraint_count: 0,
             index_count: 1,
             extension_count: 1,
             tables: tables.clone(),
@@ -5796,10 +6383,12 @@ mod tests {
         let second = SchemaDigestOutput {
             database_id: "db_b".to_string(),
             database_name: "sandbox_b".to_string(),
-            digest_version: 1,
+            digest_version: SCHEMA_DIGEST_VERSION,
             checksum: schema_digest_checksum(&tables, &extensions).unwrap(),
             table_count: 1,
+            relation_counts: relation_counts_for_digest_tables(&tables),
             column_count: 1,
+            constraint_count: 0,
             index_count: 1,
             extension_count: 1,
             tables,
@@ -5817,17 +6406,24 @@ mod tests {
             name: "email".to_string(),
             data_type: "text".to_string(),
             nullable: false,
+            default_expression: None,
+            generated_expression: None,
         });
         after.tables[0].indexes[0].definition_hash = "changed".to_string();
         after.tables.push(SchemaDigestTable {
             schema: "public".to_string(),
             name: "posts".to_string(),
+            relation_kind: "table".to_string(),
             columns: vec![SchemaDigestColumn {
                 name: "id".to_string(),
                 data_type: "integer".to_string(),
                 nullable: false,
+                default_expression: None,
+                generated_expression: None,
             }],
+            constraints: Vec::new(),
             indexes: Vec::new(),
+            view_definition_hash: None,
         });
         after.extensions[0].version = "2.0".to_string();
         after.checksum = "after-checksum".to_string();
@@ -5852,7 +6448,7 @@ mod tests {
     fn schema_diff_rejects_mismatched_digest_versions() {
         let before = test_digest("before");
         let mut after = test_digest("after");
-        after.digest_version = 2;
+        after.digest_version = SCHEMA_DIGEST_VERSION + 1;
 
         let error = diff_schema_digests(&before, &after).unwrap_err();
 
@@ -6632,6 +7228,126 @@ services:
     }
 
     #[test]
+    fn serializes_common_postgres_arrays_as_json_arrays() {
+        let timestamp = DateTime::parse_from_rfc3339("2026-07-01T12:34:56Z")
+            .unwrap()
+            .with_timezone(&Utc);
+        let uuid = Uuid::parse_str("0f3f2410-ae28-44d2-98c9-09bc42cf12d1").unwrap();
+
+        assert_eq!(
+            optional_array_to_json(
+                Some(vec![
+                    Some("alpha".to_string()),
+                    None,
+                    Some("beta".to_string())
+                ]),
+                Value::String
+            ),
+            json!(["alpha", null, "beta"])
+        );
+        assert_eq!(
+            optional_array_to_json(Some(vec![Some(1_i32), None, Some(3_i32)]), |value| json!(
+                value
+            )),
+            json!([1, null, 3])
+        );
+        assert_eq!(
+            optional_array_to_json(Some(vec![Some(uuid), None]), |value| Value::String(
+                value.to_string()
+            )),
+            json!(["0f3f2410-ae28-44d2-98c9-09bc42cf12d1", null])
+        );
+        assert_eq!(
+            optional_array_to_json(Some(vec![Some(json!({"ok": true})), None]), |value| value),
+            json!([{"ok": true}, null])
+        );
+        assert_eq!(
+            optional_array_to_json(Some(vec![Some(timestamp), None]), |value| Value::String(
+                value.to_rfc3339()
+            )),
+            json!(["2026-07-01T12:34:56+00:00", null])
+        );
+        assert_eq!(
+            optional_array_to_json::<String, _>(None, Value::String),
+            Value::Null
+        );
+    }
+
+    #[test]
+    fn maps_common_postgres_array_types_to_json_array_serializers() {
+        assert_eq!(
+            array_cell_kind(&Type::TEXT_ARRAY),
+            Some(ArrayCellKind::Text)
+        );
+        assert_eq!(
+            array_cell_kind(&Type::INT4_ARRAY),
+            Some(ArrayCellKind::Int4)
+        );
+        assert_eq!(
+            array_cell_kind(&Type::UUID_ARRAY),
+            Some(ArrayCellKind::Uuid)
+        );
+        assert_eq!(
+            array_cell_kind(&Type::JSONB_ARRAY),
+            Some(ArrayCellKind::Json)
+        );
+        assert_eq!(
+            array_cell_kind(&Type::TIMESTAMPTZ_ARRAY),
+            Some(ArrayCellKind::TimestampTz)
+        );
+    }
+
+    #[test]
+    fn readonly_violation_message_names_mutating_statement() {
+        let error = anyhow::anyhow!("db error: cannot execute SELECT in a read-only transaction");
+        let message =
+            readonly_violation_message("insert into users(name) values ('a') returning id", &error)
+                .unwrap();
+
+        assert!(message.contains("readonly=true blocked INSERT statement"));
+        assert!(message.contains("Database detail:"));
+        assert!(!message.contains("blocked SELECT statement"));
+    }
+
+    #[test]
+    fn relation_counts_split_tables_views_and_materialized_views() {
+        let counts = relation_counts_for_digest_tables(&[
+            SchemaDigestTable {
+                schema: "public".to_string(),
+                name: "users".to_string(),
+                relation_kind: "table".to_string(),
+                columns: Vec::new(),
+                indexes: Vec::new(),
+                constraints: Vec::new(),
+                view_definition_hash: None,
+            },
+            SchemaDigestTable {
+                schema: "public".to_string(),
+                name: "active_users".to_string(),
+                relation_kind: "view".to_string(),
+                columns: Vec::new(),
+                indexes: Vec::new(),
+                constraints: Vec::new(),
+                view_definition_hash: Some("view-hash".to_string()),
+            },
+            SchemaDigestTable {
+                schema: "public".to_string(),
+                name: "daily_rollup".to_string(),
+                relation_kind: "materialized_view".to_string(),
+                columns: Vec::new(),
+                indexes: Vec::new(),
+                constraints: Vec::new(),
+                view_definition_hash: Some("matview-hash".to_string()),
+            },
+        ]);
+
+        assert_eq!(counts.tables, 1);
+        assert_eq!(counts.views, 1);
+        assert_eq!(counts.materialized_views, 1);
+        assert_eq!(counts.total(), 3);
+    }
+
+    #[test]
     fn decodes_postgres_numeric_values() {
         assert_eq!(
             decode_pg_numeric(&numeric_raw(1, 0x0000, 2, &[1, 2345, 6700])).unwrap(),
@@ -6684,15 +7400,20 @@ services:
         let tables = vec![SchemaDigestTable {
             schema: "public".to_string(),
             name: "users".to_string(),
+            relation_kind: "table".to_string(),
             columns: vec![SchemaDigestColumn {
                 name: "id".to_string(),
                 data_type: "integer".to_string(),
                 nullable: false,
+                default_expression: None,
+                generated_expression: None,
             }],
+            constraints: Vec::new(),
             indexes: vec![SchemaDigestIndex {
                 name: "users_pkey".to_string(),
                 definition_hash: "original".to_string(),
             }],
+            view_definition_hash: None,
         }];
         let extensions = vec![SchemaDigestExtension {
             name: "plpgsql".to_string(),
@@ -6701,10 +7422,12 @@ services:
         SchemaDigestOutput {
             database_id: database_id.to_string(),
             database_name: format!("sandbox_{database_id}"),
-            digest_version: 1,
+            digest_version: SCHEMA_DIGEST_VERSION,
             checksum: "before-checksum".to_string(),
             table_count: 1,
+            relation_counts: relation_counts_for_digest_tables(&tables),
             column_count: 1,
+            constraint_count: 0,
             index_count: 1,
             extension_count: 1,
             tables,
@@ -6722,7 +7445,8 @@ services:
                     json!({
                         "schema": "public",
                         "name": name,
-                        "tableType": "BASE TABLE"
+                        "relationKind": "table",
+                        "viewDefinitionHash": null
                     }),
                 )
                 .unwrap()
@@ -6730,7 +7454,12 @@ services:
             .collect::<Vec<_>>();
         let object_counts = SchemaObjectCounts {
             tables: tables.len(),
+            partitioned_tables: 0,
+            views: 0,
+            materialized_views: 0,
+            foreign_tables: 0,
             columns: 0,
+            constraints: 0,
             indexes: 0,
             extensions: 0,
         };
@@ -6739,6 +7468,7 @@ services:
             "objectCounts": object_counts.clone(),
             "tables": tables.clone(),
             "columns": [],
+            "constraints": [],
             "indexes": [],
             "extensions": []
         }))
@@ -6750,6 +7480,7 @@ services:
             object_counts,
             tables,
             columns: Vec::new(),
+            constraints: Vec::new(),
             indexes: Vec::new(),
             extensions: Vec::new(),
         }

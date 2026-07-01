@@ -203,7 +203,9 @@ impl PgsandboxServer {
             .await
     }
 
-    #[tool(description = "Return schema metadata for a sandbox database.")]
+    #[tool(
+        description = "Inspect sandbox schema metadata for tables, views, relation kinds, columns, defaults, constraints, indexes, extensions, and migration review."
+    )]
     async fn describe_schema(
         &self,
         Parameters(input): Parameters<DatabaseSelector>,
@@ -217,7 +219,9 @@ impl PgsandboxServer {
         .await
     }
 
-    #[tool(description = "Return a compact checksummed schema digest for a sandbox database.")]
+    #[tool(
+        description = "Create a compact checksummed schema digest for schema diff, migration review, before/after comparison, snapshots, and drift detection."
+    )]
     async fn schema_digest(
         &self,
         Parameters(input): Parameters<DatabaseSelector>,
@@ -231,7 +235,9 @@ impl PgsandboxServer {
         .await
     }
 
-    #[tool(description = "Compare a base schema_digest response with the current sandbox schema.")]
+    #[tool(
+        description = "Compare a prior schema_digest response with the current sandbox schema for before/after schema diff, migration review, and drift detection."
+    )]
     async fn schema_diff(
         &self,
         Parameters(input): Parameters<SchemaDiffInput>,
@@ -269,7 +275,9 @@ impl PgsandboxServer {
         .await
     }
 
-    #[tool(description = "Create a named schema snapshot for a PGSandbox-owned database.")]
+    #[tool(
+        description = "Create a named schema snapshot checkpoint for before/after migration review, schema diff workflows, rollback comparison, and drift detection."
+    )]
     async fn create_schema_snapshot(
         &self,
         Parameters(input): Parameters<CreateSchemaSnapshotInput>,
@@ -288,7 +296,9 @@ impl PgsandboxServer {
         .await
     }
 
-    #[tool(description = "List schema snapshots for a PGSandbox-owned database.")]
+    #[tool(
+        description = "List named schema snapshot checkpoints for before/after migration review, schema diff workflows, and stored schema baselines."
+    )]
     async fn list_schema_snapshots(
         &self,
         Parameters(input): Parameters<ListSchemaSnapshotsInput>,
@@ -306,7 +316,9 @@ impl PgsandboxServer {
         .await
     }
 
-    #[tool(description = "Delete a named schema snapshot for a PGSandbox-owned database.")]
+    #[tool(
+        description = "Delete a named schema snapshot checkpoint created for schema diff workflows or migration review baselines."
+    )]
     async fn delete_schema_snapshot(
         &self,
         Parameters(input): Parameters<DeleteSchemaSnapshotInput>,
@@ -324,7 +336,9 @@ impl PgsandboxServer {
         .await
     }
 
-    #[tool(description = "Diff a named schema snapshot against the current sandbox schema.")]
+    #[tool(
+        description = "Diff a named schema snapshot against the current sandbox schema for before/after migration review, drift detection, and schema comparison workflows."
+    )]
     async fn diff_schema_snapshot(
         &self,
         Parameters(input): Parameters<DiffSchemaSnapshotInput>,
@@ -426,7 +440,9 @@ impl PgsandboxServer {
         .await
     }
 
-    #[tool(description = "Export a PGSandbox-owned database to a local template artifact.")]
+    #[tool(
+        description = "Export a PGSandbox-owned database to a reusable local template artifact for seeded sandbox workflows, regression fixtures, and pg_dump/pg_restore reuse."
+    )]
     async fn create_template_from_sandbox(
         &self,
         Parameters(input): Parameters<CreateTemplateFromSandboxInput>,
@@ -446,7 +462,9 @@ impl PgsandboxServer {
         .await
     }
 
-    #[tool(description = "Create a new sandbox database from a local template artifact.")]
+    #[tool(
+        description = "Create a new sandbox database from a reusable local template artifact for seeded sandbox workflows, regression fixtures, and repeatable test states."
+    )]
     async fn create_sandbox_from_template(
         &self,
         Parameters(input): Parameters<CreateSandboxFromTemplateInput>,
@@ -469,7 +487,9 @@ impl PgsandboxServer {
         .await
     }
 
-    #[tool(description = "List local template artifacts for a profile.")]
+    #[tool(
+        description = "List reusable local template artifacts for seeded sandbox workflows, template restore, regression fixtures, and repeatable test states."
+    )]
     async fn list_templates(
         &self,
         Parameters(input): Parameters<ListTemplatesInput>,
@@ -489,7 +509,9 @@ impl PgsandboxServer {
         .await
     }
 
-    #[tool(description = "Delete a local template artifact.")]
+    #[tool(
+        description = "Delete a reusable local template artifact from seeded sandbox workflows and template restore state."
+    )]
     async fn delete_template(
         &self,
         Parameters(input): Parameters<DeleteTemplateInput>,

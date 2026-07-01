@@ -430,6 +430,14 @@ V0 supports:
 
 See [docs/mcp-tools.md](docs/mcp-tools.md) for details.
 
+For tool discovery, the schema inspection family is `describe_schema`,
+`schema_digest`, `schema_diff`, `create_schema_snapshot`,
+`list_schema_snapshots`, `diff_schema_snapshot`, and `delete_schema_snapshot`.
+Use those for migration review, before/after schema diff workflows, stored
+baselines, and drift detection. The reusable seeded-state family is
+`create_template_from_sandbox`, `create_sandbox_from_template`,
+`list_templates`, and `delete_template`.
+
 ## Agent Workflows
 
 For a Django repo, an agent can:
@@ -452,6 +460,10 @@ errors include stable categories such as `database_not_found`,
 `readonly_violation`, and `template_not_found` so agents can branch without
 parsing prose. Commands are executed without a shell and receive sandbox
 credentials through environment variables, not permanent settings rewrites.
+Schema inspection includes relation-kind counts, constraints, column defaults
+and generated expressions, and view definition hashes. `run_sql` returns common
+Postgres arrays such as `text[]`, integer arrays, `uuid[]`, `jsonb[]`, and
+`timestamptz[]` as JSON arrays; numeric values remain strings for precision.
 
 By default, `list_databases` and `cleanup_expired` are scoped to the selected
 profile. Pass `includeAllVersions: true` or `postgresVersion: "*"` for an
