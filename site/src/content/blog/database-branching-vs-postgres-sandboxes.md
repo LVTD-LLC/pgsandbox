@@ -128,7 +128,7 @@ If the branch is going to be shared by people, CI, or app infrastructure, it sho
 
 ### Choose Disposable Sandboxes When The Database Belongs To One Agent Task
 
-A disposable sandbox fits when the database exists only so an agent can prove one unit of work:
+A disposable sandbox fits when the [database sandbox](https://pgsandbox-mcp.lvtd.dev/blog/what-is-database-sandbox/) exists only so an agent can prove one unit of work:
 
 - Apply a migration and inspect the final schema.
 - Reproduce a bug with a small seed state.

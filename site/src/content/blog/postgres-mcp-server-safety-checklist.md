@@ -85,7 +85,7 @@ Read-only access is useful, but most coding-agent database work is not purely re
 
 The unsafe default is to point the agent at a shared development database because it already exists. That is convenient until a migration leaves it half-changed, a test seed collides with another developer, or an interrupted session leaves stale state behind.
 
-A disposable database is the better default for agent work:
+A [database sandbox](https://pgsandbox-mcp.lvtd.dev/blog/what-is-database-sandbox/) is the better default for agent work:
 
 - The agent can run real migrations.
 - The agent can insert bad seed data without polluting shared state.
