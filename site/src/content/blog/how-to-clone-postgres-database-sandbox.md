@@ -28,7 +28,7 @@ PGSandbox MCP's clone model is deliberately narrow:
 6. Clean up the destination sandbox if restore fails.
 7. Let the agent run validation SQL only against the destination.
 
-The result is not a database branch. It is a task database with a copy of the source shape the agent can safely inspect, mutate, and throw away.
+The result is not a database branch. It is a [database sandbox](https://pgsandbox-mcp.lvtd.dev/blog/what-is-database-sandbox/) with a copy of the source shape the agent can safely inspect, mutate, and throw away.
 
 ## When to clone a Postgres database
 

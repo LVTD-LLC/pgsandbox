@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-07-01
+
+- Added the Astro Markdown blog post "What Is a Database Sandbox?" with SEO ledger, link inventory, and inbound blog links.
+- Updated existing blog posts to link to the new database sandbox definition page.
+
 ## 2026-06-30
 
 - Added the Docker-safe managed local Postgres runtime with init/start/stop/status helpers, free-port selection, health checks, and local profile persistence.
