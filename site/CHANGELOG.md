@@ -18,7 +18,7 @@
 
 - Added the Docker-safe managed local Postgres runtime with init/start/stop/status helpers, free-port selection, health checks, and local profile persistence.
 - Added lifecycle audit logging, local/private safety policy checks, allowed-host validation, per-owner sandbox quotas, and explicit external-admin opt-ins.
-- Added Django-first repo workflow tools for preparing repos, running and validating migrations, seeding databases, and returning compact schema diffs.
+- Added repo workflow tools for preparing repos, running and validating migrations, seeding databases, and returning compact schema diffs.
 - Added schema snapshot and local template workflows for repeatable agent database checkpoints, diffs, exports, restores, and cleanup.
 - Expanded install, MCP client, no-Docker quickstart, troubleshooting, workflow, template, and snapshot documentation.
 - Added the Astro Markdown blog post "How to Clone a Postgres Database Into a Safe Sandbox" with SEO ledger, link inventory, and inbound blog links.

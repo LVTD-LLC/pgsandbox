@@ -400,7 +400,7 @@ Inputs:
 
 Deletes the local snapshot artifact.
 
-## Repo Command And Framework Preset Tools
+## Repo Workflow Tools
 
 These tools are repo-aware but conservative. They do not rewrite application
 settings permanently and they execute the exact argv array supplied by the
@@ -412,14 +412,12 @@ needed. Django detection remains a convenience preset, not a requirement.
 
 ### `prepare_for_repo`
 
-Detects a Django repo from `manage.py` and settings patterns, then writes a
-secret-free `.pgsandbox/project.json` with a default Django migration command.
-If detection is uncertain, the tool returns `ok: false` with an action-needed
-message that points agents at the generic SQL/repo-command tools instead of
-guessing. If `postgresVersion` is omitted, PGSandbox checks existing
-`.pgsandbox/project.json`, then Compose/devcontainer image references such as
-`postgres:16` or `postgis/postgis:16-3.4`, and records the inferred version
-when found.
+Writes a secret-free `.pgsandbox/project.json` with generic workflow metadata
+and optional explicit command argv arrays. It does not detect or assume an
+application framework. If `postgresVersion` is omitted, PGSandbox checks
+existing `.pgsandbox/project.json`, then Compose/devcontainer image references
+such as `postgres:16` or `postgis/postgis:16-3.4`, and records the inferred
+version when found.
 
 Inputs:
 
@@ -427,10 +425,13 @@ Inputs:
 - `profile`: optional Postgres profile name
 - `postgresVersion`: optional Postgres major version
 - `databaseId` or `databaseName`: optional sandbox to report as the masked target
+- `migrationCommand`: optional argv array for the repo migration workflow
+- `seedCommand`: optional argv array for the repo seed workflow
 
 ### `run_repo_command`
 
-Runs an explicit repo command against a selected sandbox.
+Runs an explicit or configured repo schema-change command against a selected
+sandbox.
 
 Inputs:
 
@@ -443,15 +444,14 @@ Inputs:
 - `timeoutSeconds`: optional timeout, capped by the server
 
 The command runs with `repoPath` as current directory. The argv array must be
-short, non-empty, free of NUL/newline characters, and is executed directly. If
-you need a shell script, pass the script runner explicitly, for example
-`["sh", "scripts/migrate.sh"]`.
+short, non-empty, free of NUL/newline characters, and is executed directly
+without shell expansion or indirect launchers.
 
 ### `validate_schema_change`
 
-Captures a before schema digest, runs an explicit repo schema-change command
-against a fresh or selected sandbox, captures the after digest, and returns a
-compact schema diff plus bounded command output.
+Captures a before schema digest, runs an explicit or configured repo
+schema-change command against a fresh or selected sandbox, captures the after
+digest, and returns a compact schema diff plus bounded command output.
 
 Inputs:
 

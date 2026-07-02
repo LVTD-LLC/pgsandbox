@@ -376,7 +376,7 @@ impl PgsandboxServer {
         .await
     }
 
-    #[tool(description = "Detect a Django repo and write a secret-free PG Sandbox project config.")]
+    #[tool(description = "Prepare generic repo workflow metadata for PG Sandbox.")]
     async fn prepare_for_repo(
         &self,
         Parameters(input): Parameters<PrepareForRepoInput>,

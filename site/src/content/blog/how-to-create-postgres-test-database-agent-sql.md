@@ -18,7 +18,7 @@ To create a Postgres test database for agent-generated SQL, create a fresh datab
 
 That is different from handing an agent the same `DATABASE_URL` a human developer uses all week.
 
-Framework test runners already understand this boundary. Django's testing docs say database-backed tests do not use the real production database; they create separate blank test databases and destroy them after the run (https://docs.djangoproject.com/en/6.0/topics/testing/overview/). The same rule should apply when the "test runner" is a coding agent generating migrations, seed scripts, or SQL fixes.
+Framework test runners already understand this boundary: database-backed tests should run against isolated test databases instead of the real production database. The same rule should apply when the "test runner" is a coding agent generating migrations, seed scripts, or SQL fixes.
 
 The useful pattern is a short-lived proof harness:
 
@@ -99,7 +99,7 @@ PGSandbox MCP handles that lifecycle through its [MCP tool contract](https://pgs
 
 A test database is only useful if it matches the schema the generated SQL expects.
 
-For application work, run the same migration command a human would run in a disposable environment. Django's advanced testing docs describe the standard test run sequence as creating the test database, running migrations to install models and initial data, running checks and tests, and then destroying the test database (https://docs.djangoproject.com/en/6.0/topics/testing/advanced/). That sequence is a good baseline for agent work too.
+For application work, run the same migration command a human would run in a disposable environment. A useful baseline is to create the test database, run migrations to install schema and initial data, run checks or validation queries, and destroy the database when the proof is complete.
 
 For a PGSandbox-backed MCP client, the workflow can be:
 

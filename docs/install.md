@@ -277,14 +277,16 @@ PGSandbox keeps each requested major version in separate local state, such as
 It discovers binaries from `PATH`, common package-manager locations,
 `PGSANDBOX_POSTGRES_BIN_DIR`, or `PGSANDBOX_POSTGRES_18_BIN_DIR`.
 
-## Django Recipe
+## Repo Workflow Recipe
 
-After installation and MCP restart, an agent can validate a Django migration
-without using the developer's real database:
+After installation and MCP restart, an agent can validate a repo migration
+workflow without using the developer's real database:
 
 1. Call `create_database` with a short `nameHint`, owner, labels, and TTL.
-2. Call `prepare_for_repo` with the Django checkout path and the sandbox id.
-3. Call `validate_migration` with the same repo path and sandbox id.
+2. Optionally call `prepare_for_repo` with the repo path, sandbox id, and an
+   explicit `migrationCommand` argv array to store reusable workflow metadata.
+3. Call `validate_migration` with the same repo path, sandbox id, and either an
+   explicit command or the configured `migrationCommand`.
 4. Optionally call `seed_database` with an explicit seed command argv array.
 5. Save a checkpoint with `create_schema_snapshot` or create a reusable local
    template with `create_template_from_sandbox`.
@@ -295,8 +297,8 @@ environment variables, and return bounded stdout/stderr. If the repo has a
 Compose or devcontainer Postgres image such as `postgres:16`, `prepare_for_repo`
 records that version so later workflow calls can use the matching local profile.
 
-Prisma, Rails, and Alembic adapters are future work. For now, use explicit
-commands only when they are safe for the target sandbox.
+PGSandbox does not ship framework adapters. Agents should choose the appropriate
+repo command for the task and pass it as a short argv array.
 
 ## Troubleshooting
 

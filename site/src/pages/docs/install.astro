@@ -95,16 +95,17 @@ pgsandbox-mcp smoke-test</code></pre>
     as <code>65432</code> or the next available port.
   </p>
 
-  <h2>Django workflow</h2>
+  <h2>Repo workflow</h2>
   <p>
-    Agents can create a sandbox, call <code>prepare_for_repo</code> for a
-    Django checkout, then call <code>validate_migration</code> to run
-    <code>python manage.py migrate --noinput</code> against the sandbox and
-    receive a compact schema diff.
+    Agents can create a sandbox, optionally call
+    <code>prepare_for_repo</code> with explicit command metadata, then call
+    <code>validate_migration</code> to run the repo's migration command against
+    the sandbox and receive a compact schema diff.
   </p>
   <p>
-    Seed commands must be explicit. Prisma, Rails, and Alembic adapters are
-    future work unless a user provides a safe command for the selected sandbox.
+    Migration and seed commands are generic argv arrays. Agents choose the
+    command that fits the repository and PGSandbox injects sandbox database
+    credentials through environment variables.
   </p>
 
   <h2>Troubleshooting</h2>
