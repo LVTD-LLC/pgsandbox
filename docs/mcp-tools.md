@@ -178,9 +178,18 @@ Returns:
 - affected row count for mutations
 - execution timing
 
+Typed result rows serialize common scalar and array values to JSON. Numeric
+values are returned as strings to preserve precision. Common Postgres arrays
+such as `text[]`, integer arrays, `uuid[]`, `jsonb[]`, and `timestamptz[]`
+return JSON arrays with SQL `NULL` elements preserved as JSON `null`. With
+`readonly: true`, mutating statements are blocked by a read-only transaction;
+readonly violations are wrapped with an MCP-level message that names the
+attempted statement while preserving database detail.
+
 ## `describe_schema`
 
-Returns tables, columns, indexes, and extensions for an experiment database.
+Returns relation, column, constraint, index, view, and extension metadata for an
+experiment database.
 
 Inputs:
 
@@ -193,6 +202,16 @@ Returns:
 - structured schema summary. Tables and columns include camelCase inspection
   keys such as `tableName`, `tableSchema`, `columnName`, `dataType`, and
   `isNullable`, with legacy source column names retained where applicable.
+- `relationCounts`: split counts for `tables`, `partitionedTables`, `views`,
+  `materializedViews`, `foreignTables`, and `other`.
+- `tables`: relations with `relationKind` values such as `table`, `view`, and
+  `materialized_view`.
+- `columns`: includes `columnDefault`, `generatedKind`, and
+  `generationExpression` when Postgres exposes them.
+- `constraints`: primary key, unique, foreign key, check, and exclusion
+  constraints with readable definitions and FK actions when applicable.
+- `views`: view and materialized view definitions.
+- `indexes` and `extensions`.
 
 ## `schema_digest`
 
@@ -212,8 +231,13 @@ Returns:
 - `databaseName`
 - `digestVersion`
 - `checksum`
-- object counts for tables, columns, indexes, and extensions
-- compact tables with column type/nullability and index definition hashes
+- `relationCounts`: split counts for tables, partitioned tables, views,
+  materialized views, foreign tables, and other relation kinds. `tableCount`
+  remains the table plus partitioned-table count for compatibility.
+- object counts for tables, columns, constraints, indexes, and extensions
+- compact tables with relation kind, column type/nullability/default/generated
+  metadata, constraint definition hashes, index definition hashes, and view
+  definition hashes
 - extensions with versions
 
 ## `schema_diff`
@@ -238,10 +262,19 @@ Example:
   "baseDigest": {
     "databaseId": "6d4b...",
     "databaseName": "pgsandbox_app_abc12345",
-    "digestVersion": 1,
+    "digestVersion": 2,
     "checksum": "...",
     "tableCount": 1,
+    "relationCounts": {
+      "tables": 1,
+      "partitionedTables": 0,
+      "views": 0,
+      "materializedViews": 0,
+      "foreignTables": 0,
+      "other": 0
+    },
     "columnCount": 3,
+    "constraintCount": 1,
     "indexCount": 1,
     "extensionCount": 1,
     "tables": [],
@@ -256,7 +289,8 @@ Returns:
 - `afterChecksum`
 - `changed`
 - added and removed tables
-- changed tables with added, removed, or changed columns and indexes
+- changed tables with added, removed, or changed columns, indexes, and
+  constraints, plus `viewDefinitionChanged` for view body changes
 - added, removed, or changed extensions
 
 ## `explain_query`
@@ -286,6 +320,11 @@ Schema snapshots are explicit named checkpoints stored under PG Sandbox's local
 state directory. They are not automatic truth; create a new snapshot whenever a
 new before-state matters.
 
+Use the schema snapshot tools together for before/after migration review,
+schema diff workflows, rollback comparison, drift detection, and stored schema
+baselines. The related tools are `create_schema_snapshot`,
+`list_schema_snapshots`, `diff_schema_snapshot`, and `delete_schema_snapshot`.
+
 ### `create_schema_snapshot`
 
 Inputs:
@@ -296,6 +335,9 @@ Inputs:
 - `notes`: optional short notes
 
 Returns snapshot metadata, object counts, and a detail handle.
+Object counts split tables, views, materialized views, foreign tables,
+constraints, indexes, columns, and extensions so snapshot counts line up with
+`schema_digest` relation counts.
 
 ### `list_schema_snapshots`
 
@@ -402,6 +444,11 @@ Templates are local artifacts under PG Sandbox's managed state directory. They
 are created only from PGSandbox-owned databases and restored into newly tracked
 PGSandbox-owned sandboxes. They use `pg_dump`/`pg_restore` and are not
 copy-on-write forks, hosted snapshots, or production-data workflows.
+
+Use the template tools together for reusable seeded sandbox workflows,
+regression fixtures, repeatable test states, and local template restore loops.
+The related tools are `create_template_from_sandbox`,
+`create_sandbox_from_template`, `list_templates`, and `delete_template`.
 
 ### `create_template_from_sandbox`
 
