@@ -2124,10 +2124,25 @@ impl PostgresSandboxManager {
             None
         };
 
+        let existing_project_config = read_repo_project_config(&repo_path)?;
+        let migration_command = input.migration_command.or_else(|| {
+            existing_project_config
+                .as_ref()
+                .and_then(|config| config.migration_command.clone())
+        });
+        let seed_command = input.seed_command.or_else(|| {
+            existing_project_config
+                .as_ref()
+                .and_then(|config| config.seed_command.clone())
+        });
+        let database_url_env = existing_project_config
+            .as_ref()
+            .map(|config| config.database_url_env.clone())
+            .unwrap_or_else(default_database_url_env);
         let project_config = RepoProjectConfig {
-            migration_command: input.migration_command,
-            seed_command: input.seed_command,
-            database_url_env: "DATABASE_URL".to_string(),
+            migration_command,
+            seed_command,
+            database_url_env,
             postgres_version: postgres_version.version.clone(),
             prepared_at: Utc::now(),
         };
@@ -7083,6 +7098,55 @@ mod tests {
         assert!(raw.contains("\"npm\""));
         assert!(!raw.contains("postgres://"));
         assert!(!raw.contains("secret"));
+    }
+
+    #[tokio::test]
+    async fn prepare_for_repo_preserves_existing_commands_when_updating_metadata() {
+        let directory = tempfile::tempdir().unwrap();
+        let repo = directory.path();
+        let config = RepoProjectConfig {
+            migration_command: Some(vec![
+                "npm".to_string(),
+                "run".to_string(),
+                "migrate".to_string(),
+            ]),
+            seed_command: Some(vec![
+                "npm".to_string(),
+                "run".to_string(),
+                "seed".to_string(),
+            ]),
+            database_url_env: "DATABASE_URL".to_string(),
+            postgres_version: Some("16".to_string()),
+            prepared_at: Utc::now(),
+        };
+        write_repo_project_config(repo, &config).unwrap();
+        let manager = PostgresSandboxManager::new(test_config());
+
+        let output = manager
+            .prepare_for_repo(PrepareForRepoInput {
+                repo_path: repo.display().to_string(),
+                profile: None,
+                postgres_version: Some("17".to_string()),
+                database_id: None,
+                database_name: None,
+                migration_command: None,
+                seed_command: None,
+            })
+            .await
+            .unwrap();
+        let updated = read_repo_project_config(repo).unwrap().unwrap();
+
+        assert!(output.ok);
+        assert!(output.result.unwrap().migration_command_configured);
+        assert_eq!(updated.postgres_version.as_deref(), Some("17"));
+        assert_eq!(
+            updated.migration_command.as_deref(),
+            Some(["npm".to_string(), "run".to_string(), "migrate".to_string()].as_slice())
+        );
+        assert_eq!(
+            updated.seed_command.as_deref(),
+            Some(["npm".to_string(), "run".to_string(), "seed".to_string()].as_slice())
+        );
     }
 
     #[test]
