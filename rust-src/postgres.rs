@@ -1611,7 +1611,7 @@ impl PostgresSandboxManager {
                          a.attname AS column_name,
                          pg_catalog.format_type(a.atttypid, a.atttypmod) AS data_type,
                          CASE WHEN a.attnotnull THEN 'NO' ELSE 'YES' END AS is_nullable,
-                         pg_get_expr(ad.adbin, ad.adrelid) AS column_default,
+                         CASE WHEN a.attgenerated = '' THEN pg_get_expr(ad.adbin, ad.adrelid) ELSE NULL END AS column_default,
                          CASE WHEN a.attgenerated = '' THEN NULL ELSE a.attgenerated::text END AS generated_kind,
                          CASE WHEN a.attgenerated = '' THEN NULL ELSE pg_get_expr(ad.adbin, ad.adrelid) END AS generation_expression,
                          n.nspname AS "tableSchema",
@@ -1619,7 +1619,7 @@ impl PostgresSandboxManager {
                          a.attname AS "columnName",
                          pg_catalog.format_type(a.atttypid, a.atttypmod) AS "dataType",
                          CASE WHEN a.attnotnull THEN 'NO' ELSE 'YES' END AS "isNullable",
-                         pg_get_expr(ad.adbin, ad.adrelid) AS "columnDefault",
+                         CASE WHEN a.attgenerated = '' THEN pg_get_expr(ad.adbin, ad.adrelid) ELSE NULL END AS "columnDefault",
                          CASE WHEN a.attgenerated = '' THEN NULL ELSE a.attgenerated::text END AS "generatedKind",
                          CASE WHEN a.attgenerated = '' THEN NULL ELSE pg_get_expr(ad.adbin, ad.adrelid) END AS "generationExpression"
                   FROM pg_attribute a
@@ -3106,7 +3106,7 @@ async fn collect_schema_digest(client: &Client) -> anyhow::Result<WorkflowSchema
                      pg_catalog.format_type(a.atttypid, a.atttypmod) AS data_type,
                      t.typname AS udt_name,
                      CASE WHEN a.attnotnull THEN 'NO' ELSE 'YES' END AS is_nullable,
-                     pg_get_expr(ad.adbin, ad.adrelid) AS column_default,
+                     CASE WHEN a.attgenerated = '' THEN pg_get_expr(ad.adbin, ad.adrelid) ELSE NULL END AS column_default,
                      CASE WHEN a.attgenerated = '' THEN NULL ELSE a.attgenerated::text END AS generated_kind,
                      CASE WHEN a.attgenerated = '' THEN NULL ELSE pg_get_expr(ad.adbin, ad.adrelid) END AS generation_expression
               FROM pg_attribute a
@@ -4649,7 +4649,7 @@ async fn schema_digest_for_connection(
                      a.attname AS column_name,
                      pg_catalog.format_type(a.atttypid, a.atttypmod) AS data_type,
                      NOT a.attnotnull AS nullable,
-                     pg_get_expr(ad.adbin, ad.adrelid) AS default_expression,
+                     CASE WHEN a.attgenerated = '' THEN pg_get_expr(ad.adbin, ad.adrelid) ELSE NULL END AS default_expression,
                      CASE WHEN a.attgenerated = '' THEN NULL ELSE pg_get_expr(ad.adbin, ad.adrelid) END AS generated_expression
               FROM pg_attribute a
               JOIN pg_class c ON c.oid = a.attrelid
@@ -7344,6 +7344,19 @@ services:
         assert_eq!(counts.views, 1);
         assert_eq!(counts.materialized_views, 1);
         assert_eq!(counts.total(), 3);
+    }
+
+    #[test]
+    fn generated_column_defaults_are_guarded_in_catalog_queries() {
+        let source = include_str!("postgres.rs");
+        let pg_get_expr = "pg_get_expr(ad.adbin, ad.adrelid)";
+        let guarded_default =
+            format!("CASE WHEN a.attgenerated = '' THEN {pg_get_expr} ELSE NULL END");
+
+        assert!(source.matches(&guarded_default).count() >= 4);
+        assert!(!source.contains(&format!("{pg_get_expr} AS column_default")));
+        assert!(!source.contains(&format!("{pg_get_expr} AS default_expression")));
+        assert!(!source.contains(&format!("{pg_get_expr} AS \"columnDefault\"")));
     }
 
     #[test]
