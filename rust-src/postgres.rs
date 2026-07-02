@@ -866,6 +866,8 @@ enum ArrayCellKind {
     Float4,
     Float8,
     Json,
+    Date,
+    Timestamp,
     TimestampTz,
     Uuid,
 }
@@ -2037,6 +2039,15 @@ impl PostgresSandboxManager {
             &unprotect_role_password(&record.role_password, &profile)?,
         )?;
         let current = collect_schema_digest_for_url(&connection_string).await?;
+        if let Some(error) =
+            workflow_schema_digest_version_mismatch(&snapshot_name, &snapshot.digest, &current)
+        {
+            return Ok(workflow_failure(
+                "Schema snapshot diff was not produced.",
+                error,
+                None,
+            ));
+        }
         let diff = diff_workflow_schema_digests(&snapshot.digest, &current);
 
         Ok(workflow_success(
@@ -3403,6 +3414,28 @@ fn diff_workflow_schema_digests(
             .collect(),
         truncated,
     }
+}
+
+fn workflow_schema_digest_version_mismatch(
+    snapshot_name: &str,
+    snapshot_digest: &WorkflowSchemaDigest,
+    current_digest: &WorkflowSchemaDigest,
+) -> Option<WorkflowError> {
+    if snapshot_digest.digest_version == current_digest.digest_version {
+        return None;
+    }
+
+    Some(workflow_error(
+        "schema_digest_version_mismatch",
+        format!(
+            "Schema snapshot `{snapshot_name}` was created with schema digest v{} but the current schema digest uses v{}.",
+            snapshot_digest.digest_version, current_digest.digest_version
+        ),
+        Some(
+            "Delete this snapshot and create a new baseline with create_schema_snapshot before diffing."
+                .to_string(),
+        ),
+    ))
 }
 
 fn schema_object_map(digest: &WorkflowSchemaDigest) -> BTreeMap<String, SchemaObjectDigest> {
@@ -6055,6 +6088,8 @@ fn array_cell_kind(value_type: &Type) -> Option<ArrayCellKind> {
         Type::FLOAT4_ARRAY => Some(ArrayCellKind::Float4),
         Type::FLOAT8_ARRAY => Some(ArrayCellKind::Float8),
         Type::JSON_ARRAY | Type::JSONB_ARRAY => Some(ArrayCellKind::Json),
+        Type::DATE_ARRAY => Some(ArrayCellKind::Date),
+        Type::TIMESTAMP_ARRAY => Some(ArrayCellKind::Timestamp),
         Type::TIMESTAMPTZ_ARRAY => Some(ArrayCellKind::TimestampTz),
         Type::UUID_ARRAY => Some(ArrayCellKind::Uuid),
         _ => None,
@@ -6102,6 +6137,16 @@ fn array_cell_to_json(row: &Row, index: usize, kind: ArrayCellKind) -> Value {
             .try_get::<_, Option<Vec<Option<Value>>>>(index)
             .ok()
             .map(|value| optional_array_to_json(value, |value| value))
+            .unwrap_or(Value::Null),
+        ArrayCellKind::Date => row
+            .try_get::<_, Option<Vec<Option<NaiveDate>>>>(index)
+            .ok()
+            .map(|value| optional_array_to_json(value, |value| Value::String(value.to_string())))
+            .unwrap_or(Value::Null),
+        ArrayCellKind::Timestamp => row
+            .try_get::<_, Option<Vec<Option<NaiveDateTime>>>>(index)
+            .ok()
+            .map(|value| optional_array_to_json(value, |value| Value::String(value.to_string())))
             .unwrap_or(Value::Null),
         ArrayCellKind::TimestampTz => row
             .try_get::<_, Option<Vec<Option<DateTime<Utc>>>>>(index)
@@ -7203,6 +7248,27 @@ services:
     }
 
     #[test]
+    fn workflow_schema_diff_version_mismatch_is_detectable() {
+        let mut snapshot = workflow_test_digest(vec!["public.users".to_string()]);
+        let current = workflow_test_digest(vec!["public.users".to_string()]);
+        snapshot.digest_version = SCHEMA_DIGEST_VERSION - 1;
+
+        let error =
+            workflow_schema_digest_version_mismatch("baseline", &snapshot, &current).unwrap();
+
+        assert_eq!(error.code, "schema_digest_version_mismatch");
+        assert_eq!(error.category, "workflow");
+        assert!(error.message.contains("baseline"));
+        assert!(error.message.contains("v1"));
+        assert!(error.message.contains("v2"));
+        assert!(error
+            .hint
+            .unwrap()
+            .contains("create_schema_snapshot before diffing"));
+        assert!(workflow_schema_digest_version_mismatch("baseline", &current, &current).is_none());
+    }
+
+    #[test]
     fn summarizes_tool_stderr_without_splitting_utf8_characters() {
         let stderr = format!("{}éproblem", "a".repeat(3_999));
         let summary = summarize_tool_stderr(stderr.as_bytes());
@@ -7231,6 +7297,11 @@ services:
         let timestamp = DateTime::parse_from_rfc3339("2026-07-01T12:34:56Z")
             .unwrap()
             .with_timezone(&Utc);
+        let plain_timestamp = NaiveDate::from_ymd_opt(2026, 7, 1)
+            .unwrap()
+            .and_hms_opt(12, 34, 56)
+            .unwrap();
+        let date = NaiveDate::from_ymd_opt(2026, 7, 1).unwrap();
         let uuid = Uuid::parse_str("0f3f2410-ae28-44d2-98c9-09bc42cf12d1").unwrap();
 
         assert_eq!(
@@ -7267,6 +7338,18 @@ services:
             json!(["2026-07-01T12:34:56+00:00", null])
         );
         assert_eq!(
+            optional_array_to_json(Some(vec![Some(plain_timestamp), None]), |value| {
+                Value::String(value.to_string())
+            }),
+            json!(["2026-07-01 12:34:56", null])
+        );
+        assert_eq!(
+            optional_array_to_json(Some(vec![Some(date), None]), |value| Value::String(
+                value.to_string()
+            )),
+            json!(["2026-07-01", null])
+        );
+        assert_eq!(
             optional_array_to_json::<String, _>(None, Value::String),
             Value::Null
         );
@@ -7289,6 +7372,14 @@ services:
         assert_eq!(
             array_cell_kind(&Type::JSONB_ARRAY),
             Some(ArrayCellKind::Json)
+        );
+        assert_eq!(
+            array_cell_kind(&Type::DATE_ARRAY),
+            Some(ArrayCellKind::Date)
+        );
+        assert_eq!(
+            array_cell_kind(&Type::TIMESTAMP_ARRAY),
+            Some(ArrayCellKind::Timestamp)
         );
         assert_eq!(
             array_cell_kind(&Type::TIMESTAMPTZ_ARRAY),
