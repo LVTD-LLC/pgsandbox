@@ -3845,7 +3845,7 @@ fn validate_workflow_command(command: &[String], label: &str) -> Result<(), Work
     if command_invokes_shell(command) {
         return Err(workflow_error(
             "unsafe_command",
-            format!("{label} cannot invoke a shell directly."),
+            format!("{label} cannot invoke a shell or command launcher."),
             Some("Pass the executable and arguments directly, for example [\"npm\", \"run\", \"migrate\"] or [\"alembic\", \"upgrade\", \"head\"].".to_string()),
         ));
     }
@@ -3868,14 +3868,22 @@ fn command_is_bounded(command: &[String]) -> bool {
 }
 
 fn command_invokes_shell(command: &[String]) -> bool {
-    let Some(program) = command.first() else {
-        return false;
-    };
-    let executable = Path::new(program)
+    command.iter().any(|part| command_part_is_shell(part))
+        || command
+            .first()
+            .is_some_and(|program| command_part_is_indirect_launcher(program))
+}
+
+fn command_part_executable_name(part: &str) -> String {
+    Path::new(part)
         .file_name()
         .and_then(|value| value.to_str())
-        .unwrap_or(program)
-        .to_ascii_lowercase();
+        .unwrap_or(part)
+        .to_ascii_lowercase()
+}
+
+fn command_part_is_shell(part: &str) -> bool {
+    let executable = command_part_executable_name(part);
     matches!(
         executable.as_str(),
         "sh" | "bash"
@@ -3891,6 +3899,27 @@ fn command_invokes_shell(command: &[String]) -> bool {
             | "powershell.exe"
             | "pwsh"
             | "pwsh.exe"
+    )
+}
+
+fn command_part_is_indirect_launcher(part: &str) -> bool {
+    let executable = command_part_executable_name(part);
+    matches!(
+        executable.as_str(),
+        "env"
+            | "sudo"
+            | "sudoedit"
+            | "doas"
+            | "su"
+            | "runuser"
+            | "xargs"
+            | "nsenter"
+            | "unshare"
+            | "chroot"
+            | "setsid"
+            | "nohup"
+            | "nice"
+            | "stdbuf"
     )
 }
 
@@ -7210,6 +7239,47 @@ services:
         .unwrap()
         .unwrap_err();
         assert_eq!(shell.code, "unsafe_command");
+
+        let env_shell = resolve_migration_command(
+            repo,
+            Some(vec![
+                "env".to_string(),
+                "bash".to_string(),
+                "-c".to_string(),
+                "npm run migrate".to_string(),
+            ]),
+        )
+        .unwrap()
+        .unwrap_err();
+        assert_eq!(env_shell.code, "unsafe_command");
+
+        let sudo_shell = resolve_migration_command(
+            repo,
+            Some(vec![
+                "sudo".to_string(),
+                "/bin/sh".to_string(),
+                "-c".to_string(),
+                "npm run migrate".to_string(),
+            ]),
+        )
+        .unwrap()
+        .unwrap_err();
+        assert_eq!(sudo_shell.code, "unsafe_command");
+
+        let launcher_without_shell = resolve_migration_command(
+            repo,
+            Some(vec![
+                "nsenter".to_string(),
+                "--target".to_string(),
+                "1".to_string(),
+                "npm".to_string(),
+                "run".to_string(),
+                "migrate".to_string(),
+            ]),
+        )
+        .unwrap()
+        .unwrap_err();
+        assert_eq!(launcher_without_shell.code, "unsafe_command");
 
         let alembic = resolve_migration_command(
             repo,
