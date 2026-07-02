@@ -172,6 +172,8 @@ For routine coding tasks, approve a Postgres MCP server only when the agent can 
 
 That rule keeps the normal path simple. The agent can still get real Postgres behavior. It can still validate migrations and generated SQL. It can still reproduce bugs. But it does not need shared development credentials for every task.
 
+For a step-by-step version of the execution loop, see [how to create a Postgres test database for agent-generated SQL](https://pgsandbox-mcp.lvtd.dev/blog/how-to-create-postgres-test-database-agent-sql/). It covers database creation, scoped roles, migrations, seed data, bounded query results, and cleanup as one proof workflow.
+
 Exceptions should be visible:
 
 - Read-only inspection of a shared development database.

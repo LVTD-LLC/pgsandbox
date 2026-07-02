@@ -8,6 +8,7 @@
 | 2026-06-29 | Comparison | Database Branching vs Disposable Postgres Sandboxes | database-branching-vs-postgres-sandboxes | database branching | /, /docs/mcp-tools/, /docs/architecture/, /docs/install/, /blog/postgres-mcp-server-safety-checklist/ | Rowset row 1586, status `published`; compares environment-oriented branching with task-oriented sandboxes for agent workflows. |
 | 2026-06-30 | How-to / tutorial | How to Clone a Postgres Database Into a Safe Sandbox | how-to-clone-postgres-database-sandbox | postgres clone database | /docs/mcp-tools/, /docs/architecture/, /docs/install/, /blog/postgres-mcp-server-safety-checklist/, /blog/database-branching-vs-postgres-sandboxes/ | Astro Markdown source of truth; uses Postgres primary docs and repo clone implementation as information gain. |
 | 2026-07-01 | Definition / guide | What Is a Database Sandbox? | what-is-database-sandbox | database sandbox | /docs/architecture/, /docs/mcp-tools/, /docs/install/, /blog/postgres-mcp-server-safety-checklist/, /blog/database-branching-vs-postgres-sandboxes/, /blog/how-to-clone-postgres-database-sandbox/ | Astro Markdown source of truth; uses the five-part sandbox contract as the information-gain framework. |
+| 2026-07-02 | How-to / tutorial | How to Create a Postgres Test Database for Agent SQL | how-to-create-postgres-test-database-agent-sql | postgres test database | /docs/mcp-tools/, /docs/architecture/, /blog/postgres-mcp-server-safety-checklist/, /blog/what-is-database-sandbox/, /blog/how-to-clone-postgres-database-sandbox/ | Astro Markdown source of truth; uses the agent-generated SQL proof harness as the information-gain framework. |
 
 ## Removed
 
@@ -17,16 +18,20 @@
 
 ## Candidate Backlog
 
-Last researched: 2026-06-29
+Last researched: 2026-07-02
 
 | Rank | Score | Proposed Type | Title | Target Keyword | Volume | KD | Intent | SERP Read | Why It Fits |
 | --- | ---: | --- | --- | --- | ---: | ---: | --- | --- | --- |
-| 5 | 16 | Tutorial | How to Create a Test Postgres Database for Agent-Generated SQL | postgres test database | 20 | 2 | Informational | Low-volume long-tail with practical developer intent. | Very winnable, but lower ceiling. Good future support piece for migration validation. |
+| 1 | 18 | Comparison | Testcontainers vs Disposable Postgres Sandboxes for Agent Work | testcontainers postgres | TBD | TBD | Commercial investigation | Web fallback shows Testcontainers docs and integration-test articles ranking for isolated Postgres testing. | Adjacent to current sandbox content without duplicating it; strong product-led contrast between service-container isolation and task-database isolation. |
+| 2 | 17 | How-to / tutorial | How to Validate Postgres Migrations Before an Agent Opens a PR | database migration testing | TBD | TBD | Informational | Web fallback shows framework testing docs and migration-testing guides; no PGSandbox-owned migration validation page exists. | Directly tied to PGSandbox repo workflow tools and likely converts agent operators who need proof before review. |
+| 3 | 15 | Comparison / explainer | Postgres Template Databases vs Task Sandboxes | postgres template database | TBD | TBD | Informational | Web fallback shows template-database testing articles and PostgreSQL CREATE DATABASE TEMPLATE usage. | Useful bridge from existing Postgres test patterns into the PGSandbox task database model. |
 
 ## Notes
 
 - Keyword data source: DataForSEO Google keyword overview and suggestions, United States / English, pulled 2026-06-29.
 - SERP read source: web search fallback on 2026-06-29 because DataForSEO live SERP endpoint disconnected repeatedly from this environment.
+- 2026-07-02 backlog refresh used web-search fallback because DataForSEO credentials were not available in the cron environment. Treat `TBD` volume/KD rows as candidates requiring keyword-tool refresh before final selection.
 - Treat `postgres mcp server` and `mcp postgres` as related but not identical: the former is broader informational discovery; the latter appears navigational and may skew toward specific registries/repos.
 - 2026-06-30 cron selected the top remaining backlog candidate automatically per cron instruction. New source-of-truth content file: `site/src/content/blog/how-to-clone-postgres-database-sandbox.md`.
 - 2026-07-01 cron selected the top remaining backlog candidate automatically per cron instruction. New source-of-truth content file: `site/src/content/blog/what-is-database-sandbox.md`.
+- 2026-07-02 cron selected the top remaining backlog candidate automatically per cron instruction. New source-of-truth content file: `site/src/content/blog/how-to-create-postgres-test-database-agent-sql.md`.

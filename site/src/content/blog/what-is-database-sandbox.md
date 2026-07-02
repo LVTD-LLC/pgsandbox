@@ -87,6 +87,8 @@ That means a Postgres sandbox for an MCP client should be more than a connection
 
 The [PGSandbox MCP tool contract](https://pgsandbox-mcp.lvtd.dev/docs/mcp-tools/) is intentionally small: create a sandbox, clone a source into a sandbox, run bounded SQL, describe schema, list tracked sandboxes, delete a tracked sandbox, and clean up expired resources. That does not make an agent incapable of bad SQL. It gives the bad SQL a smaller place to land.
 
+When the task is specifically about generated SQL or migrations, the practical workflow is a [Postgres test database for agent-generated SQL](https://pgsandbox-mcp.lvtd.dev/blog/how-to-create-postgres-test-database-agent-sql/): create a task database, apply the right schema state, run the agent SQL through a scoped role, capture bounded proof, and clean up the resource.
+
 ## What a Postgres sandbox needs
 
 Postgres gives you useful primitives for sandboxing, but you still have to compose them carefully.

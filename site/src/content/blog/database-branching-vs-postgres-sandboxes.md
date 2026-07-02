@@ -139,6 +139,8 @@ A disposable sandbox fits when the [database sandbox](https://pgsandbox-mcp.lvtd
 
 This is where PGSandbox is deliberately small. It gives the agent a database lifecycle, not a full hosted platform. The admin connection creates and tracks resources. The sandbox role runs task SQL. Cleanup deletes tracked resources with the configured prefix.
 
+If you want the task-database version as an implementation checklist, see [how to create a Postgres test database for agent SQL](https://pgsandbox-mcp.lvtd.dev/blog/how-to-create-postgres-test-database-agent-sql/). It turns the sandbox idea into a repeatable proof loop for migrations, seed data, generated queries, bounded output, and cleanup.
+
 That shape is boring in the right way. For many backend tasks, you do not need a new platform branch. You need a place where the agent can be wrong without making shared state confusing.
 
 ## The Data Question

@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-07-02
+
+- Added the Astro Markdown blog post "How to Create a Postgres Test Database for Agent SQL" with SEO ledger, link inventory, and inbound blog links.
+
 ## 2026-07-01
 
 - Released `pgsandbox-mcp` v0.3.0 with agent-safe cross-profile databaseId lookup, all-version list/cleanup modes, clone downgrade preflight, structured version diagnostics, and regression coverage for the agent-facing version contract.
