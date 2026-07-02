@@ -289,7 +289,8 @@ Returns:
 - `afterChecksum`
 - `changed`
 - added and removed tables
-- changed tables with added, removed, or changed columns and indexes
+- changed tables with added, removed, or changed columns, indexes, and
+  constraints, plus `viewDefinitionChanged` for view body changes
 - added, removed, or changed extensions
 
 ## `explain_query`

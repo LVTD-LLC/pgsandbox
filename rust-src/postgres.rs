@@ -546,6 +546,10 @@ pub struct SchemaTableDiff {
     pub added_indexes: Vec<String>,
     pub removed_indexes: Vec<String>,
     pub changed_indexes: Vec<String>,
+    pub added_constraints: Vec<String>,
+    pub removed_constraints: Vec<String>,
+    pub changed_constraints: Vec<String>,
+    pub view_definition_changed: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -5025,6 +5029,10 @@ impl SchemaTableDiff {
             || !self.added_indexes.is_empty()
             || !self.removed_indexes.is_empty()
             || !self.changed_indexes.is_empty()
+            || !self.added_constraints.is_empty()
+            || !self.removed_constraints.is_empty()
+            || !self.changed_constraints.is_empty()
+            || self.view_definition_changed
     }
 }
 
@@ -5053,6 +5061,16 @@ fn diff_schema_table(
         .iter()
         .map(|index| (index.name.clone(), index))
         .collect::<BTreeMap<_, _>>();
+    let before_constraints = before
+        .constraints
+        .iter()
+        .map(|constraint| (constraint.name.clone(), constraint))
+        .collect::<BTreeMap<_, _>>();
+    let after_constraints = after
+        .constraints
+        .iter()
+        .map(|constraint| (constraint.name.clone(), constraint))
+        .collect::<BTreeMap<_, _>>();
 
     SchemaTableDiff {
         table: table_key.to_string(),
@@ -5078,6 +5096,18 @@ fn diff_schema_table(
                     .map(|_| name.clone())
             })
             .collect(),
+        added_constraints: keys_added(&before_constraints, &after_constraints),
+        removed_constraints: keys_removed(&before_constraints, &after_constraints),
+        changed_constraints: before_constraints
+            .iter()
+            .filter_map(|(name, before_constraint)| {
+                after_constraints
+                    .get(name)
+                    .filter(|after_constraint| *after_constraint != before_constraint)
+                    .map(|_| name.clone())
+            })
+            .collect(),
+        view_definition_changed: before.view_definition_hash != after.view_definition_hash,
     }
 }
 
@@ -6486,6 +6516,57 @@ mod tests {
         let unchanged = diff_schema_digests(&before, &before).unwrap();
         assert!(!unchanged.changed);
         assert!(unchanged.changed_tables.is_empty());
+    }
+
+    #[test]
+    fn schema_diff_reports_constraint_and_view_definition_changes() {
+        let mut before = test_digest("before");
+        before.tables[0].constraints.push(SchemaDigestConstraint {
+            name: "users_email_check".to_string(),
+            constraint_type: "check".to_string(),
+            definition_hash: "original-check".to_string(),
+            update_action: None,
+            delete_action: None,
+        });
+
+        let mut after = before.clone();
+        after.tables[0].constraints[0].definition_hash = "changed-check".to_string();
+        after.tables[0].constraints.push(SchemaDigestConstraint {
+            name: "users_account_fk".to_string(),
+            constraint_type: "foreign_key".to_string(),
+            definition_hash: "new-fk".to_string(),
+            update_action: Some("NO ACTION".to_string()),
+            delete_action: Some("CASCADE".to_string()),
+        });
+        after.checksum = "after-constraint-checksum".to_string();
+
+        let constraint_diff = diff_schema_digests(&before, &after).unwrap();
+
+        assert!(constraint_diff.changed);
+        assert_eq!(constraint_diff.changed_tables.len(), 1);
+        assert_eq!(
+            constraint_diff.changed_tables[0].added_constraints,
+            ["users_account_fk"]
+        );
+        assert_eq!(
+            constraint_diff.changed_tables[0].changed_constraints,
+            ["users_email_check"]
+        );
+
+        let mut before = test_digest("before");
+        before.tables[0].relation_kind = "view".to_string();
+        before.tables[0].view_definition_hash = Some("view-v1".to_string());
+        let mut after = before.clone();
+        after.tables[0].view_definition_hash = Some("view-v2".to_string());
+        after.checksum = "after-view-checksum".to_string();
+
+        let view_diff = diff_schema_digests(&before, &after).unwrap();
+
+        assert!(view_diff.changed);
+        assert_eq!(view_diff.changed_tables.len(), 1);
+        assert!(view_diff.changed_tables[0].view_definition_changed);
+        assert!(view_diff.changed_tables[0].changed_columns.is_empty());
+        assert!(view_diff.changed_tables[0].changed_indexes.is_empty());
     }
 
     #[test]
