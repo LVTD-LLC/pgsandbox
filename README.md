@@ -419,9 +419,7 @@ V0 supports:
 - `delete_schema_snapshot`
 - `prepare_for_repo`
 - `run_repo_command`
-- `run_migrations`
 - `validate_schema_change`
-- `validate_migration`
 - `seed_database`
 - `create_template_from_sandbox`
 - `create_sandbox_from_template`
@@ -451,9 +449,7 @@ For repo-backed database work, an agent can:
 2. Use `run_sql` for direct SQL changes, or `run_repo_command` for an explicit
    repo command such as `["npm", "run", "migrate"]`.
 3. Use `validate_schema_change` when the agent needs a before/after schema diff
-   around a direct repo command. The older `run_migrations` and
-   `validate_migration` names remain as backward-compatible aliases for
-   configured migration workflows and are no longer Django-only.
+   around a direct repo command.
 4. Optionally call `prepare_for_repo` with explicit `migrationCommand` or
    `seedCommand` argv arrays. This writes a secret-free
    `.pgsandbox/project.json`. If the repo has a `postgres:<major>` or compatible

@@ -7,7 +7,7 @@ use pgsandbox_mcp::{
         CreateSchemaSnapshotInput, CreateTemplateFromSandboxInput, DatabaseSelector,
         DeleteTemplateInput, DiffSchemaSnapshotInput, ExplainQueryInput, ListDatabasesInput,
         ListSchemaSnapshotsInput, ListTemplatesInput, PostgresSandboxManager, RunSqlInput,
-        SchemaDiffInput, ValidateMigrationInput,
+        SchemaDiffInput, ValidateSchemaChangeInput,
     },
 };
 use serde_json::json;
@@ -303,20 +303,22 @@ async fn validate_repo_command(
     owner: &str,
 ) -> anyhow::Result<()> {
     let directory = tempfile::tempdir()?;
-    let script = directory.path().join("migrate.sh");
-    std::fs::write(
-        &script,
-        "psql \"$DATABASE_URL\" -v ON_ERROR_STOP=1 -c 'CREATE TABLE repo_items(id serial PRIMARY KEY); CREATE INDEX repo_items_id_idx ON repo_items(id);'\n",
-    )?;
 
     let validation = manager
-        .validate_schema_change(ValidateMigrationInput {
+        .validate_schema_change(ValidateSchemaChangeInput {
             repo_path: directory.path().display().to_string(),
             profile: None,
             postgres_version: None,
             database_id: None,
             database_name: None,
-            command: Some(vec!["sh".to_string(), "migrate.sh".to_string()]),
+            command: Some(vec![
+                "psql".to_string(),
+                "-v".to_string(),
+                "ON_ERROR_STOP=1".to_string(),
+                "-c".to_string(),
+                "CREATE TABLE repo_items(id serial PRIMARY KEY); CREATE INDEX repo_items_id_idx ON repo_items(id);"
+                    .to_string(),
+            ]),
             timeout_seconds: Some(20),
             name_hint: Some("dogfood validate".to_string()),
             ttl_minutes: Some(45),

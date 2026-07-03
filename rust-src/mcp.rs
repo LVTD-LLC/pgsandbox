@@ -15,8 +15,8 @@ use crate::{
         CreateSandboxFromTemplateInput, CreateSchemaSnapshotInput, CreateTemplateFromSandboxInput,
         DatabaseSelector, DeleteSchemaSnapshotInput, DeleteTemplateInput, DiffSchemaSnapshotInput,
         ExplainQueryInput, ListDatabasesInput, ListProfilesInput, ListSchemaSnapshotsInput,
-        ListTemplatesInput, PostgresSandboxManager, PrepareForRepoInput, RunMigrationsInput,
-        RunSqlInput, SchemaDiffInput, SeedDatabaseInput, ValidateMigrationInput,
+        ListTemplatesInput, PostgresSandboxManager, PrepareForRepoInput, RunRepoCommandInput,
+        RunSqlInput, SchemaDiffInput, SeedDatabaseInput, ValidateSchemaChangeInput,
     },
     telemetry::{properties, Telemetry, EVENT_MCP_SERVER_STARTED, EVENT_MCP_TOOL_COMPLETED},
 };
@@ -38,9 +38,7 @@ pub const PUBLIC_MCP_TOOLS: &[&str] = &[
     "diff_schema_snapshot",
     "prepare_for_repo",
     "run_repo_command",
-    "run_migrations",
     "validate_schema_change",
-    "validate_migration",
     "seed_database",
     "create_template_from_sandbox",
     "create_sandbox_from_template",
@@ -399,7 +397,7 @@ impl PgsandboxServer {
     )]
     async fn run_repo_command(
         &self,
-        Parameters(input): Parameters<RunMigrationsInput>,
+        Parameters(input): Parameters<RunRepoCommandInput>,
     ) -> Result<CallToolResult, ErrorData> {
         let event_properties = properties([
             ("hasProfile", json!(input.profile.is_some())),
@@ -417,33 +415,11 @@ impl PgsandboxServer {
     }
 
     #[tool(
-        description = "Run an explicit repo schema-change command against a sandbox database. Backward-compatible alias for generic repo command workflows."
-    )]
-    async fn run_migrations(
-        &self,
-        Parameters(input): Parameters<RunMigrationsInput>,
-    ) -> Result<CallToolResult, ErrorData> {
-        let event_properties = properties([
-            ("hasProfile", json!(input.profile.is_some())),
-            ("hasDatabaseId", json!(input.database_id.is_some())),
-            ("hasDatabaseName", json!(input.database_name.is_some())),
-            ("hasCommand", json!(input.command.is_some())),
-            ("hasTimeout", json!(input.timeout_seconds.is_some())),
-        ]);
-        self.tracked_tool(
-            "run_migrations",
-            event_properties,
-            self.manager.run_migrations(input),
-        )
-        .await
-    }
-
-    #[tool(
         description = "Run an explicit repo schema-change command in a sandbox and return a before/after schema diff."
     )]
     async fn validate_schema_change(
         &self,
-        Parameters(input): Parameters<ValidateMigrationInput>,
+        Parameters(input): Parameters<ValidateSchemaChangeInput>,
     ) -> Result<CallToolResult, ErrorData> {
         let event_properties = properties([
             ("hasProfile", json!(input.profile.is_some())),
@@ -462,34 +438,6 @@ impl PgsandboxServer {
             "validate_schema_change",
             event_properties,
             self.manager.validate_schema_change(input),
-        )
-        .await
-    }
-
-    #[tool(
-        description = "Run an explicit repo schema-change command in a sandbox and return before/after schema diff. Backward-compatible alias for migration workflows."
-    )]
-    async fn validate_migration(
-        &self,
-        Parameters(input): Parameters<ValidateMigrationInput>,
-    ) -> Result<CallToolResult, ErrorData> {
-        let event_properties = properties([
-            ("hasProfile", json!(input.profile.is_some())),
-            ("hasDatabaseId", json!(input.database_id.is_some())),
-            ("hasDatabaseName", json!(input.database_name.is_some())),
-            ("hasCommand", json!(input.command.is_some())),
-            ("hasTimeout", json!(input.timeout_seconds.is_some())),
-            ("hasTtlMinutes", json!(input.ttl_minutes.is_some())),
-            ("hasOwner", json!(input.owner.is_some())),
-            (
-                "labelCount",
-                json!(input.labels.as_ref().map_or(0, |labels| labels.len())),
-            ),
-        ]);
-        self.tracked_tool(
-            "validate_migration",
-            event_properties,
-            self.manager.validate_migration(input),
         )
         .await
     }

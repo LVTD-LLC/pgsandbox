@@ -469,18 +469,6 @@ response states `createdSandbox`. Failed validations delete that auto-created
 sandbox when cleanup succeeds; successful validations return the created
 sandbox id so callers can inspect it or delete it explicitly.
 
-### `run_migrations`
-
-Backward-compatible alias for `run_repo_command` with migration-oriented
-wording. It accepts the same explicit bounded repo commands as
-`run_repo_command`; it is no longer Django-only.
-
-### `validate_migration`
-
-Backward-compatible alias for `validate_schema_change` with migration-oriented
-wording. It accepts the same explicit bounded repo commands as
-`validate_schema_change`; it is no longer Django-only.
-
 ### `seed_database`
 
 Runs only an explicit configured seed command against a selected sandbox. It

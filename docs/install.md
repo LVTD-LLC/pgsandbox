@@ -285,7 +285,7 @@ workflow without using the developer's real database:
 1. Call `create_database` with a short `nameHint`, owner, labels, and TTL.
 2. Optionally call `prepare_for_repo` with the repo path, sandbox id, and an
    explicit `migrationCommand` argv array to store reusable workflow metadata.
-3. Call `validate_migration` with the same repo path, sandbox id, and either an
+3. Call `validate_schema_change` with the same repo path, sandbox id, and either an
    explicit command or the configured `migrationCommand`.
 4. Optionally call `seed_database` with an explicit seed command argv array.
 5. Save a checkpoint with `create_schema_snapshot` or create a reusable local

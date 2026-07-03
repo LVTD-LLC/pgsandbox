@@ -213,7 +213,7 @@ pub struct PrepareForRepoInput {
 
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct RunMigrationsInput {
+pub struct RunRepoCommandInput {
     pub repo_path: String,
     pub profile: Option<String>,
     pub postgres_version: Option<String>,
@@ -225,7 +225,7 @@ pub struct RunMigrationsInput {
 
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct ValidateMigrationInput {
+pub struct ValidateSchemaChangeInput {
     pub repo_path: String,
     pub profile: Option<String>,
     pub postgres_version: Option<String>,
@@ -745,7 +745,7 @@ pub struct CommandWorkflowOutput {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ValidateMigrationOutput {
+pub struct ValidateSchemaChangeOutput {
     pub database_id: String,
     pub database_name: String,
     pub created_sandbox: bool,
@@ -849,17 +849,6 @@ struct RepoPostgresVersionInference {
 struct RepoPostgresVersionResolution {
     version: Option<String>,
     source: Option<String>,
-}
-
-#[derive(Debug, Clone, Copy)]
-struct ValidateSchemaChangeWorkflow {
-    label: &'static str,
-    detail_type: &'static str,
-    default_name_hint: &'static str,
-    validation_error_code: &'static str,
-    command_failure_code: &'static str,
-    command_failure_subject: &'static str,
-    use_migration_missing_code: bool,
 }
 
 #[derive(Debug)]
@@ -2272,48 +2261,20 @@ impl PostgresSandboxManager {
         ))
     }
 
-    pub async fn run_migrations(
-        &self,
-        input: RunMigrationsInput,
-    ) -> anyhow::Result<WorkflowEnvelope<CommandWorkflowOutput>> {
-        self.run_repo_schema_command(
-            input,
-            "Migrations",
-            "migration-run",
-            "migration_failed",
-            "Migration command",
-            true,
-        )
-        .await
-    }
-
     pub async fn run_repo_command(
         &self,
-        input: RunMigrationsInput,
+        input: RunRepoCommandInput,
     ) -> anyhow::Result<WorkflowEnvelope<CommandWorkflowOutput>> {
-        self.run_repo_schema_command(
-            input,
-            "Repo command",
-            "repo-command-run",
-            "repo_command_failed",
-            "Repo command",
-            false,
-        )
-        .await
+        self.run_repo_schema_command(input).await
     }
 
     async fn run_repo_schema_command(
         &self,
-        input: RunMigrationsInput,
-        label: &'static str,
-        detail_type: &'static str,
-        command_failure_code: &'static str,
-        command_failure_subject: &'static str,
-        use_migration_missing_code: bool,
+        input: RunRepoCommandInput,
     ) -> anyhow::Result<WorkflowEnvelope<CommandWorkflowOutput>> {
         if !selector_has_database(&input.database_id, &input.database_name) {
             return Ok(workflow_failure(
-                format!("{label} was not run."),
+                "Repo command was not run.",
                 workflow_error(
                     "missing_sandbox",
                     "Repo commands require databaseId or databaseName.",
@@ -2325,20 +2286,14 @@ impl PostgresSandboxManager {
         let repo_path = PathBuf::from(&input.repo_path);
         if !repo_path.is_dir() {
             return Ok(workflow_failure(
-                format!("{label} was not run."),
+                "Repo command was not run.",
                 repo_not_found_error(&repo_path),
                 None,
             ));
         }
-        let command = match resolve_migration_command(&repo_path, input.command)? {
+        let command = match resolve_repo_schema_command(&repo_path, input.command)? {
             Ok(command) => command,
-            Err(error) => {
-                return Ok(workflow_failure(
-                    format!("{label} was not run."),
-                    migration_alias_command_error(error, use_migration_missing_code),
-                    None,
-                ))
-            }
+            Err(error) => return Ok(workflow_failure("Repo command was not run.", error, None)),
         };
         let timeout = workflow_timeout(input.timeout_seconds);
         let postgres_version =
@@ -2363,91 +2318,56 @@ impl PostgresSandboxManager {
 
         Ok(if ok {
             workflow_success(
-                format!("{label} completed successfully."),
+                "Repo command completed successfully.",
                 None,
                 Vec::new(),
                 vec![json!({
-                    "type": detail_type,
+                    "type": "repo-command-run",
                     "databaseId": connection.database_id
                 })],
                 output,
             )
         } else {
             workflow_failure(
-                format!("{label} failed."),
+                "Repo command failed.",
                 workflow_error(
-                    command_failure_code,
-                    format!(
-                        "{command_failure_subject} exited with {:?}",
-                        output.exit_code
+                    "repo_command_failed",
+                    format!("Repo command exited with {:?}", output.exit_code),
+                    Some(
+                        "Inspect stderr/stdout in the result and rerun after fixing the command."
+                            .to_string(),
                     ),
-                    Some(format!(
-                        "Inspect stderr/stdout in the result and rerun after fixing the {}.",
-                        workflow_retry_noun(command_failure_code)
-                    )),
                 ),
                 Some(output),
             )
         })
     }
 
-    pub async fn validate_migration(
-        &self,
-        input: ValidateMigrationInput,
-    ) -> anyhow::Result<WorkflowEnvelope<ValidateMigrationOutput>> {
-        self.validate_schema_change_with_label(
-            input,
-            ValidateSchemaChangeWorkflow {
-                label: "Migration validation",
-                detail_type: "migration-validation",
-                default_name_hint: "migration validation",
-                validation_error_code: "migration_validation_error",
-                command_failure_code: "migration_failed",
-                command_failure_subject: "Migration command",
-                use_migration_missing_code: true,
-            },
-        )
-        .await
-    }
-
     pub async fn validate_schema_change(
         &self,
-        input: ValidateMigrationInput,
-    ) -> anyhow::Result<WorkflowEnvelope<ValidateMigrationOutput>> {
-        self.validate_schema_change_with_label(
-            input,
-            ValidateSchemaChangeWorkflow {
-                label: "Schema change validation",
-                detail_type: "schema-change-validation",
-                default_name_hint: "schema change validation",
-                validation_error_code: "schema_change_validation_error",
-                command_failure_code: "repo_command_failed",
-                command_failure_subject: "Repo command",
-                use_migration_missing_code: false,
-            },
-        )
-        .await
+        input: ValidateSchemaChangeInput,
+    ) -> anyhow::Result<WorkflowEnvelope<ValidateSchemaChangeOutput>> {
+        self.validate_schema_change_workflow(input).await
     }
 
-    async fn validate_schema_change_with_label(
+    async fn validate_schema_change_workflow(
         &self,
-        input: ValidateMigrationInput,
-        workflow: ValidateSchemaChangeWorkflow,
-    ) -> anyhow::Result<WorkflowEnvelope<ValidateMigrationOutput>> {
+        input: ValidateSchemaChangeInput,
+    ) -> anyhow::Result<WorkflowEnvelope<ValidateSchemaChangeOutput>> {
         let repo_path = PathBuf::from(&input.repo_path);
         if !repo_path.is_dir() {
             return Ok(workflow_failure(
-                format!("{} was not run.", workflow.label),
+                "Schema change validation was not run.",
                 repo_not_found_error(&repo_path),
                 None,
             ));
         }
-        let command = match resolve_migration_command(&repo_path, input.command)? {
+        let command = match resolve_repo_schema_command(&repo_path, input.command)? {
             Ok(command) => command,
             Err(error) => {
                 return Ok(workflow_failure(
-                    format!("{} was not run.", workflow.label),
-                    migration_alias_command_error(error, workflow.use_migration_missing_code),
+                    "Schema change validation was not run.",
+                    error,
                     None,
                 ))
             }
@@ -2465,7 +2385,7 @@ impl PostgresSandboxManager {
                     name_hint: Some(
                         input
                             .name_hint
-                            .unwrap_or_else(|| workflow.default_name_hint.to_string()),
+                            .unwrap_or_else(|| "schema change validation".to_string()),
                     ),
                     ttl_minutes: input.ttl_minutes,
                     owner: input.owner,
@@ -2512,17 +2432,16 @@ impl PostgresSandboxManager {
                     .await;
                 return match cleanup {
                     Ok(_) => Ok(workflow_failure(
-                        format!("{} failed before completion; the created sandbox was deleted.", workflow.label),
+                        "Schema change validation failed before completion; the created sandbox was deleted.",
                         workflow_error(
-                            workflow.validation_error_code,
+                            "schema_change_validation_error",
                             error.to_string(),
                             Some("Retry after fixing the validation error. No sandbox cleanup is required.".to_string()),
                         ),
                         None,
                     )),
                     Err(cleanup_error) => Err(anyhow::anyhow!(
-                        "{} failed and cleanup also failed for {}: {error}; cleanup error: {cleanup_error}",
-                        workflow.default_name_hint,
+                        "schema change validation failed and cleanup also failed for {}: {error}; cleanup error: {cleanup_error}",
                         connection.database_name
                     )),
                 };
@@ -2530,7 +2449,7 @@ impl PostgresSandboxManager {
             Err(error) => return Err(error),
         };
         let ok = command_result.exit_code == Some(0);
-        let output = validate_migration_output(
+        let output = validate_schema_change_output(
             &connection.database_id,
             &connection.database_name,
             created_sandbox,
@@ -2540,11 +2459,11 @@ impl PostgresSandboxManager {
 
         if ok {
             return Ok(workflow_success(
-                format!("{} completed successfully.", workflow.label),
+                "Schema change validation completed successfully.",
                 Some(diff.changed_objects),
                 Vec::new(),
                 vec![json!({
-                    "type": workflow.detail_type,
+                    "type": "schema-change-validation",
                     "databaseId": connection.database_id,
                     "createdSandbox": created_sandbox
                 })],
@@ -2565,8 +2484,7 @@ impl PostgresSandboxManager {
                 Ok(_) => true,
                 Err(cleanup_error) => {
                     return Err(anyhow::anyhow!(
-                        "{} failed and cleanup also failed for {}: cleanup error: {cleanup_error}",
-                        workflow.default_name_hint,
+                        "schema change validation failed and cleanup also failed for {}: cleanup error: {cleanup_error}",
                         connection.database_name
                     ))
                 }
@@ -2577,24 +2495,17 @@ impl PostgresSandboxManager {
 
         Ok(workflow_failure_with_changes(
             if deleted_auto_sandbox {
-                format!("{} failed; the created sandbox was deleted.", workflow.label)
+                "Schema change validation failed; the created sandbox was deleted."
             } else {
-                format!("{} failed.", workflow.label)
+                "Schema change validation failed."
             },
             diff.changed_objects,
             workflow_error(
-                workflow.command_failure_code,
-                format!(
-                    "{} exited with {:?}",
-                    workflow.command_failure_subject, output.exit_code
-                ),
+                "repo_command_failed",
+                format!("Repo command exited with {:?}", output.exit_code),
                 Some(
                     if deleted_auto_sandbox {
-                        if workflow.command_failure_code == "migration_failed" {
-                            "Inspect stderr/stdout and rerun after fixing the migration. No sandbox cleanup is required."
-                        } else {
-                            "Inspect stderr/stdout and rerun after fixing the command. No sandbox cleanup is required."
-                        }
+                        "Inspect stderr/stdout and rerun after fixing the command. No sandbox cleanup is required."
                     } else {
                         "Inspect stderr/stdout in the result and the schema diff before retrying."
                     }
@@ -3243,44 +3154,17 @@ fn workflow_error_category(code: &str) -> &'static str {
     match code {
         "template_not_found" => "template_not_found",
         "template_restore_failed" => "restore_failed",
-        "missing_migration_command"
-        | "missing_seed_command"
+        "missing_seed_command"
         | "missing_schema_change_command"
         | "unsafe_command"
         | "unclear_command"
         | "invalid_artifact_name"
         | "repo_not_found" => "validation",
-        "migration_failed" | "repo_command_failed" | "seed_failed" => "command_failed",
+        "repo_command_failed" | "seed_failed" => "command_failed",
         "schema_change_validation_error" | "schema_snapshot_failed" | "schema_snapshot_timeout" => {
             "workflow"
         }
         _ => "workflow",
-    }
-}
-
-fn migration_alias_command_error(
-    error: WorkflowError,
-    use_migration_missing_code: bool,
-) -> WorkflowError {
-    if use_migration_missing_code && error.code == "missing_schema_change_command" {
-        workflow_error(
-            "missing_migration_command",
-            "No migration command was provided and .pgsandbox/project.json is missing.",
-            Some(
-                "Pass an explicit migration command argv array, or run prepare_for_repo with migrationCommand."
-                    .to_string(),
-            ),
-        )
-    } else {
-        error
-    }
-}
-
-fn workflow_retry_noun(command_failure_code: &str) -> &'static str {
-    if command_failure_code == "migration_failed" {
-        "migration"
-    } else {
-        "command"
     }
 }
 
@@ -4080,7 +3964,7 @@ fn read_repo_project_config(repo_path: &Path) -> anyhow::Result<Option<RepoProje
     read_json_file(&repo_project_config_path(repo_path))
 }
 
-fn resolve_migration_command(
+fn resolve_repo_schema_command(
     repo_path: &Path,
     input_command: Option<Vec<String>>,
 ) -> anyhow::Result<Result<Vec<String>, WorkflowError>> {
@@ -4091,9 +3975,9 @@ fn resolve_migration_command(
                 Some(command) => command,
                 None => {
                     return Ok(Err(workflow_error(
-                        "missing_migration_command",
+                        "missing_schema_change_command",
                         ".pgsandbox/project.json has no migrationCommand.",
-                        Some("Pass an explicit migration command argv array or add migrationCommand to the project config.".to_string()),
+                        Some("Pass an explicit repo command argv array or add migrationCommand to the project config.".to_string()),
                     )))
                 }
             },
@@ -4376,14 +4260,14 @@ fn command_workflow_output(
     }
 }
 
-fn validate_migration_output(
+fn validate_schema_change_output(
     database_id: &str,
     database_name: &str,
     created_sandbox: bool,
     result: CommandRunResult,
     schema_diff: WorkflowSchemaDiffOutput,
-) -> ValidateMigrationOutput {
-    ValidateMigrationOutput {
+) -> ValidateSchemaChangeOutput {
+    ValidateSchemaChangeOutput {
         database_id: database_id.to_string(),
         database_name: database_name.to_string(),
         created_sandbox,
@@ -7112,29 +6996,13 @@ mod tests {
     fn workflow_errors_include_agent_branching_category() {
         let template = workflow_error("template_not_found", "missing", None);
         let repo_command = workflow_error("repo_command_failed", "failed", None);
-        let migration_command = workflow_error("migration_failed", "failed", None);
         let validation = workflow_error("missing_schema_change_command", "missing", None);
         let unsafe_command = workflow_error("unsafe_command", "unsafe", None);
 
         assert_eq!(template.category, "template_not_found");
         assert_eq!(repo_command.category, "command_failed");
-        assert_eq!(migration_command.category, "command_failed");
         assert_eq!(validation.category, "validation");
         assert_eq!(unsafe_command.category, "validation");
-    }
-
-    #[test]
-    fn migration_aliases_preserve_legacy_missing_command_code() {
-        let generic = workflow_error("missing_schema_change_command", "missing", None);
-
-        let alias = migration_alias_command_error(generic.clone(), true);
-        let non_alias = migration_alias_command_error(generic, false);
-
-        assert_eq!(alias.code, "missing_migration_command");
-        assert_eq!(alias.category, "validation");
-        assert_eq!(non_alias.code, "missing_schema_change_command");
-        assert_eq!(workflow_retry_noun("migration_failed"), "migration");
-        assert_eq!(workflow_retry_noun("repo_command_failed"), "command");
     }
 
     #[test]
@@ -7627,7 +7495,7 @@ services:
         let directory = tempfile::tempdir().unwrap();
         let repo = directory.path();
 
-        let django = resolve_migration_command(
+        let django = resolve_repo_schema_command(
             repo,
             Some(vec![
                 "npm".to_string(),
@@ -7639,7 +7507,7 @@ services:
         .unwrap();
         assert_eq!(django[2], "migrate");
 
-        let shell = resolve_migration_command(
+        let shell = resolve_repo_schema_command(
             repo,
             Some(vec![
                 "bash".to_string(),
@@ -7651,7 +7519,7 @@ services:
         .unwrap_err();
         assert_eq!(shell.code, "unsafe_command");
 
-        let env_shell = resolve_migration_command(
+        let env_shell = resolve_repo_schema_command(
             repo,
             Some(vec![
                 "env".to_string(),
@@ -7664,7 +7532,7 @@ services:
         .unwrap_err();
         assert_eq!(env_shell.code, "unsafe_command");
 
-        let sudo_shell = resolve_migration_command(
+        let sudo_shell = resolve_repo_schema_command(
             repo,
             Some(vec![
                 "sudo".to_string(),
@@ -7677,7 +7545,7 @@ services:
         .unwrap_err();
         assert_eq!(sudo_shell.code, "unsafe_command");
 
-        let launcher_without_shell = resolve_migration_command(
+        let launcher_without_shell = resolve_repo_schema_command(
             repo,
             Some(vec![
                 "nsenter".to_string(),
@@ -7692,7 +7560,7 @@ services:
         .unwrap_err();
         assert_eq!(launcher_without_shell.code, "unsafe_command");
 
-        let alembic = resolve_migration_command(
+        let alembic = resolve_repo_schema_command(
             repo,
             Some(vec![
                 "alembic".to_string(),
@@ -7703,7 +7571,7 @@ services:
         .unwrap();
         assert!(alembic.is_ok());
 
-        let prisma = resolve_migration_command(
+        let prisma = resolve_repo_schema_command(
             repo,
             Some(vec![
                 "npx".to_string(),
@@ -7715,7 +7583,7 @@ services:
         .unwrap();
         assert!(prisma.is_ok());
 
-        let rails = resolve_migration_command(
+        let rails = resolve_repo_schema_command(
             repo,
             Some(vec![
                 "bundle".to_string(),
@@ -7727,7 +7595,7 @@ services:
         .unwrap();
         assert!(rails.is_ok());
 
-        let psql_file = resolve_migration_command(
+        let psql_file = resolve_repo_schema_command(
             repo,
             Some(vec![
                 "psql".to_string(),
@@ -7739,10 +7607,12 @@ services:
         .unwrap();
         assert!(psql_file.is_ok());
 
-        let missing = resolve_migration_command(repo, None).unwrap().unwrap_err();
+        let missing = resolve_repo_schema_command(repo, None)
+            .unwrap()
+            .unwrap_err();
         assert_eq!(missing.code, "missing_schema_change_command");
 
-        let empty = resolve_migration_command(repo, Some(Vec::new()))
+        let empty = resolve_repo_schema_command(repo, Some(Vec::new()))
             .unwrap()
             .unwrap_err();
         assert_eq!(empty.code, "unclear_command");
