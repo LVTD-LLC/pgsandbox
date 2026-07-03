@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-07-03
+
+- Added the Astro Markdown blog post "Testcontainers vs Disposable Postgres Sandboxes for Agent Work" with SEO ledger, link inventory, and inbound blog links.
+
 ## 2026-07-02
 
 - Added the Astro Markdown blog post "How to Create a Postgres Test Database for Agent SQL" with SEO ledger, link inventory, and inbound blog links.

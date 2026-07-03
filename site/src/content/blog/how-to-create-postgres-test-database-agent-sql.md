@@ -218,7 +218,7 @@ No. Use a dedicated database when the task needs execution proof against real Po
 
 ### Can I use Docker instead?
 
-Yes. A containerized Postgres service is a good test boundary for many teams. PGSandbox MCP is useful when you already have a Postgres host or managed local cluster and want the smaller unit to be a task database and role, not a whole new database server.
+Yes. A containerized Postgres service is a good test boundary for many teams. PGSandbox MCP is useful when you already have a Postgres host or managed local cluster and want the smaller unit to be a task database and role, not a whole new database server. For the tradeoff in detail, read the [Testcontainers vs disposable Postgres sandboxes comparison](https://pgsandbox-mcp.lvtd.dev/blog/testcontainers-vs-disposable-postgres-sandboxes/).
 
 ### Should an agent ever test against production?
 

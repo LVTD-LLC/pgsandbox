@@ -53,7 +53,7 @@ This is the useful distinction: the sandbox boundary can be a transaction, a con
 
 For example, Ecto's SQL Sandbox is a transactional test mechanism. Its docs describe a pool for concurrent transactional tests, where explicit checkout wraps a connection in a transaction and controls which processes can access it (https://hexdocs.pm/ecto_sql/Ecto.Adapters.SQL.Sandbox.html). That is a strong fit for framework test isolation.
 
-Testcontainers is a different pattern. Its docs describe on-demand isolated infrastructure and note that each pipeline can run with an isolated set of services, avoiding test data pollution (https://testcontainers.com/getting-started/). That is a strong fit when the test should use real dependencies in throwaway containers.
+Testcontainers is a different pattern. Its docs describe on-demand isolated infrastructure and note that each pipeline can run with an isolated set of services, avoiding test data pollution (https://testcontainers.com/getting-started/). That is a strong fit when the test should use real dependencies in throwaway containers. The [Testcontainers vs disposable Postgres sandboxes comparison](https://pgsandbox-mcp.lvtd.dev/blog/testcontainers-vs-disposable-postgres-sandboxes/) breaks down when a service-container boundary is better than a task database and role.
 
 Database branching is another pattern. As covered in [Database Branching vs Disposable Postgres Sandboxes](https://pgsandbox-mcp.lvtd.dev/blog/database-branching-vs-postgres-sandboxes/), branches are usually environment primitives. They work well when the database should follow a pull request, preview app, staging environment, or developer workspace.
 
