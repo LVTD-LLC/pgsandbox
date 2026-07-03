@@ -2409,29 +2409,44 @@ impl PostgresSandboxManager {
             })
             .await?
         };
-        let validation_result = async {
-            let before = collect_schema_digest_for_url(&connection.connection_string).await?;
-            let command_result =
-                execute_repo_command(&repo_path, &command, &connection.connection_string, timeout)
+        let before = match collect_schema_digest_for_url(&connection.connection_string).await {
+            Ok(digest) => digest,
+            Err(error) => {
+                let summary = if created_sandbox {
+                    self.cleanup_auto_created_sandbox(
+                        created_profile.clone(),
+                        &connection,
+                        "schema change validation failed",
+                    )
                     .await?;
-            let after = collect_schema_digest_for_url(&connection.connection_string).await?;
-            let diff = diff_workflow_schema_digests(&before, &after);
-            anyhow::Ok((command_result, diff))
-        }
-        .await;
-        let (command_result, diff) = match validation_result {
+                    "Schema change validation failed before completion; the created sandbox was deleted."
+                } else {
+                    "Schema change validation failed before completion."
+                };
+                return Ok(workflow_failure(
+                    summary,
+                    schema_snapshot_workflow_error(error),
+                    None,
+                ));
+            }
+        };
+        let command_result = match execute_repo_command(
+            &repo_path,
+            &command,
+            &connection.connection_string,
+            timeout,
+        )
+        .await
+        {
             Ok(result) => result,
             Err(error) if created_sandbox => {
-                let cleanup = self
-                    .delete_database(DatabaseSelector {
-                        profile: created_profile.clone(),
-                        postgres_version: None,
-                        database_id: Some(connection.database_id.clone()),
-                        database_name: None,
-                    })
-                    .await;
-                return match cleanup {
-                    Ok(_) => Ok(workflow_failure(
+                self.cleanup_auto_created_sandbox(
+                    created_profile.clone(),
+                    &connection,
+                    "schema change validation failed",
+                )
+                .await?;
+                return Ok(workflow_failure(
                         "Schema change validation failed before completion; the created sandbox was deleted.",
                         workflow_error(
                             "schema_change_validation_error",
@@ -2439,15 +2454,32 @@ impl PostgresSandboxManager {
                             Some("Retry after fixing the validation error. No sandbox cleanup is required.".to_string()),
                         ),
                         None,
-                    )),
-                    Err(cleanup_error) => Err(anyhow::anyhow!(
-                        "schema change validation failed and cleanup also failed for {}: {error}; cleanup error: {cleanup_error}",
-                        connection.database_name
-                    )),
-                };
+                    ));
             }
             Err(error) => return Err(error),
         };
+        let after = match collect_schema_digest_for_url(&connection.connection_string).await {
+            Ok(digest) => digest,
+            Err(error) => {
+                let summary = if created_sandbox {
+                    self.cleanup_auto_created_sandbox(
+                        created_profile.clone(),
+                        &connection,
+                        "schema change validation failed",
+                    )
+                    .await?;
+                    "Schema change validation failed before completion; the created sandbox was deleted."
+                } else {
+                    "Schema change validation failed before completion."
+                };
+                return Ok(workflow_failure(
+                    summary,
+                    schema_snapshot_workflow_error(error),
+                    None,
+                ));
+            }
+        };
+        let diff = diff_workflow_schema_digests(&before, &after);
         let ok = command_result.exit_code == Some(0);
         let output = validate_schema_change_output(
             &connection.database_id,
@@ -2472,23 +2504,13 @@ impl PostgresSandboxManager {
         }
 
         let deleted_auto_sandbox = if created_sandbox {
-            let cleanup = self
-                .delete_database(DatabaseSelector {
-                    profile: created_profile,
-                    postgres_version: None,
-                    database_id: Some(connection.database_id.clone()),
-                    database_name: None,
-                })
-                .await;
-            match cleanup {
-                Ok(_) => true,
-                Err(cleanup_error) => {
-                    return Err(anyhow::anyhow!(
-                        "schema change validation failed and cleanup also failed for {}: cleanup error: {cleanup_error}",
-                        connection.database_name
-                    ))
-                }
-            }
+            self.cleanup_auto_created_sandbox(
+                created_profile,
+                &connection,
+                "schema change validation failed",
+            )
+            .await?;
+            true
         } else {
             false
         };
@@ -2514,6 +2536,28 @@ impl PostgresSandboxManager {
             ),
             Some(output),
         ))
+    }
+
+    async fn cleanup_auto_created_sandbox(
+        &self,
+        created_profile: Option<String>,
+        connection: &ConnectionStringOutput,
+        context: &str,
+    ) -> anyhow::Result<()> {
+        self.delete_database(DatabaseSelector {
+            profile: created_profile,
+            postgres_version: None,
+            database_id: Some(connection.database_id.clone()),
+            database_name: None,
+        })
+        .await
+        .map(|_| ())
+        .map_err(|cleanup_error| {
+            anyhow::anyhow!(
+                "{context} and cleanup also failed for {}: cleanup error: {cleanup_error}",
+                connection.database_name
+            )
+        })
     }
 
     pub async fn seed_database(
@@ -7003,6 +7047,19 @@ mod tests {
         assert_eq!(repo_command.category, "command_failed");
         assert_eq!(validation.category, "validation");
         assert_eq!(unsafe_command.category, "validation");
+    }
+
+    #[test]
+    fn schema_snapshot_workflow_error_classifies_timeouts() {
+        let timeout = schema_snapshot_workflow_error(anyhow::anyhow!(
+            "schema_operation_timeout: schema digest exceeded 30 seconds"
+        ));
+        let failed = schema_snapshot_workflow_error(anyhow::anyhow!("catalog query failed"));
+
+        assert_eq!(timeout.code, "schema_snapshot_timeout");
+        assert_eq!(timeout.category, "workflow");
+        assert_eq!(failed.code, "schema_snapshot_failed");
+        assert_eq!(failed.category, "workflow");
     }
 
     #[test]
