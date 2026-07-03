@@ -2,6 +2,7 @@
 
 ## 2026-07-03
 
+- Released `pgsandbox-mcp` v0.4.0 with generic agent-first repo workflow tools, bounded schema validation and snapshot timeouts, MCP `doctor`, SQLSTATE-aware errors, safer connection-string redaction, richer `run_sql` metadata, cross-profile database-name lookup, and opt-in dogfood reliability coverage.
 - Added the Astro Markdown blog post "Testcontainers vs Disposable Postgres Sandboxes for Agent Work" with SEO ledger, link inventory, and inbound blog links.
 
 ## 2026-07-02
