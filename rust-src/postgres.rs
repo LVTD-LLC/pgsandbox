@@ -3369,7 +3369,7 @@ async fn collect_schema_digest(client: &Client) -> anyhow::Result<WorkflowSchema
               SELECT n.nspname AS table_schema,
                      c.relname AS table_name,
                      a.attname AS column_name,
-                     a.attnum AS ordinal_position,
+                     a.attnum::integer AS ordinal_position,
                      pg_catalog.format_type(a.atttypid, a.atttypmod) AS data_type,
                      t.typname AS udt_name,
                      CASE WHEN a.attnotnull THEN 'NO' ELSE 'YES' END AS is_nullable,
@@ -3474,7 +3474,9 @@ async fn collect_schema_digest(client: &Client) -> anyhow::Result<WorkflowSchema
         let schema: String = row.get("table_schema");
         let table: String = row.get("table_name");
         let name: String = row.get("column_name");
-        let ordinal_position: i32 = row.get("ordinal_position");
+        let ordinal_position: i32 = row
+            .try_get("ordinal_position")
+            .context("schema digest column ordinal position was not an integer")?;
         let data_type: String = row.get("data_type");
         let udt_name: String = row.get("udt_name");
         let is_nullable: String = row.get("is_nullable");

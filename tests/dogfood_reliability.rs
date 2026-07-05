@@ -1,4 +1,4 @@
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration as StdDuration, SystemTime, UNIX_EPOCH};
 
 use pgsandbox_mcp::{
     config::load_config,
@@ -55,6 +55,104 @@ async fn dogfood_reliability_suite_runs_when_enabled() {
     }
 
     result.expect("dogfood reliability suite");
+}
+
+#[tokio::test]
+async fn pg18_schema_snapshot_minimal_schema_returns_without_timeout_when_enabled() {
+    if std::env::var("PGSANDBOX_DOGFOOD_PG18_E2E").ok().as_deref() != Some("1") {
+        eprintln!("skipping PG18 schema snapshot E2E; set PGSANDBOX_DOGFOOD_PG18_E2E=1 to run");
+        return;
+    }
+
+    let manager = PostgresSandboxManager::new(load_config().expect("load PGSandbox config"));
+    let owner = format!("pgsandbox-pg18-snapshot-{}", unique_suffix());
+    let created = manager
+        .create_database(CreateDatabaseInput {
+            profile: None,
+            postgres_version: Some("18".to_string()),
+            name_hint: Some("pg18 snapshot regression".to_string()),
+            ttl_minutes: Some(30),
+            owner: Some(owner),
+            labels: Some([("suite".to_string(), json!("pg18-schema-snapshot"))].into()),
+        })
+        .await
+        .expect("create PG18 snapshot regression sandbox");
+
+    let result = async {
+        let selector = || DatabaseSelector {
+            profile: Some(created.profile.clone()),
+            postgres_version: None,
+            database_id: Some(created.database_id.clone()),
+            database_name: None,
+        };
+
+        manager
+            .run_sql(RunSqlInput {
+                profile: selector().profile,
+                postgres_version: None,
+                database_id: selector().database_id,
+                database_name: None,
+                sql: "\
+                    CREATE EXTENSION IF NOT EXISTS pgcrypto;\
+                    CREATE TABLE accounts(\
+                        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),\
+                        email text NOT NULL UNIQUE\
+                    );\
+                    CREATE TABLE events(\
+                        id bigserial PRIMARY KEY,\
+                        account_id uuid NOT NULL REFERENCES accounts(id),\
+                        name text NOT NULL,\
+                        created_at timestamptz NOT NULL DEFAULT now()\
+                    );\
+                "
+                .to_string(),
+                readonly: None,
+                row_limit: None,
+            })
+            .await?;
+
+        let snapshot = tokio::time::timeout(
+            StdDuration::from_secs(10),
+            manager.create_schema_snapshot(CreateSchemaSnapshotInput {
+                profile: selector().profile,
+                postgres_version: None,
+                database_id: selector().database_id,
+                database_name: None,
+                snapshot_name: "baseline_e2e_041".to_string(),
+                notes: Some("PGSBX-041 regression".to_string()),
+            }),
+        )
+        .await
+        .expect("create_schema_snapshot should not hang on a tiny PG18 schema")?;
+        assert!(snapshot.ok, "{snapshot:?}");
+
+        let snapshots = manager
+            .list_schema_snapshots(ListSchemaSnapshotsInput {
+                profile: selector().profile,
+                postgres_version: None,
+                database_id: selector().database_id,
+                database_name: None,
+            })
+            .await?;
+        assert_eq!(snapshots.result.unwrap().len(), 1);
+
+        anyhow::Ok(())
+    }
+    .await;
+
+    let cleanup = manager
+        .delete_database(DatabaseSelector {
+            profile: Some(created.profile),
+            postgres_version: None,
+            database_id: Some(created.database_id),
+            database_name: None,
+        })
+        .await;
+    if let Err(error) = cleanup {
+        eprintln!("PG18 snapshot regression cleanup failed: {error:#}");
+    }
+
+    result.expect("PG18 schema snapshot regression");
 }
 
 async fn run_suite(

@@ -554,6 +554,13 @@ real disposable sandboxes when local Postgres is available:
 PGSANDBOX_DOGFOOD_E2E=1 cargo test --test dogfood_reliability -- --nocapture
 ```
 
+The PG18 snapshot regression can be run separately when Postgres 18 binaries
+are installed:
+
+```bash
+PGSANDBOX_DOGFOOD_PG18_E2E=1 cargo test --test dogfood_reliability pg18_schema_snapshot_minimal_schema_returns_without_timeout_when_enabled -- --nocapture
+```
+
 Release packaging check:
 
 ```bash
