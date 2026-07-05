@@ -212,13 +212,16 @@ Returns:
 - `truncated`: whether `rows` was bounded by `rowLimit`
 - execution timing
 
-Typed result rows serialize common scalar and array values to JSON. Numeric
-values are returned as strings to preserve precision. Common Postgres arrays
-such as `text[]`, integer arrays, `uuid[]`, `jsonb[]`, and `timestamptz[]`
-return JSON arrays with SQL `NULL` elements preserved as JSON `null`. With
-`readonly: true`, mutating statements are blocked by a read-only transaction;
-readonly violations are wrapped with an MCP-level message that names the
-attempted statement while preserving database detail.
+Typed result rows serialize common scalar and array values to JSON. `int8`
+values, including `count(*)` aggregate results, and `numeric` values are
+returned as strings to preserve precision. `timestamp`, `timestamptz`, and
+`date` values are returned as strings. `json` and `jsonb` values are returned
+as nested JSON. Common Postgres arrays such as `text[]`, integer arrays,
+`uuid[]`, `jsonb[]`, and `timestamptz[]` return JSON arrays with SQL `NULL`
+elements preserved as JSON `null`; `int8[]` elements follow the same string
+serialization rule. With `readonly: true`, mutating statements are blocked by a
+read-only transaction; readonly violations are wrapped with an MCP-level
+message that names the attempted statement while preserving database detail.
 
 ## `describe_schema`
 
