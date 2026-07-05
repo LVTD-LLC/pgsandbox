@@ -3369,7 +3369,7 @@ async fn collect_schema_digest(client: &Client) -> anyhow::Result<WorkflowSchema
               SELECT n.nspname AS table_schema,
                      c.relname AS table_name,
                      a.attname AS column_name,
-                     a.attnum AS ordinal_position,
+                     a.attnum::integer AS ordinal_position,
                      pg_catalog.format_type(a.atttypid, a.atttypmod) AS data_type,
                      t.typname AS udt_name,
                      CASE WHEN a.attnotnull THEN 'NO' ELSE 'YES' END AS is_nullable,
@@ -4194,6 +4194,7 @@ async fn execute_repo_command(
     let mut child = command_builder
         .args(&command[1..])
         .current_dir(repo_path)
+        .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .kill_on_drop(true)
@@ -6666,6 +6667,136 @@ mod tests {
             telemetry: crate::config::TelemetryConfig { enabled: false },
             managed_local: crate::config::ManagedLocalConfig { enabled: false },
         }
+    }
+
+    fn test_database_url() -> &'static str {
+        "postgres://sandbox:secret@127.0.0.1:5432/app?sslmode=disable"
+    }
+
+    #[tokio::test]
+    async fn execute_repo_command_does_not_inherit_mcp_stdin() {
+        let current_exe = std::env::current_exe().unwrap();
+        let mut child = Command::new(current_exe)
+            .arg("execute_repo_command_inherited_stdin_helper")
+            .arg("--nocapture")
+            .arg("--test-threads=1")
+            .env("PGSANDBOX_RUN_STDIN_HELPER", "1")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .kill_on_drop(true)
+            .spawn()
+            .unwrap();
+        let _stdin_guard = child.stdin.take().expect("helper stdin pipe");
+        let stdout = child.stdout.take().expect("helper stdout pipe");
+        let stderr = child.stderr.take().expect("helper stderr pipe");
+        let stdout_task = tokio::spawn(read_bounded_output(stdout));
+        let stderr_task = tokio::spawn(read_bounded_output(stderr));
+        let status = time::timeout(StdDuration::from_secs(5), child.wait())
+            .await
+            .expect("helper test did not finish")
+            .expect("helper test process failed");
+        let (stdout, _) = stdout_task.await.unwrap().unwrap();
+        let (stderr, _) = stderr_task.await.unwrap().unwrap();
+
+        assert!(
+            status.success(),
+            "helper test failed with {status}; stdout:\n{stdout}\nstderr:\n{stderr}"
+        );
+    }
+
+    #[tokio::test]
+    async fn execute_repo_command_inherited_stdin_helper() {
+        if std::env::var("PGSANDBOX_RUN_STDIN_HELPER").ok().as_deref() != Some("1") {
+            return;
+        }
+        let directory = tempfile::tempdir().unwrap();
+        let command = vec![
+            "sh".to_string(),
+            "-c".to_string(),
+            "if IFS= read -r _; then echo inherited-stdin; exit 12; else echo stdin-closed; fi"
+                .to_string(),
+        ];
+
+        let result = execute_repo_command(
+            directory.path(),
+            &command,
+            test_database_url(),
+            StdDuration::from_secs(1),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(result.exit_code, Some(0), "{result:?}");
+        assert_eq!(result.stdout.trim(), "stdin-closed");
+        assert!(!result.stderr.contains("timed out"), "{result:?}");
+    }
+
+    #[tokio::test]
+    async fn execute_repo_command_captures_success_output() {
+        let directory = tempfile::tempdir().unwrap();
+        let command = vec![
+            "sh".to_string(),
+            "-c".to_string(),
+            "printf success; printf warning >&2".to_string(),
+        ];
+
+        let result = execute_repo_command(
+            directory.path(),
+            &command,
+            test_database_url(),
+            StdDuration::from_secs(5),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(result.exit_code, Some(0));
+        assert_eq!(result.stdout, "success");
+        assert_eq!(result.stderr, "warning");
+        assert!(!result.stdout_truncated);
+        assert!(!result.stderr_truncated);
+    }
+
+    #[tokio::test]
+    async fn execute_repo_command_captures_failure_output() {
+        let directory = tempfile::tempdir().unwrap();
+        let command = vec![
+            "sh".to_string(),
+            "-c".to_string(),
+            "printf failed >&2; exit 17".to_string(),
+        ];
+
+        let result = execute_repo_command(
+            directory.path(),
+            &command,
+            test_database_url(),
+            StdDuration::from_secs(5),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(result.exit_code, Some(17));
+        assert_eq!(result.stdout, "");
+        assert_eq!(result.stderr, "failed");
+    }
+
+    #[tokio::test]
+    async fn execute_repo_command_honors_timeout() {
+        let directory = tempfile::tempdir().unwrap();
+        let command = vec!["sh".to_string(), "-c".to_string(), "sleep 5".to_string()];
+
+        let result = execute_repo_command(
+            directory.path(),
+            &command,
+            test_database_url(),
+            StdDuration::from_secs(1),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(result.exit_code, None);
+        assert!(result.elapsed_ms < 3_000, "{result:?}");
+        assert!(result.stderr.contains("timed out after 1 seconds"));
     }
 
     #[test]
