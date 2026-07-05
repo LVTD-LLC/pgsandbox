@@ -8278,6 +8278,8 @@ services:
     #[test]
     fn serializes_int8_aggregate_counts_as_json_strings() {
         assert_eq!(int8_to_json(3), json!("3"));
+        assert_eq!(int8_to_json(-1), json!("-1"));
+        assert_eq!(int8_to_json(i64::MIN), json!("-9223372036854775808"));
         assert_eq!(
             int8_to_json(9_223_372_036_854_775_807),
             json!("9223372036854775807")
