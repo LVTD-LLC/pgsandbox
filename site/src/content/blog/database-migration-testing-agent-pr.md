@@ -10,7 +10,6 @@ category: "Engineering"
 metaTitle: "Database Migration Testing for Agent PRs"
 metaDescription: "Validate Postgres migrations before agent PRs with disposable databases, scoped roles, schema diffs, seed data, bounded output, and cleanup."
 canonicalUrl: "https://pgsandbox-mcp.lvtd.dev/blog/database-migration-testing-agent-pr/"
-heroImageUrl: ""
 featured: false
 sortOrder: 80
 ---
