@@ -447,6 +447,26 @@ The command runs with `repoPath` as current directory. The argv array must be
 short, non-empty, free of NUL/newline characters, and is executed directly
 without shell expansion or indirect launchers.
 
+Shell wrappers and command launchers such as `["bash", "-lc", "..."]`,
+`["sh", "-c", "..."]`, `env`, `sudo`, and `nsenter` are intentionally rejected
+with `code: "unsafe_command"`. Pass direct argv instead:
+
+```json
+["npm", "run", "migrate"]
+```
+
+```json
+["psql", "-v", "ON_ERROR_STOP=1", "-f", "migrations/schema.sql"]
+```
+
+```json
+["psql", "-Atc", "SELECT current_database(), current_user"]
+```
+
+For multi-step workflows, prefer a repo/package script that can be invoked
+directly, or split the work into separate tool calls instead of sending a
+shell snippet.
+
 ### `validate_schema_change`
 
 Captures a before schema digest, runs an explicit or configured repo

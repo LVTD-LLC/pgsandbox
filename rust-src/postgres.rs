@@ -55,6 +55,9 @@ const MAX_WORKFLOW_TIMEOUT_SECONDS: u64 = 600;
 const DEFAULT_SCHEMA_OPERATION_TIMEOUT_SECONDS: u64 = 30;
 const CONNECTION_TASK_CLOSE_TIMEOUT_SECONDS: u64 = 2;
 const MAX_COMMAND_OUTPUT_BYTES: usize = 8_000;
+const MAX_WORKFLOW_COMMAND_PARTS: usize = 16;
+const MAX_WORKFLOW_COMMAND_TOTAL_BYTES: usize = 2_048;
+const MAX_WORKFLOW_COMMAND_PART_BYTES: usize = 256;
 const TEMPLATE_PRIVACY_WARNING: &str =
     "Templates are local PG Sandbox artifacts. Do not create templates from production or sensitive data unless you have explicitly sanitized it.";
 
@@ -4076,35 +4079,54 @@ fn resolve_seed_command(
 }
 
 fn validate_workflow_command(command: &[String], label: &str) -> Result<(), WorkflowError> {
-    if !command_is_bounded(command) {
-        return Err(workflow_error(
-            "unclear_command",
-            format!("{label} is empty or too large."),
-            Some(
-                "Pass a short argv array. Commands are executed without shell expansion."
-                    .to_string(),
-            ),
-        ));
+    if command.is_empty() {
+        return Err(workflow_command_bounds_error(command, label));
     }
     if command_invokes_shell(command) {
         return Err(workflow_error(
             "unsafe_command",
             format!("{label} cannot invoke a shell or command launcher."),
-            Some("Pass the executable and arguments directly, for example [\"npm\", \"run\", \"migrate\"] or [\"alembic\", \"upgrade\", \"head\"].".to_string()),
+            Some("Shells such as bash -lc and indirect launchers such as env/sudo are intentionally unsupported. Pass the executable and arguments directly, for example [\"npm\", \"run\", \"migrate\"] or [\"alembic\", \"upgrade\", \"head\"].".to_string()),
         ));
+    }
+    if !command_is_bounded(command) {
+        return Err(workflow_command_bounds_error(command, label));
     }
     Ok(())
 }
 
+fn workflow_command_bounds_error(command: &[String], label: &str) -> WorkflowError {
+    let part_count = command.len();
+    let total_len = command.iter().map(String::len).sum::<usize>();
+    let longest_part_len = command.iter().map(String::len).max().unwrap_or(0);
+    let part_suffix = if part_count == 1 { "part" } else { "parts" };
+    let longest_clause = if part_count > 0 {
+        format!(", and longest part is {longest_part_len} bytes")
+    } else {
+        String::new()
+    };
+    workflow_error(
+        "unclear_command",
+        format!(
+            "{label} is invalid: observed {part_count} argv {part_suffix}, {total_len} total bytes{longest_clause}. Limits: 1 to maximum {MAX_WORKFLOW_COMMAND_PARTS} argv parts, maximum {MAX_WORKFLOW_COMMAND_TOTAL_BYTES} total bytes, maximum {MAX_WORKFLOW_COMMAND_PART_BYTES} bytes per part, and no NUL/newline characters."
+        ),
+        Some(
+            format!(
+                "Pass a direct argv array with 1 to {MAX_WORKFLOW_COMMAND_PARTS} parts, maximum {MAX_WORKFLOW_COMMAND_TOTAL_BYTES} total bytes, maximum {MAX_WORKFLOW_COMMAND_PART_BYTES} bytes per part, and no NUL/newline characters. Commands are executed without shell expansion."
+            ),
+        ),
+    )
+}
+
 fn command_is_bounded(command: &[String]) -> bool {
-    if command.is_empty() || command.len() > 16 {
+    if command.is_empty() || command.len() > MAX_WORKFLOW_COMMAND_PARTS {
         return false;
     }
     let total_len = command.iter().map(String::len).sum::<usize>();
-    total_len <= 2_048
+    total_len <= MAX_WORKFLOW_COMMAND_TOTAL_BYTES
         && command.iter().all(|part| {
             !part.is_empty()
-                && part.len() <= 256
+                && part.len() <= MAX_WORKFLOW_COMMAND_PART_BYTES
                 && !part.contains('\0')
                 && !part.contains('\n')
                 && !part.contains('\r')
@@ -7726,6 +7748,21 @@ services:
         .unwrap_err();
         assert_eq!(shell.code, "unsafe_command");
 
+        let multiline_shell = resolve_repo_schema_command(
+            repo,
+            Some(vec![
+                "bash".to_string(),
+                "-lc".to_string(),
+                "set -euo pipefail\npsql \"$DATABASE_URL\" -Atc \"SELECT 1\"".to_string(),
+            ]),
+        )
+        .unwrap()
+        .unwrap_err();
+        assert_eq!(multiline_shell.code, "unsafe_command");
+        assert!(multiline_shell
+            .message
+            .contains("cannot invoke a shell or command launcher"));
+
         let env_shell = resolve_repo_schema_command(
             repo,
             Some(vec![
@@ -7823,6 +7860,17 @@ services:
             .unwrap()
             .unwrap_err();
         assert_eq!(empty.code, "unclear_command");
+        assert!(empty.message.contains("0 argv parts"));
+        assert!(empty.message.contains("maximum 16"));
+        assert!(!empty.message.contains("longest part"));
+
+        let oversized = resolve_repo_schema_command(repo, Some(vec!["x".repeat(257)]))
+            .unwrap()
+            .unwrap_err();
+        assert_eq!(oversized.code, "unclear_command");
+        assert!(oversized.message.contains("1 argv part"));
+        assert!(oversized.message.contains("longest part is 257 bytes"));
+        assert!(oversized.hint.unwrap().contains("maximum 256 bytes"));
     }
 
     #[test]

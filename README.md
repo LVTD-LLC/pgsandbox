@@ -467,6 +467,11 @@ errors include stable categories such as `sql_analysis`, `sql_syntax`,
 agents can branch without parsing prose. Postgres errors include SQLSTATE when
 available. Commands are executed without an implicit shell and receive sandbox
 credentials through environment variables, not permanent settings rewrites.
+Shell wrappers and indirect launchers such as `["bash", "-lc", "..."]`,
+`["sh", "-c", "..."]`, `env`, and `sudo` are rejected. Pass direct argv, for
+example `["npm", "run", "migrate"]`,
+`["psql", "-v", "ON_ERROR_STOP=1", "-f", "migrations/schema.sql"]`, or
+`["psql", "-Atc", "SELECT current_database(), current_user"]`.
 Schema inspection includes relation-kind counts, constraints, column defaults
 and generated expressions, and view definition hashes. `run_sql` returns common
 Postgres arrays such as `text[]`, integer arrays, `uuid[]`, `jsonb[]`, and

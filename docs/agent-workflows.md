@@ -131,15 +131,20 @@ Use `run_repo_command` when the repo already has a script. Use
     "nameHint": "validate repo schema change",
     "ttlMinutes": 45,
     "owner": "agent-session",
-    "command": ["sh", "scripts/migrate.sh"]
+    "command": ["npm", "run", "migrate"]
   }
 }
 ```
 
 Commands run with `repoPath` as current directory and receive `DATABASE_URL`,
 `PGSANDBOX_DATABASE_URL`, and libpq `PG*` variables for the sandbox. PGSandbox
-does not add an implicit shell. If the command uses shell behavior, pass the
-shell or script runner explicitly.
+does not add an implicit shell, and it rejects shell wrappers and indirect
+launchers such as `["bash", "-lc", "..."]`, `["sh", "-c", "..."]`, `env`, and
+`sudo`. Pass direct argv such as `["npm", "run", "migrate"]`,
+`["psql", "-v", "ON_ERROR_STOP=1", "-f", "migrations/schema.sql"]`, or
+`["psql", "-Atc", "SELECT current_database(), current_user"]`. For multi-step
+workflows, prefer a repo/package script that can be invoked directly, or split
+the work into separate tool calls.
 
 ## Templates And Clone
 
