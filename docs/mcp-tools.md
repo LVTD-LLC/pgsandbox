@@ -38,15 +38,17 @@ include `error.sqlstate` when it is available. Expected failure classes use
 stable categories such as `sql_analysis`, `sql_syntax`,
 `constraint_violation`, `readonly_violation`, `database_not_found`,
 `version_mismatch`, `restore_incompatible`, `template_not_found`, and
-`timeout`. Version
+`timeout`. Profile selection failures use `code: "unknown_profile"` with
+category `validation` and a `detailHandle` that points to `list_profiles`,
+names the invalid profile, and includes a bounded `knownProfiles` list. Version
 diagnostics may also include `requestedVersion`, `sourceVersion`,
 `targetVersion`, `detectedVersions`, and a `detailHandle` pointing to
 `list_profiles` or `doctor` instead of embedding long local path traces.
 Typical codes include `undefined_column`, `undefined_table`, `syntax_error`,
 `permission_denied`, `lock_timeout`, `statement_timeout`,
 `command_timeout`, `postgres_auth_failed`, `postgres_connection_failed`,
-`postgres_version_unavailable`, `local_postgres_unavailable`, and
-`invalid_ttl`.
+`unknown_profile`, `postgres_version_unavailable`,
+`local_postgres_unavailable`, and `invalid_ttl`.
 
 When selecting a local major version, omit `profile` and pass only
 `postgresVersion`, for example `{ "postgresVersion": "18" }`. Supplying both is

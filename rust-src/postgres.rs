@@ -58,6 +58,7 @@ const MAX_COMMAND_OUTPUT_BYTES: usize = 8_000;
 const MAX_WORKFLOW_COMMAND_PARTS: usize = 16;
 const MAX_WORKFLOW_COMMAND_TOTAL_BYTES: usize = 2_048;
 const MAX_WORKFLOW_COMMAND_PART_BYTES: usize = 256;
+const MAX_PROFILE_HINTS: usize = 20;
 const TEMPLATE_PRIVACY_WARNING: &str =
     "Templates are local PG Sandbox artifacts. Do not create templates from production or sensitive data unless you have explicitly sanitized it.";
 const UNSUPPORTED_TYPE_CAST_HINT: &str =
@@ -77,6 +78,20 @@ static TYPED_ROW_PREFIX_RE: LazyLock<Regex> = LazyLock::new(|| {
 pub struct PostgresSandboxManager {
     config: SandboxConfig,
 }
+
+#[derive(Debug)]
+pub(crate) struct UnknownProfileError {
+    pub(crate) profile: String,
+    pub(crate) known_profiles: Vec<String>,
+}
+
+impl fmt::Display for UnknownProfileError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "Unknown Postgres profile: {}", self.profile)
+    }
+}
+
+impl std::error::Error for UnknownProfileError {}
 
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -1064,12 +1079,25 @@ impl PostgresSandboxManager {
                     && profile_name == Some(profile.as_str()) =>
             {
                 let Some(version) = profile.strip_prefix("local-pg") else {
-                    return Err(ConfigError::UnknownProfile(profile).into());
+                    return Err(self.unknown_profile_error(profile));
                 };
                 self.ensure_managed_local_profile(Some(version))
             }
+            Err(ConfigError::UnknownProfile(profile)) => Err(self.unknown_profile_error(profile)),
             Err(error) => Err(error.into()),
         }
+    }
+
+    fn unknown_profile_error(&self, profile: String) -> anyhow::Error {
+        UnknownProfileError {
+            profile,
+            known_profiles: self
+                .profile_names_for_scope_hint()
+                .into_iter()
+                .take(MAX_PROFILE_HINTS)
+                .collect(),
+        }
+        .into()
     }
 
     fn ensure_managed_local_profile(

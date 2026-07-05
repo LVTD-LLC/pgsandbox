@@ -16,7 +16,7 @@ use crate::{
         DatabaseSelector, DeleteSchemaSnapshotInput, DeleteTemplateInput, DescribeSchemaInput,
         DiffSchemaSnapshotInput, ExplainQueryInput, ListDatabasesInput, ListProfilesInput,
         ListSchemaSnapshotsInput, ListTemplatesInput, PostgresSandboxManager, PrepareForRepoInput,
-        RunRepoCommandInput, RunSqlInput, SchemaDiffInput, SeedDatabaseInput,
+        RunRepoCommandInput, RunSqlInput, SchemaDiffInput, SeedDatabaseInput, UnknownProfileError,
         ValidateSchemaChangeInput,
     },
     telemetry::{properties, Telemetry, EVENT_MCP_SERVER_STARTED, EVENT_MCP_TOOL_COMPLETED},
@@ -724,6 +724,8 @@ impl ToolErrorResponse {
         let lower = chain.to_ascii_lowercase();
         let body = if let Some(body) = postgres_db_error_body(error, &chain) {
             body
+        } else if let Some(body) = unknown_profile_error_body(error) {
+            body
         } else if let Some(body) = stringly_sql_error_body(&lower, &chain) {
             // Fallback for Postgres-shaped messages when no typed DbError is in the chain.
             body
@@ -937,6 +939,29 @@ impl ToolErrorResponse {
             error: body,
         }
     }
+}
+
+fn unknown_profile_error_body(error: &anyhow::Error) -> Option<ToolErrorBody> {
+    let profile_error = error
+        .chain()
+        .find_map(|cause| cause.downcast_ref::<UnknownProfileError>())?;
+    Some(ToolErrorBody {
+        code: "unknown_profile",
+        category: "validation",
+        message: profile_error.to_string(),
+        hint: "Call list_profiles to inspect configured and discoverable profile names, then retry with a known profile or omit profile to use the default.".to_string(),
+        sqlstate: None,
+        requested_version: None,
+        source_version: None,
+        target_version: None,
+        detected_versions: Vec::new(),
+        detail_handle: Some(json!({
+            "type": "diagnostic",
+            "tool": "list_profiles",
+            "invalidProfile": profile_error.profile,
+            "knownProfiles": profile_error.known_profiles,
+        })),
+    })
 }
 
 fn postgres_db_error_body(error: &anyhow::Error, message: &str) -> Option<ToolErrorBody> {
@@ -1207,6 +1232,91 @@ mod tests {
             .as_str()
             .unwrap()
             .contains("positive ttlMinutes"));
+    }
+
+    #[tokio::test]
+    async fn invalid_profile_tool_error_is_structured_and_lists_safe_profiles() {
+        let mut config = crate::config::parse_config_file(
+            r#"{
+              "defaultProfile": "default",
+              "profiles": [
+                {
+                  "name": "default",
+                  "adminUrl": "postgres://postgres:secret@localhost:5432/postgres?sslmode=disable"
+                },
+                {
+                  "name": "analytics",
+                  "adminUrl": "postgres://postgres:secret@localhost:5433/postgres?sslmode=disable",
+                  "postgresVersion": "17"
+                }
+              ]
+            }"#,
+        )
+        .unwrap();
+        config.telemetry.enabled = false;
+        let server = PgsandboxServer::new(config);
+
+        let result = server
+            .create_database(Parameters(CreateDatabaseInput {
+                profile: Some("does-not-exist".to_string()),
+                postgres_version: None,
+                name_hint: Some("invalid-profile-test".to_string()),
+                ttl_minutes: Some(5),
+                owner: None,
+                labels: None,
+            }))
+            .await
+            .unwrap();
+        let text = result.content[0].as_text().unwrap().text.clone();
+        let value = serde_json::from_str::<Value>(&text).unwrap();
+
+        assert!(result.is_error.unwrap_or(false));
+        assert_eq!(value["ok"], false);
+        assert_eq!(value["error"]["code"], "unknown_profile");
+        assert_eq!(value["error"]["category"], "validation");
+        assert_eq!(
+            value["error"]["detailHandle"]["invalidProfile"],
+            "does-not-exist"
+        );
+        assert!(value["error"]["hint"]
+            .as_str()
+            .unwrap()
+            .contains("list_profiles"));
+        assert_eq!(value["error"]["detailHandle"]["tool"], "list_profiles");
+        assert_eq!(
+            value["error"]["detailHandle"]["knownProfiles"],
+            json!(["default", "analytics"])
+        );
+        assert!(
+            value["error"]["detailHandle"]["knownProfiles"]
+                .as_array()
+                .unwrap()
+                .len()
+                <= 20
+        );
+        assert!(!text.contains("secret"));
+
+        let result = server
+            .create_database(Parameters(CreateDatabaseInput {
+                profile: Some("syntax error".to_string()),
+                postgres_version: None,
+                name_hint: Some("invalid-profile-test".to_string()),
+                ttl_minutes: Some(5),
+                owner: None,
+                labels: None,
+            }))
+            .await
+            .unwrap();
+        let text = result.content[0].as_text().unwrap().text.clone();
+        let value = serde_json::from_str::<Value>(&text).unwrap();
+
+        assert!(result.is_error.unwrap_or(false));
+        assert_eq!(value["error"]["code"], "unknown_profile");
+        assert_eq!(value["error"]["category"], "validation");
+        assert_eq!(
+            value["error"]["detailHandle"]["invalidProfile"],
+            "syntax error"
+        );
     }
 
     #[test]
