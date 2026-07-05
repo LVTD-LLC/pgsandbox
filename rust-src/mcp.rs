@@ -724,10 +724,10 @@ impl ToolErrorResponse {
         let lower = chain.to_ascii_lowercase();
         let body = if let Some(body) = postgres_db_error_body(error, &chain) {
             body
+        } else if let Some(body) = unknown_profile_error_body(error) {
+            body
         } else if let Some(body) = stringly_sql_error_body(&lower, &chain) {
             // Fallback for Postgres-shaped messages when no typed DbError is in the chain.
-            body
-        } else if let Some(body) = unknown_profile_error_body(error) {
             body
         } else if lower.contains("basedigest string must contain")
             || lower.contains("basedigest must be a schema_digest response")
@@ -1295,6 +1295,28 @@ mod tests {
                 <= 20
         );
         assert!(!text.contains("secret"));
+
+        let result = server
+            .create_database(Parameters(CreateDatabaseInput {
+                profile: Some("syntax error".to_string()),
+                postgres_version: None,
+                name_hint: Some("invalid-profile-test".to_string()),
+                ttl_minutes: Some(5),
+                owner: None,
+                labels: None,
+            }))
+            .await
+            .unwrap();
+        let text = result.content[0].as_text().unwrap().text.clone();
+        let value = serde_json::from_str::<Value>(&text).unwrap();
+
+        assert!(result.is_error.unwrap_or(false));
+        assert_eq!(value["error"]["code"], "unknown_profile");
+        assert_eq!(value["error"]["category"], "validation");
+        assert_eq!(
+            value["error"]["detailHandle"]["invalidProfile"],
+            "syntax error"
+        );
     }
 
     #[test]
