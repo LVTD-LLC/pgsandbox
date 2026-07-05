@@ -154,7 +154,7 @@ Here is the practical pattern for repeatable agent QA:
 6. Run the agent's migration, SQL, or bug reproduction against the new sandbox.
 7. Capture proof and delete the sandbox.
 
-The [MCP tool contract](https://pgsandbox-mcp.lvtd.dev/docs/mcp-tools/) supports that loop directly. The [agent workflow docs](https://pgsandbox-mcp.lvtd.dev/docs/agent-workflows/) show the template calls as JSON, with `templateName`, `nameHint`, `ttlMinutes`, and `owner` fields.
+The [MCP tool contract](https://pgsandbox-mcp.lvtd.dev/docs/mcp-tools/) supports that loop directly. Its template-tool section documents the JSON inputs for `create_template_from_sandbox` and `create_sandbox_from_template`, including `templateName`, `nameHint`, `ttlMinutes`, and `owner` fields.
 
 This works best for small to medium local states: a baseline schema, a few fixture accounts, a reproduced bug shape, or a post-migration known-good state. It is not a production-data import workflow. PGSandbox's template warning is explicit: do not create templates from production or sensitive data unless you have sanitized it.
 
