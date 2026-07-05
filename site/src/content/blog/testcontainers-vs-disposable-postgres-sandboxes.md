@@ -115,6 +115,8 @@ Good examples:
 4. The reviewer needs a compact record of what database state changed.
 5. Cleanup should be tied to sandbox metadata, not to a test class lifecycle.
 
+For migration-heavy agent work, the [database migration testing workflow](https://pgsandbox-mcp.lvtd.dev/blog/database-migration-testing-agent-pr/) is the more specific version of this pattern: create a sandbox, run the repo migration command, capture the schema diff, test risky data rows, and put the proof in the PR.
+
 That is the workflow behind the [Postgres test database guide](https://pgsandbox-mcp.lvtd.dev/blog/how-to-create-postgres-test-database-agent-sql/). Create a task database, apply the needed schema, seed or clone the smallest useful state, run generated SQL with bounded output, record the result, and delete the database and role.
 
 PGSandbox MCP makes that loop available to MCP clients without requiring the agent to start Docker, bind `localhost:5432`, or handle raw admin credentials. The [install guide](https://pgsandbox-mcp.lvtd.dev/docs/install/) covers the local-first setup and explicitly keeps existing Docker or developer Postgres services on port `5432` out of the way.
