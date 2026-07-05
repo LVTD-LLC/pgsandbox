@@ -22,6 +22,8 @@ use crate::{
     telemetry::{properties, Telemetry, EVENT_MCP_SERVER_STARTED, EVENT_MCP_TOOL_COMPLETED},
 };
 
+const TOOL_ENVELOPE_MARKER: &str = "__pgsandboxEnvelope";
+
 pub const PUBLIC_MCP_TOOLS: &[&str] = &[
     "list_profiles",
     "create_database",
@@ -686,34 +688,47 @@ fn tool_json<T: Serialize>(result: anyhow::Result<T>) -> Result<CallToolResult, 
 
 fn normalize_success_payload(value: Value) -> Value {
     match value {
-        Value::Object(mut object) if is_tool_envelope(&object) => {
-            object
-                .entry("warnings".to_string())
-                .or_insert_with(|| json!([]));
-            object
-                .entry("errors".to_string())
-                .or_insert_with(|| json!([]));
-            object
-                .entry("detailHandles".to_string())
-                .or_insert_with(|| json!([]));
-            object.remove("createdSandbox");
-            Value::Object(object)
+        Value::Object(mut object) => {
+            if remove_tool_envelope_marker(&mut object) {
+                normalize_marked_envelope(object)
+            } else {
+                wrap_success_payload(Value::Object(object))
+            }
         }
-        value => json!({
-            "ok": true,
-            "summary": "Tool completed successfully.",
-            "warnings": [],
-            "errors": [],
-            "detailHandles": [],
-            "result": value
-        }),
+        value => wrap_success_payload(value),
     }
 }
 
-fn is_tool_envelope(object: &Map<String, Value>) -> bool {
-    object.get("ok").and_then(Value::as_bool).is_some()
-        && object.get("summary").and_then(Value::as_str).is_some()
-        && (object.contains_key("result") || object.contains_key("errors"))
+fn remove_tool_envelope_marker(object: &mut Map<String, Value>) -> bool {
+    object
+        .remove(TOOL_ENVELOPE_MARKER)
+        .and_then(|value| value.as_bool())
+        == Some(true)
+}
+
+fn normalize_marked_envelope(mut object: Map<String, Value>) -> Value {
+    object
+        .entry("warnings".to_string())
+        .or_insert_with(|| json!([]));
+    object
+        .entry("errors".to_string())
+        .or_insert_with(|| json!([]));
+    object
+        .entry("detailHandles".to_string())
+        .or_insert_with(|| json!([]));
+    object.remove("createdSandbox");
+    Value::Object(object)
+}
+
+fn wrap_success_payload(value: Value) -> Value {
+    json!({
+        "ok": true,
+        "summary": "Tool completed successfully.",
+        "warnings": [],
+        "errors": [],
+        "detailHandles": [],
+        "result": value
+    })
 }
 
 fn internal_error(error: impl std::fmt::Display) -> ErrorData {
@@ -763,7 +778,7 @@ impl ToolErrorResponse {
             // Fallback for Postgres-shaped messages when no typed DbError is in the chain.
             body
         } else if lower.contains("basedigest string must contain")
-            || lower.contains("basedigest must be a schema_digest response")
+            || lower.contains("basedigest must be a schema_digest result")
         {
             ToolErrorBody {
                 code: "invalid_base_digest",
@@ -1256,9 +1271,30 @@ mod tests {
     }
 
     #[test]
+    fn envelope_shaped_domain_payloads_are_wrapped_without_marker() {
+        let value = tool_payload(
+            tool_json::<Value>(Ok(json!({
+                "ok": true,
+                "summary": "domain object",
+                "result": {"nested": true}
+            })))
+            .unwrap(),
+        );
+
+        assert_eq!(value["ok"], true);
+        assert_eq!(value["summary"], "Tool completed successfully.");
+        assert_eq!(value["warnings"], json!([]));
+        assert_eq!(value["errors"], json!([]));
+        assert_eq!(value["detailHandles"], json!([]));
+        assert_eq!(value["result"]["summary"], "domain object");
+        assert_eq!(value["result"]["result"]["nested"], true);
+    }
+
+    #[test]
     fn workflow_template_responses_keep_warnings_discoverable_without_aliases() {
         let value = tool_payload(
             tool_json::<Value>(Ok(json!({
+                "__pgsandboxEnvelope": true,
                 "ok": true,
                 "summary": "Sandbox created from template `seeded`.",
                 "changedObjects": null,
@@ -1287,6 +1323,7 @@ mod tests {
         assert_eq!(value["errors"], json!([]));
         assert_eq!(value["detailHandles"][0]["type"], "template");
         assert_eq!(value["result"]["templateName"], "seeded");
+        assert!(value.get("__pgsandboxEnvelope").is_none());
         assert!(
             value.get("createdSandbox").is_none(),
             "createdSandbox is a legacy alias; canonical data belongs under result"

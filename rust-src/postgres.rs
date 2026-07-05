@@ -676,6 +676,8 @@ pub struct SchemaTableDiff {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkflowEnvelope<T: Serialize> {
+    #[serde(rename = "__pgsandboxEnvelope")]
+    pub envelope_marker: bool,
     pub ok: bool,
     pub summary: String,
     pub changed_objects: Option<SchemaChangeCounts>,
@@ -3233,6 +3235,7 @@ fn workflow_success<T: Serialize>(
     result: T,
 ) -> WorkflowEnvelope<T> {
     WorkflowEnvelope {
+        envelope_marker: true,
         ok: true,
         summary: summary.into(),
         changed_objects,
@@ -3258,6 +3261,7 @@ fn workflow_failure_with_changes<T: Serialize>(
     result: Option<T>,
 ) -> WorkflowEnvelope<T> {
     WorkflowEnvelope {
+        envelope_marker: true,
         ok: false,
         summary: summary.into(),
         changed_objects: Some(changed_objects),
