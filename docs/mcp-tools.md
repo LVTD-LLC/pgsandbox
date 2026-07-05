@@ -215,7 +215,10 @@ Returns:
 Typed result rows serialize common scalar and array values to JSON. Numeric
 values are returned as strings to preserve precision. Common Postgres arrays
 such as `text[]`, integer arrays, `uuid[]`, `jsonb[]`, and `timestamptz[]`
-return JSON arrays with SQL `NULL` elements preserved as JSON `null`. With
+return JSON arrays with SQL `NULL` elements preserved as JSON `null`.
+Unsupported non-null Postgres result types return a structured object with
+`unsupportedPostgresType` and a cast-to-text `hint`; unsupported SQL `NULL`
+values remain JSON `null`. With
 `readonly: true`, mutating statements are blocked by a read-only transaction;
 readonly violations are wrapped with an MCP-level message that names the
 attempted statement while preserving database detail.

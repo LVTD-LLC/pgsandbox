@@ -476,6 +476,9 @@ Schema inspection includes relation-kind counts, constraints, column defaults
 and generated expressions, and view definition hashes. `run_sql` returns common
 Postgres arrays such as `text[]`, integer arrays, `uuid[]`, `jsonb[]`, and
 `timestamptz[]` as JSON arrays; numeric values remain strings for precision.
+Unsupported non-null Postgres result types return a structured object with the
+original type name and a cast-to-text hint; unsupported SQL `NULL` values remain
+JSON `null`.
 It also reports `returnedRowCount`, `affectedRowCount`, `totalRowCountKnown`,
 and `truncated` so agents do not infer row-count semantics from `rowCount`.
 Creation tools return `connectionStringRedacted` for safe summaries and task

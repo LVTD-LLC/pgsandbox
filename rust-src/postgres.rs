@@ -60,6 +60,8 @@ const MAX_WORKFLOW_COMMAND_TOTAL_BYTES: usize = 2_048;
 const MAX_WORKFLOW_COMMAND_PART_BYTES: usize = 256;
 const TEMPLATE_PRIVACY_WARNING: &str =
     "Templates are local PG Sandbox artifacts. Do not create templates from production or sensitive data unless you have explicitly sanitized it.";
+const UNSUPPORTED_TYPE_CAST_HINT: &str =
+    "Cast this expression to text in SQL to render its display value, for example `expression::text`.";
 
 static CURSOR_QUERY_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?is)^\s*(?:--[^\n]*(?:\n|$)|/\*.*?\*/\s*)*(select|with|values|table)\b")
@@ -6484,12 +6486,38 @@ fn cell_to_json(row: &Row, index: usize, value_type: &Type) -> anyhow::Result<Va
             .flatten()
             .map(|value| Value::String(value.to_string()))
             .unwrap_or(Value::Null),
-        _ => {
-            let type_name = value_type.name();
-            Value::String(format!("<unsupported Postgres type {type_name}>"))
-        }
+        _ => unsupported_cell_to_json(row, index, value_type),
     };
     Ok(value)
+}
+
+struct PgUnsupportedValue;
+
+impl<'a> FromSql<'a> for PgUnsupportedValue {
+    fn from_sql(
+        _ty: &Type,
+        _raw: &'a [u8],
+    ) -> Result<PgUnsupportedValue, Box<dyn std::error::Error + Sync + Send>> {
+        Ok(PgUnsupportedValue)
+    }
+
+    fn accepts(_ty: &Type) -> bool {
+        true
+    }
+}
+
+fn unsupported_cell_to_json(row: &Row, index: usize, value_type: &Type) -> Value {
+    match row.try_get::<_, Option<PgUnsupportedValue>>(index) {
+        Ok(None) => Value::Null,
+        Ok(Some(_)) | Err(_) => unsupported_type_to_json(value_type),
+    }
+}
+
+fn unsupported_type_to_json(value_type: &Type) -> Value {
+    json!({
+        "unsupportedPostgresType": value_type.name(),
+        "hint": UNSUPPORTED_TYPE_CAST_HINT,
+    })
 }
 
 fn array_cell_kind(value_type: &Type) -> Option<ArrayCellKind> {
@@ -8297,6 +8325,20 @@ services:
             array_cell_kind(&Type::TIMESTAMPTZ_ARRAY),
             Some(ArrayCellKind::TimestampTz)
         );
+    }
+
+    #[test]
+    fn unsupported_postgres_types_include_original_type_and_cast_hint() {
+        let value = unsupported_type_to_json(&Type::REGCLASS);
+
+        assert_eq!(
+            value.get("unsupportedPostgresType").and_then(Value::as_str),
+            Some("regclass")
+        );
+        assert!(value
+            .get("hint")
+            .and_then(Value::as_str)
+            .is_some_and(|hint| hint.contains("::text")));
     }
 
     #[test]
