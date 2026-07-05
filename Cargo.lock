@@ -1102,6 +1102,7 @@ dependencies = [
  "base64",
  "chrono",
  "dirs",
+ "libc",
  "native-tls",
  "postgres-native-tls",
  "regex",

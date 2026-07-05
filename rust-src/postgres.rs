@@ -4191,6 +4191,7 @@ async fn execute_repo_command(
     let started = std::time::Instant::now();
     let mut command_builder = Command::new(&command[0]);
     apply_command_env(&mut command_builder, &env);
+    configure_repo_command_process(&mut command_builder);
     let mut child = command_builder
         .args(&command[1..])
         .current_dir(repo_path)
@@ -4213,8 +4214,7 @@ async fn execute_repo_command(
     let status = match time::timeout(timeout, child.wait()).await {
         Ok(status) => status?,
         Err(_) => {
-            let _ = child.kill().await;
-            let _ = child.wait().await;
+            terminate_repo_command(&mut child).await;
             let (stdout, stdout_truncated) = stdout_task.await.context("stdout task failed")??;
             let (stderr, stderr_truncated) = stderr_task.await.context("stderr task failed")??;
             return Ok(CommandRunResult {
@@ -4239,6 +4239,25 @@ async fn execute_repo_command(
         stdout_truncated,
         stderr_truncated,
     })
+}
+
+fn configure_repo_command_process(command: &mut Command) {
+    #[cfg(unix)]
+    {
+        command.process_group(0);
+    }
+}
+
+async fn terminate_repo_command(child: &mut tokio::process::Child) {
+    #[cfg(unix)]
+    if let Some(process_group_id) = child.id().and_then(|pid| i32::try_from(pid).ok()) {
+        // Negating the spawned child pid targets the process group created above.
+        unsafe {
+            libc::kill(-process_group_id, libc::SIGKILL);
+        }
+    }
+    let _ = child.kill().await;
+    let _ = child.wait().await;
 }
 
 fn apply_command_env(command: &mut Command, env: &BTreeMap<String, String>) {
