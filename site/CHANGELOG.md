@@ -3,6 +3,7 @@
 ## 2026-07-05
 
 - Added the Astro Markdown blog post "Database Migration Testing Before Agent PRs" with SEO ledger, link inventory, and inbound blog links.
+- Added the Astro Markdown blog post "Postgres Template Databases vs Task Sandboxes" with SEO ledger, link inventory, and inbound blog links.
 
 ## 2026-07-03
 

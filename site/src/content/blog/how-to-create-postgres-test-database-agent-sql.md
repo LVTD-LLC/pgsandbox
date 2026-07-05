@@ -59,10 +59,11 @@ Use the smallest state that can expose the failure or validate the change:
 | Small fixture seed | The query needs representative relationships | The fixture would hide production-shaped edge cases |
 | Schema-only clone | The agent needs real object names, constraints, indexes, or extensions | Row-level behavior matters |
 | Masked or reduced clone | The bug depends on realistic data shape | Sensitive rows cannot be safely copied |
+| Local template sandbox | The same sanitized seed state should be reused across agent tasks | You need live production-shaped data or server-native copy speed |
 
 A blank database is safest, but it is not always honest. A generated SQL query can pass against three clean rows and still fail against nullable legacy data, partial indexes, or enum values that only exist in a long-lived database.
 
-The practical decision is the data shape. If you choose that poorly, the agent can produce a false proof even though every command appears to succeed.
+The practical decision is the data shape. If you choose that poorly, the agent can produce a false proof even though every command appears to succeed. For repeatable seeded states, use the [Postgres template database vs task sandbox](https://pgsandbox-mcp.lvtd.dev/blog/postgres-template-database-vs-task-sandbox/) guide to decide whether the state belongs in a native Postgres template, a PGSandbox local template artifact, or a one-off sandbox.
 
 ## Step 2: create the database with lifecycle authority
 
