@@ -2444,6 +2444,7 @@ impl PostgresSandboxManager {
                     timeout,
                     "repo_command_failed",
                     "Inspect stderr/stdout in the result and rerun after fixing the command.",
+                    None,
                 ),
                 Some(output),
             )
@@ -2640,6 +2641,11 @@ impl PostgresSandboxManager {
                 } else {
                     "Inspect stderr/stdout in the result and the schema diff before retrying."
                 },
+                Some(if deleted_auto_sandbox {
+                    "Increase timeoutSeconds if this command is expected to run longer, or inspect the command for a hang. The created sandbox was already deleted; no sandbox cleanup is required."
+                } else {
+                    "Increase timeoutSeconds if this command is expected to run longer, or inspect the command for a hang. Inspect stderr/stdout in the result and the schema diff before retrying."
+                }),
             ),
             Some(output),
         ))
@@ -2735,6 +2741,7 @@ impl PostgresSandboxManager {
                     timeout,
                     "seed_failed",
                     "Inspect stderr/stdout in the result before retrying.",
+                    None,
                 ),
                 Some(output),
             )
@@ -3311,13 +3318,17 @@ fn command_failure_workflow_error(
     timeout: StdDuration,
     failed_code: &str,
     failed_hint: &str,
+    timeout_hint: Option<&str>,
 ) -> WorkflowError {
     if timed_out {
         return workflow_error(
             "command_timeout",
             format!("{label} timed out after {} seconds.", timeout.as_secs()),
             Some(
-                "Increase timeoutSeconds if this command is expected to run longer, or inspect the command for a hang."
+                timeout_hint
+                    .unwrap_or(
+                        "Increase timeoutSeconds if this command is expected to run longer, or inspect the command for a hang.",
+                    )
                     .to_string(),
             ),
         );
@@ -7609,6 +7620,7 @@ mod tests {
             StdDuration::from_secs(1),
             "repo_command_failed",
             "Inspect stderr/stdout in the result and rerun after fixing the command.",
+            None,
         );
 
         assert_eq!(error.code, "command_timeout");
@@ -7618,6 +7630,29 @@ mod tests {
         assert!(error.hint.as_deref().unwrap().contains("timeoutSeconds"));
         assert_eq!(output.exit_code, None);
         assert!(output.stderr.contains("timed out after 1 seconds"));
+    }
+
+    #[test]
+    fn command_failure_workflow_error_preserves_timeout_cleanup_hint() {
+        let error = command_failure_workflow_error(
+            "Repo command",
+            None,
+            true,
+            StdDuration::from_secs(1),
+            "repo_command_failed",
+            "Inspect stderr/stdout and rerun after fixing the command. No sandbox cleanup is required.",
+            Some(
+                "Increase timeoutSeconds if this command is expected to run longer. The created sandbox was already deleted; no sandbox cleanup is required.",
+            ),
+        );
+
+        assert_eq!(error.code, "command_timeout");
+        assert_eq!(error.category, "timeout");
+        assert!(error
+            .hint
+            .as_deref()
+            .unwrap()
+            .contains("no sandbox cleanup is required"));
     }
 
     #[test]
