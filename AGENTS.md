@@ -108,6 +108,41 @@ npm run package:homebrew
   connection strings, passwords, production URLs, SQL containing secrets, or raw
   local paths beyond repo-relative references.
 
+## ReviewGate Setup Guidance
+
+- When documenting or helping users set up ReviewGate, configure the actual
+  review job to run only after a PR comment containing the trigger phrase
+  `@reviewgate review` is created. Do not configure the ReviewGate review to run
+  automatically on every PR commit through `pull_request` or `synchronize`.
+- The GitHub Actions trigger should use `issue_comment` and guard the PR
+  context, trigger phrase, and commenter permission before running the
+  ReviewGate action:
+
+```yaml
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  reviewgate:
+    if: >
+      github.event.issue.pull_request &&
+      contains(github.event.comment.body, '@reviewgate review') &&
+      (github.event.comment.author_association == 'OWNER' ||
+       github.event.comment.author_association == 'MEMBER' ||
+       github.event.comment.author_association == 'COLLABORATOR')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: refs/pull/${{ github.event.issue.number }}/head
+      # Use the ReviewGate action's documented invocation here.
+```
+
+- No PGSandbox MCP Rust code changes are needed for this trigger policy unless
+  the project later ships a generator, installer, or template that writes
+  ReviewGate workflow files.
+
 ## Workflow
 
 - Check `git status --short` before editing and do not overwrite unrelated user
