@@ -96,6 +96,18 @@ npm run package:homebrew
   integration path and document whether it uses the managed local runtime or an
   explicit `PGSANDBOX_ADMIN_DATABASE_URL`.
 
+## Rowset Task Boards
+
+- When creating or updating Rowset task-board datasets from dogfood or E2E test
+  runs, use the Rowset project `PGSandbox MCP`
+  (`d008690f-e78f-4e7c-bcd2-5c1bed537d0a`).
+- Put those datasets in the `Dogfooding Task Boards` section
+  (`13aae3f4-de24-4fcf-b13e-a218cbd70914`). This section is for structured issue
+  inventories from E2E runs, MCP smoke tests, and agent usability reviews.
+- Keep Rowset rows secret-free. Do not include full admin URLs, sandbox
+  connection strings, passwords, production URLs, SQL containing secrets, or raw
+  local paths beyond repo-relative references.
+
 ## Workflow
 
 - Check `git status --short` before editing and do not overwrite unrelated user
