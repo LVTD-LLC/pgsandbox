@@ -129,7 +129,7 @@ jobs:
       contains(github.event.comment.body, '@reviewgate review')
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v7
       # Use the ReviewGate action's documented invocation here.
 ```
 
