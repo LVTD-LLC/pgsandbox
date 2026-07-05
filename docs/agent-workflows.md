@@ -226,5 +226,7 @@ repair cases include:
 - `statement_timeout` or `lock_timeout`: reduce scope or retry after the
   conflicting operation ends.
 
-Credential-bearing tools intentionally return `connectionString`. Use
-`connectionStringRedacted` in summaries, task trackers, and logs.
+Creation tools return `connectionStringRedacted` for summaries, task trackers,
+and logs. Call `get_connection_string` only when a command or database client
+needs the actual credential, and do not echo that full value into chat, logs, or
+durable datasets.

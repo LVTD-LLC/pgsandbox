@@ -21,9 +21,15 @@ Workflow-oriented tools return a compact result envelope:
 - `errors`: structured `code`, `category`, `message`, and optional `hint`
 - `detailHandles`: opaque pointers agents can use in follow-up calls
 - `result`: workflow-specific output when available
-- `createdSandbox`: for `create_sandbox_from_template`, the same created
-  sandbox payload is also exposed at the top level so agents do not need to
-  special-case the workflow envelope.
+- `createdSandbox`: for `create_sandbox_from_template`, the same secret-free
+  created sandbox payload is also exposed at the top level so agents do not
+  need to special-case the workflow envelope.
+
+Full sandbox connection strings are returned only by `get_connection_string`.
+Creation-style tools return `connectionStringRedacted` for safe summaries and
+task trackers. Call `get_connection_string` only when a tool or command needs
+the actual credential, and do not echo that value into chat, logs, or durable
+datasets.
 
 Tool failures are returned as MCP tool errors whose text content is a safe JSON
 object with `ok: false`, `error.code`, `error.category`, `error.message`, and
@@ -64,7 +70,6 @@ Returns:
 - `databaseName`
 - `roleName`
 - `expiresAt`
-- `connectionString`
 - `connectionStringRedacted`: safe display value for logs, task trackers, and
   summaries
 
@@ -143,7 +148,6 @@ Returns:
 - `databaseName`
 - `roleName`
 - `expiresAt`
-- `connectionString`
 - `connectionStringRedacted`
 - `source`: currently `external`
 - `schemaOnly`
@@ -540,9 +544,10 @@ Inputs:
 - `owner`
 - `labels`
 
-Returns the new sandbox metadata, `connectionString`, and
-`connectionStringRedacted`. The workflow envelope includes the payload under
-both `result` and `createdSandbox`.
+Returns the new sandbox metadata and `connectionStringRedacted`. The workflow
+envelope includes the same secret-free payload under both `result` and
+`createdSandbox`. Call `get_connection_string` with the returned `databaseId`
+only when the full connection string is explicitly needed.
 
 ### `list_templates`
 

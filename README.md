@@ -478,9 +478,11 @@ Postgres arrays such as `text[]`, integer arrays, `uuid[]`, `jsonb[]`, and
 `timestamptz[]` as JSON arrays; numeric values remain strings for precision.
 It also reports `returnedRowCount`, `affectedRowCount`, `totalRowCountKnown`,
 and `truncated` so agents do not infer row-count semantics from `rowCount`.
-Tools that intentionally return credentials also include
-`connectionStringRedacted` for safe summaries and task trackers. Use `doctor`
-from MCP when a client cannot shell out to `pgsandbox-mcp doctor`.
+Creation tools return `connectionStringRedacted` for safe summaries and task
+trackers. Full sandbox connection strings are returned only by
+`get_connection_string`; call it only when a tool or command needs the actual
+credential, and avoid echoing that value into chat, logs, or durable datasets.
+Use `doctor` from MCP when a client cannot shell out to `pgsandbox-mcp doctor`.
 
 By default, `list_databases` and `cleanup_expired` are scoped to the selected
 profile. Pass `includeAllVersions: true` or `postgresVersion: "*"` for an
