@@ -475,7 +475,10 @@ example `["npm", "run", "migrate"]`,
 Schema inspection includes relation-kind counts, constraints, column defaults
 and generated expressions, and view definition hashes. `run_sql` returns common
 Postgres arrays such as `text[]`, integer arrays, `uuid[]`, `jsonb[]`, and
-`timestamptz[]` as JSON arrays; numeric values remain strings for precision.
+`timestamptz[]` as JSON arrays. `int8` values, including `count(*)` aggregate
+results, and `numeric` values are serialized as JSON strings to preserve
+precision. `timestamp`, `timestamptz`, and `date` values are serialized as
+strings, while `json` and `jsonb` values are returned as nested JSON.
 It also reports `returnedRowCount`, `affectedRowCount`, `totalRowCountKnown`,
 and `truncated` so agents do not infer row-count semantics from `rowCount`.
 Creation tools return `connectionStringRedacted` for safe summaries and task
