@@ -1207,7 +1207,7 @@ impl PostgresSandboxManager {
 
         let profile = self.resolve_profile(profile_name.as_deref(), postgres_version.as_deref())?;
         let (client, connection_task) = connect_admin(&profile).await?;
-        ensure_metadata_table(&client).await?;
+        ensure_metadata_table(&client, &profile).await?;
         let selector = DatabaseSelector {
             profile: None,
             postgres_version: None,
@@ -1255,7 +1255,7 @@ impl PostgresSandboxManager {
             let profile_name = profile.name.clone();
             let search = async {
                 let (client, connection_task) = connect_admin(&profile).await?;
-                ensure_metadata_table(&client).await?;
+                ensure_metadata_table(&client, &profile).await?;
                 let mut selector = DatabaseSelector {
                     profile: None,
                     postgres_version: None,
@@ -1319,7 +1319,7 @@ impl PostgresSandboxManager {
         let expires_at = Utc::now() + Duration::minutes(ttl_minutes.into());
 
         let (client, connection_task) = connect_admin(&profile).await?;
-        ensure_metadata_table(&client).await?;
+        ensure_metadata_table(&client, &profile).await?;
         enforce_owner_quota(&client, &profile, input.owner.as_deref()).await?;
 
         let mut created_role = false;
@@ -1662,7 +1662,7 @@ impl PostgresSandboxManager {
         owner: Option<&String>,
     ) -> anyhow::Result<ListDatabasesOutput> {
         let (client, connection_task) = connect_admin(profile).await?;
-        ensure_metadata_table(&client).await?;
+        ensure_metadata_table(&client, profile).await?;
         let owner = owner.map(String::as_str);
         let rows = client
             .query(
@@ -2947,7 +2947,7 @@ impl PostgresSandboxManager {
         dry_run: bool,
     ) -> anyhow::Result<CleanupExpiredOutput> {
         let (client, connection_task) = connect_admin(profile).await?;
-        ensure_metadata_table(&client).await?;
+        ensure_metadata_table(&client, profile).await?;
         let expired = client
             .query(
                 &format!(
@@ -4868,7 +4868,7 @@ fn tls_connector(verification: TlsVerification) -> anyhow::Result<native_tls::Tl
     Ok(builder.build()?)
 }
 
-async fn ensure_metadata_table(client: &Client) -> anyhow::Result<()> {
+async fn ensure_metadata_table(client: &Client, profile: &SandboxProfile) -> anyhow::Result<()> {
     client
         .batch_execute(&format!(
             r#"
@@ -4906,6 +4906,50 @@ async fn ensure_metadata_table(client: &Client) -> anyhow::Result<()> {
             quote_ident(AUDIT_TABLE)?
         ))
         .await?;
+    encrypt_plaintext_role_passwords(client, profile).await?;
+    Ok(())
+}
+
+async fn encrypt_plaintext_role_passwords(
+    client: &Client,
+    profile: &SandboxProfile,
+) -> anyhow::Result<()> {
+    let encrypted_prefix = format!("{ENCRYPTED_PASSWORD_PREFIX}:%");
+    let rows = client
+        .query(
+            &format!(
+                r#"
+                  SELECT database_id, role_password
+                  FROM {}
+                  WHERE profile_name = $1
+                    AND role_password NOT LIKE $2
+                "#,
+                quote_ident(METADATA_TABLE)?
+            ),
+            &[&profile.name, &encrypted_prefix],
+        )
+        .await?;
+
+    for row in rows {
+        let database_id = row.get::<_, String>("database_id");
+        let plaintext_password = row.get::<_, String>("role_password");
+        let encrypted_password = protect_role_password(&plaintext_password, profile)?;
+        client
+            .execute(
+                &format!(
+                    r#"
+                      UPDATE {}
+                      SET role_password = $1
+                      WHERE database_id = $2
+                        AND role_password = $3
+                    "#,
+                    quote_ident(METADATA_TABLE)?
+                ),
+                &[&encrypted_password, &database_id, &plaintext_password],
+            )
+            .await?;
+    }
+
     Ok(())
 }
 
