@@ -814,6 +814,7 @@ pub struct CommandWorkflowOutput {
     pub command: Vec<String>,
     pub elapsed_ms: u128,
     pub exit_code: Option<i32>,
+    pub timed_out: bool,
     pub stdout: String,
     pub stderr: String,
     pub stdout_truncated: bool,
@@ -829,6 +830,7 @@ pub struct ValidateSchemaChangeOutput {
     pub command: Vec<String>,
     pub elapsed_ms: u128,
     pub exit_code: Option<i32>,
+    pub timed_out: bool,
     pub schema_diff: WorkflowSchemaDiffOutput,
     pub stdout: String,
     pub stderr: String,
@@ -953,6 +955,7 @@ struct CommandRunResult {
     command: Vec<String>,
     elapsed_ms: u128,
     exit_code: Option<i32>,
+    timed_out: bool,
     stdout: String,
     stderr: String,
     stdout_truncated: bool,
@@ -2434,13 +2437,13 @@ impl PostgresSandboxManager {
         } else {
             workflow_failure(
                 "Repo command failed.",
-                workflow_error(
+                command_failure_workflow_error(
+                    "Repo command",
+                    output.exit_code,
+                    output.timed_out,
+                    timeout,
                     "repo_command_failed",
-                    format!("Repo command exited with {:?}", output.exit_code),
-                    Some(
-                        "Inspect stderr/stdout in the result and rerun after fixing the command."
-                            .to_string(),
-                    ),
+                    "Inspect stderr/stdout in the result and rerun after fixing the command.",
                 ),
                 Some(output),
             )
@@ -2626,17 +2629,17 @@ impl PostgresSandboxManager {
                 "Schema change validation failed."
             },
             diff.changed_objects,
-            workflow_error(
+            command_failure_workflow_error(
+                "Repo command",
+                output.exit_code,
+                output.timed_out,
+                timeout,
                 "repo_command_failed",
-                format!("Repo command exited with {:?}", output.exit_code),
-                Some(
-                    if deleted_auto_sandbox {
-                        "Inspect stderr/stdout and rerun after fixing the command. No sandbox cleanup is required."
-                    } else {
-                        "Inspect stderr/stdout in the result and the schema diff before retrying."
-                    }
-                    .to_string(),
-                ),
+                if deleted_auto_sandbox {
+                    "Inspect stderr/stdout and rerun after fixing the command. No sandbox cleanup is required."
+                } else {
+                    "Inspect stderr/stdout in the result and the schema diff before retrying."
+                },
             ),
             Some(output),
         ))
@@ -2725,10 +2728,13 @@ impl PostgresSandboxManager {
         } else {
             workflow_failure(
                 "Seed command failed.",
-                workflow_error(
+                command_failure_workflow_error(
+                    "Seed command",
+                    output.exit_code,
+                    output.timed_out,
+                    timeout,
                     "seed_failed",
-                    format!("Seed command exited with {:?}", output.exit_code),
-                    Some("Inspect stderr/stdout in the result before retrying.".to_string()),
+                    "Inspect stderr/stdout in the result before retrying.",
                 ),
                 Some(output),
             )
@@ -3298,10 +3304,37 @@ fn workflow_error(
     }
 }
 
+fn command_failure_workflow_error(
+    label: &str,
+    exit_code: Option<i32>,
+    timed_out: bool,
+    timeout: StdDuration,
+    failed_code: &str,
+    failed_hint: &str,
+) -> WorkflowError {
+    if timed_out {
+        return workflow_error(
+            "command_timeout",
+            format!("{label} timed out after {} seconds.", timeout.as_secs()),
+            Some(
+                "Increase timeoutSeconds if this command is expected to run longer, or inspect the command for a hang."
+                    .to_string(),
+            ),
+        );
+    }
+
+    workflow_error(
+        failed_code,
+        format!("{label} exited with {exit_code:?}"),
+        Some(failed_hint.to_string()),
+    )
+}
+
 fn workflow_error_category(code: &str) -> &'static str {
     match code {
         "template_not_found" => "template_not_found",
         "template_restore_failed" => "restore_failed",
+        "command_timeout" => "timeout",
         "missing_seed_command"
         | "missing_schema_change_command"
         | "unsafe_command"
@@ -4348,6 +4381,7 @@ async fn execute_repo_command(
                 command: command.to_vec(),
                 elapsed_ms: started.elapsed().as_millis(),
                 exit_code: None,
+                timed_out: true,
                 stdout,
                 stderr: append_timeout_message(stderr, timeout),
                 stdout_truncated,
@@ -4361,6 +4395,7 @@ async fn execute_repo_command(
         command: command.to_vec(),
         elapsed_ms: started.elapsed().as_millis(),
         exit_code: status.code(),
+        timed_out: false,
         stdout,
         stderr,
         stdout_truncated,
@@ -4444,6 +4479,7 @@ fn command_workflow_output(
         command: result.command,
         elapsed_ms: result.elapsed_ms,
         exit_code: result.exit_code,
+        timed_out: result.timed_out,
         stdout: result.stdout,
         stderr: result.stderr,
         stdout_truncated: result.stdout_truncated,
@@ -4465,6 +4501,7 @@ fn validate_schema_change_output(
         command: result.command,
         elapsed_ms: result.elapsed_ms,
         exit_code: result.exit_code,
+        timed_out: result.timed_out,
         schema_diff,
         stdout: result.stdout,
         stderr: result.stderr,
@@ -7071,6 +7108,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(result.exit_code, Some(0));
+        assert!(!result.timed_out);
         assert_eq!(result.stdout, "success");
         assert_eq!(result.stderr, "warning");
         assert!(!result.stdout_truncated);
@@ -7096,6 +7134,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(result.exit_code, Some(17));
+        assert!(!result.timed_out);
         assert_eq!(result.stdout, "");
         assert_eq!(result.stderr, "failed");
     }
@@ -7115,6 +7154,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(result.exit_code, None);
+        assert!(result.timed_out);
         assert!(result.elapsed_ms < 3_000, "{result:?}");
         assert!(result.stderr.contains("timed out after 1 seconds"));
     }
@@ -7537,13 +7577,47 @@ mod tests {
     fn workflow_errors_include_agent_branching_category() {
         let template = workflow_error("template_not_found", "missing", None);
         let repo_command = workflow_error("repo_command_failed", "failed", None);
+        let command_timeout = workflow_error("command_timeout", "timed out", None);
         let validation = workflow_error("missing_schema_change_command", "missing", None);
         let unsafe_command = workflow_error("unsafe_command", "unsafe", None);
 
         assert_eq!(template.category, "template_not_found");
         assert_eq!(repo_command.category, "command_failed");
+        assert_eq!(command_timeout.category, "timeout");
         assert_eq!(validation.category, "validation");
         assert_eq!(unsafe_command.category, "validation");
+    }
+
+    #[test]
+    fn command_failure_workflow_error_classifies_timeouts() {
+        let output = CommandWorkflowOutput {
+            database_id: "db-id".to_string(),
+            database_name: "pgsandbox_test".to_string(),
+            command: vec!["sleep".to_string(), "2".to_string()],
+            elapsed_ms: 1_001,
+            exit_code: None,
+            timed_out: true,
+            stdout: String::new(),
+            stderr: "PGSandbox command timed out after 1 seconds.".to_string(),
+            stdout_truncated: false,
+            stderr_truncated: false,
+        };
+        let error = command_failure_workflow_error(
+            "Repo command",
+            output.exit_code,
+            output.timed_out,
+            StdDuration::from_secs(1),
+            "repo_command_failed",
+            "Inspect stderr/stdout in the result and rerun after fixing the command.",
+        );
+
+        assert_eq!(error.code, "command_timeout");
+        assert_eq!(error.category, "timeout");
+        assert_eq!(error.message, "Repo command timed out after 1 seconds.");
+        assert!(!error.message.contains("None"));
+        assert!(error.hint.as_deref().unwrap().contains("timeoutSeconds"));
+        assert_eq!(output.exit_code, None);
+        assert!(output.stderr.contains("timed out after 1 seconds"));
     }
 
     #[test]

@@ -37,13 +37,14 @@ object with `ok: false`, `error.code`, `error.category`, `error.message`, and
 include `error.sqlstate` when it is available. Expected failure classes use
 stable categories such as `sql_analysis`, `sql_syntax`,
 `constraint_violation`, `readonly_violation`, `database_not_found`,
-`version_mismatch`, `restore_incompatible`, and `template_not_found`. Version
+`version_mismatch`, `restore_incompatible`, `template_not_found`, and
+`timeout`. Version
 diagnostics may also include `requestedVersion`, `sourceVersion`,
 `targetVersion`, `detectedVersions`, and a `detailHandle` pointing to
 `list_profiles` or `doctor` instead of embedding long local path traces.
 Typical codes include `undefined_column`, `undefined_table`, `syntax_error`,
 `permission_denied`, `lock_timeout`, `statement_timeout`,
-`postgres_auth_failed`, `postgres_connection_failed`,
+`command_timeout`, `postgres_auth_failed`, `postgres_connection_failed`,
 `postgres_version_unavailable`, `local_postgres_unavailable`, and
 `invalid_ttl`.
 
@@ -491,6 +492,14 @@ For multi-step workflows, prefer a repo/package script that can be invoked
 directly, or split the work into separate tool calls instead of sending a
 shell snippet.
 
+Returns bounded command output with `databaseId`, `databaseName`, `command`,
+`elapsedMs`, `exitCode`, `timedOut`, `stdout`, `stderr`,
+`stdoutTruncated`, and `stderrTruncated`. When the command exceeds
+`timeoutSeconds`, the workflow returns `ok: false` with
+`code: "command_timeout"` and `category: "timeout"`; `result.exitCode`
+remains `null`, `result.timedOut` is `true`, and `stderr` may include the
+human-readable timeout line.
+
 ### `validate_schema_change`
 
 Captures a before schema digest, runs an explicit or configured repo
@@ -515,6 +524,10 @@ response states `createdSandbox`. Failed validations delete that auto-created
 sandbox when cleanup succeeds; successful validations return the created
 sandbox id so callers can inspect it or delete it explicitly.
 
+Command timeouts use the same `command_timeout` / `timeout` structured error
+as `run_repo_command`, with `result.exitCode: null` and
+`result.timedOut: true` in the bounded command output.
+
 ### `seed_database`
 
 Runs only an explicit configured seed command against a selected sandbox. It
@@ -529,6 +542,10 @@ Inputs:
 - `databaseId` or `databaseName`
 - `command`: optional argv array; defaults to `.pgsandbox/project.json` `seedCommand`
 - `timeoutSeconds`
+
+Command timeouts use the same `command_timeout` / `timeout` structured error
+as `run_repo_command`, with `result.exitCode: null` and
+`result.timedOut: true` in the bounded command output.
 
 ## Template Tools
 
