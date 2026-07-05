@@ -123,7 +123,7 @@ async fn pg18_schema_snapshot_minimal_schema_returns_without_timeout_when_enable
             }),
         )
         .await
-        .expect("create_schema_snapshot should not hang on a tiny PG18 schema")?;
+        .map_err(|_| anyhow::anyhow!("create_schema_snapshot timed out on a tiny PG18 schema"))??;
         assert!(snapshot.ok, "{snapshot:?}");
 
         let snapshots = manager
@@ -134,7 +134,10 @@ async fn pg18_schema_snapshot_minimal_schema_returns_without_timeout_when_enable
                 database_name: None,
             })
             .await?;
-        assert_eq!(snapshots.result.unwrap().len(), 1);
+        let snapshot_summaries = snapshots
+            .result
+            .ok_or_else(|| anyhow::anyhow!("list_schema_snapshots returned no result"))?;
+        assert_eq!(snapshot_summaries.len(), 1);
 
         anyhow::Ok(())
     }
