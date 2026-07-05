@@ -491,8 +491,9 @@ with `code: "unsafe_command"`. Pass direct argv instead:
 ```
 
 For multi-step workflows, prefer a repo/package script that can be invoked
-directly, or split the work into separate tool calls instead of sending a
-shell snippet.
+directly, such as `["./scripts/seed.sh"]` after `chmod +x scripts/seed.sh` if
+needed, or split the work into separate tool calls instead of sending a shell
+snippet.
 
 Returns bounded command output with `databaseId`, `databaseName`, `command`,
 `elapsedMs`, `exitCode`, `timedOut`, `stdout`, `stderr`,
@@ -534,6 +535,15 @@ as `run_repo_command`, with `result.exitCode: null` and
 
 Runs only an explicit configured seed command against a selected sandbox. It
 does not auto-discover or auto-run repo scripts.
+
+Seed commands follow the same no-shell rule as other workflow commands. Shell
+wrappers such as `["bash", "scripts/seed.sh"]` or `["sh", "-c", "..."]` fail
+with `code: "unsafe_command"`. To run a repo seed script, make it executable if
+needed and pass it directly:
+
+```json
+["./scripts/seed.sh"]
+```
 
 Inputs:
 

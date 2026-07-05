@@ -4235,7 +4235,7 @@ fn validate_workflow_command(command: &[String], label: &str) -> Result<(), Work
         return Err(workflow_error(
             "unsafe_command",
             format!("{label} cannot invoke a shell or command launcher."),
-            Some("Shells such as bash -lc and indirect launchers such as env/sudo are intentionally unsupported. Pass the executable and arguments directly, for example [\"npm\", \"run\", \"migrate\"] or [\"alembic\", \"upgrade\", \"head\"].".to_string()),
+            Some("Shells such as bash -lc and indirect launchers such as env/sudo are intentionally unsupported. Pass the executable and arguments directly, for example [\"npm\", \"run\", \"migrate\"], [\"alembic\", \"upgrade\", \"head\"], or an executable repo script such as [\"./scripts/seed.sh\"] after chmod +x if needed.".to_string()),
         ));
     }
     if !command_is_bounded(command) {
@@ -8524,6 +8524,28 @@ services:
         assert!(oversized.message.contains("1 argv part"));
         assert!(oversized.message.contains("longest part is 257 bytes"));
         assert!(oversized.hint.unwrap().contains("maximum 256 bytes"));
+    }
+
+    #[test]
+    fn seed_command_shell_rejection_hints_direct_executable_scripts() {
+        let directory = tempfile::tempdir().unwrap();
+        let repo = directory.path();
+
+        let shell = resolve_seed_command(
+            repo,
+            Some(vec!["bash".to_string(), "scripts/seed.sh".to_string()]),
+        )
+        .unwrap()
+        .unwrap_err();
+        assert_eq!(shell.code, "unsafe_command");
+        assert!(shell
+            .hint
+            .as_deref()
+            .is_some_and(|hint| hint.contains("[\"./scripts/seed.sh\"]")));
+
+        let direct_script =
+            resolve_seed_command(repo, Some(vec!["./scripts/seed.sh".to_string()])).unwrap();
+        assert!(direct_script.is_ok());
     }
 
     #[test]

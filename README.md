@@ -480,7 +480,9 @@ Shell wrappers and indirect launchers such as `["bash", "-lc", "..."]`,
 `["sh", "-c", "..."]`, `env`, and `sudo` are rejected. Pass direct argv, for
 example `["npm", "run", "migrate"]`,
 `["psql", "-v", "ON_ERROR_STOP=1", "-f", "migrations/schema.sql"]`, or
-`["psql", "-Atc", "SELECT current_database(), current_user"]`.
+`["psql", "-Atc", "SELECT current_database(), current_user"]`. Executable repo
+scripts are allowed when invoked directly, for example `["./scripts/seed.sh"]`
+after `chmod +x scripts/seed.sh` if needed.
 Schema inspection includes relation-kind counts, constraints, column defaults
 and generated expressions, view definition hashes, compact canonical field
 names, and semantic constraint types such as `not_null`. `describe_schema` can
