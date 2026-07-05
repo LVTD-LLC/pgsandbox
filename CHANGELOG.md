@@ -2,6 +2,7 @@
 
 ## 2026-07-05
 
+- Released `pgsandbox-mcp` v0.4.1 with the latest site content updates and Homebrew packaging metadata.
 - Added the Astro Markdown blog post "Database Migration Testing Before Agent PRs" with SEO ledger, link inventory, and inbound blog links.
 - Added the Astro Markdown blog post "Postgres Template Databases vs Task Sandboxes" with SEO ledger, link inventory, and inbound blog links.
 
