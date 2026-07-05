@@ -7344,16 +7344,40 @@ mod tests {
 
     #[test]
     fn ttl_validation_rejects_negative_minutes_after_deserialization() {
-        let input = serde_json::from_value::<CreateDatabaseInput>(json!({
-            "ttlMinutes": -1
-        }))
-        .unwrap();
+        let input =
+            serde_json::from_value::<CreateDatabaseInput>(json!({ "ttlMinutes": -1 })).unwrap();
         let profile = &test_config().profiles[0];
 
         let error = clamp_ttl(input.ttl_minutes, profile).unwrap_err();
 
         assert!(error.to_string().contains("invalid_ttl"));
         assert!(error.to_string().contains("ttlMinutes must be at least 1"));
+    }
+
+    #[test]
+    fn ttl_validation_accepts_negative_values_from_all_ttl_input_shapes() {
+        let create =
+            serde_json::from_value::<CreateDatabaseInput>(json!({ "ttlMinutes": -1 })).unwrap();
+        let clone = serde_json::from_value::<CloneDatabaseInput>(json!({
+            "sourceDatabaseUrl": "postgres://postgres:secret@localhost/source",
+            "ttlMinutes": -1
+        }))
+        .unwrap();
+        let validate = serde_json::from_value::<ValidateSchemaChangeInput>(json!({
+            "repoPath": "/tmp/repo",
+            "ttlMinutes": -1
+        }))
+        .unwrap();
+        let template = serde_json::from_value::<CreateSandboxFromTemplateInput>(json!({
+            "templateName": "seeded_accounts",
+            "ttlMinutes": -1
+        }))
+        .unwrap();
+
+        assert_eq!(create.ttl_minutes, Some(-1));
+        assert_eq!(clone.ttl_minutes, Some(-1));
+        assert_eq!(validate.ttl_minutes, Some(-1));
+        assert_eq!(template.ttl_minutes, Some(-1));
     }
 
     #[test]

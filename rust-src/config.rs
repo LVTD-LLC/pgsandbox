@@ -28,7 +28,7 @@ pub enum ConfigError {
     EmptyProfileName,
     #[error("profile adminUrl cannot be empty")]
     EmptyAdminUrl,
-    #[error("defaultTtlMinutes cannot exceed maxTtlMinutes for profile {0}")]
+    #[error("{0}")]
     InvalidTtl(String),
     #[error("profile {profile} adminUrl is invalid: {source}")]
     InvalidAdminUrl {
@@ -392,8 +392,23 @@ fn normalize_config(raw: RawConfig) -> Result<SandboxConfig, ConfigError> {
         if profile.admin_url.trim().is_empty() {
             return Err(ConfigError::EmptyAdminUrl);
         }
+        if profile.default_ttl_minutes == 0 {
+            return Err(ConfigError::InvalidTtl(format!(
+                "defaultTtlMinutes must be at least 1 for profile {}",
+                profile.name
+            )));
+        }
+        if profile.max_ttl_minutes == 0 {
+            return Err(ConfigError::InvalidTtl(format!(
+                "maxTtlMinutes must be at least 1 for profile {}",
+                profile.name
+            )));
+        }
         if profile.default_ttl_minutes > profile.max_ttl_minutes {
-            return Err(ConfigError::InvalidTtl(profile.name.clone()));
+            return Err(ConfigError::InvalidTtl(format!(
+                "defaultTtlMinutes cannot exceed maxTtlMinutes for profile {}",
+                profile.name
+            )));
         }
         validate_admin_url_policy(profile)?;
     }
@@ -983,5 +998,45 @@ mod tests {
         .unwrap_err();
 
         assert!(err.to_string().contains("default profile"));
+    }
+
+    #[test]
+    fn rejects_zero_default_ttl_minutes() {
+        let err = parse_config_file(
+            r#"{
+              "defaultProfile": "local",
+              "profiles": [{
+                "name": "local",
+                "adminUrl": "postgres://localhost/postgres",
+                "defaultTtlMinutes": 0,
+                "maxTtlMinutes": 20
+              }]
+            }"#,
+        )
+        .unwrap_err();
+
+        let message = err.to_string();
+        assert!(message.contains("defaultTtlMinutes"));
+        assert!(message.contains("at least 1"));
+    }
+
+    #[test]
+    fn rejects_zero_max_ttl_minutes() {
+        let err = parse_config_file(
+            r#"{
+              "defaultProfile": "local",
+              "profiles": [{
+                "name": "local",
+                "adminUrl": "postgres://localhost/postgres",
+                "defaultTtlMinutes": 1,
+                "maxTtlMinutes": 0
+              }]
+            }"#,
+        )
+        .unwrap_err();
+
+        let message = err.to_string();
+        assert!(message.contains("maxTtlMinutes"));
+        assert!(message.contains("at least 1"));
     }
 }

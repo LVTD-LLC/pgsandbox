@@ -322,6 +322,9 @@ export PGSANDBOX_CONFIG="./pgsandbox.config.json"
 pgsandbox-mcp
 ```
 
+Profile `defaultTtlMinutes` and `maxTtlMinutes` must both be positive, and the
+default cannot exceed the max.
+
 MCP tools can select profiles by `profile` or by `postgresVersion` when profile
 metadata is present. On the managed local default, requesting `postgresVersion`
 starts the corresponding `local-pg<major>` cluster on demand when matching
