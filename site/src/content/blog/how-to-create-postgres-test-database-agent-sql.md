@@ -154,6 +154,8 @@ For migrations and generated SQL patches, a useful proof record includes:
 - Any errors in structured form.
 - Whether cleanup succeeded.
 
+For a migration-specific version of that proof record, see [database migration testing before agent PRs](https://pgsandbox-mcp.lvtd.dev/blog/database-migration-testing-agent-pr/). It focuses on running the repo migration command, capturing schema diffs, seeding risky data cases, and turning the result into a reviewable PR note.
+
 That record is what a human reviewer can trust. "The agent said it tested it" is not enough.
 
 ## Step 6: delete the database and role

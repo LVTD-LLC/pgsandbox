@@ -28,6 +28,7 @@
 | /blog/what-is-database-sandbox/ | What Is a Database Sandbox? | database sandbox; what is a database sandbox; Postgres database sandbox; task-scoped database sandbox; database sandbox for coding agents | Definition and guide for database sandbox patterns, boundaries, and the five-part sandbox contract. |
 | /blog/how-to-create-postgres-test-database-agent-sql/ | How to Create a Postgres Test Database for Agent SQL | postgres test database; Postgres test database for agent SQL; agent-generated SQL proof loop; task-scoped Postgres test database; SQL validation database for coding agents | How-to tutorial for creating a task database, applying schema state, running bounded generated SQL, and cleaning up. |
 | /blog/testcontainers-vs-disposable-postgres-sandboxes/ | Testcontainers vs Disposable Postgres Sandboxes for Agent Work | Testcontainers vs disposable Postgres sandboxes; Testcontainers Postgres; disposable Postgres sandboxes; service container vs task database; Postgres sandbox for agent work | Comparison for choosing between Testcontainers service-container isolation and PGSandbox task-database isolation. |
+| /blog/database-migration-testing-agent-pr/ | Database Migration Testing Before Agent PRs | database migration testing; Postgres migration validation; validate migrations before an agent PR; agent migration proof loop; migration schema diff for coding agents | How-to tutorial for validating Postgres migrations in a disposable sandbox before an agent opens a PR. |
 
 ## Changelog
 
