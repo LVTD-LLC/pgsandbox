@@ -6413,7 +6413,7 @@ fn cell_to_json(row: &Row, index: usize, value_type: &Type) -> anyhow::Result<Va
             .try_get::<_, Option<i64>>(index)
             .ok()
             .flatten()
-            .map(|value| json!(value))
+            .map(int8_to_json)
             .unwrap_or(Value::Null),
         Type::FLOAT4 => row
             .try_get::<_, Option<f32>>(index)
@@ -6565,7 +6565,7 @@ fn array_cell_to_json(row: &Row, index: usize, kind: ArrayCellKind) -> Value {
         ArrayCellKind::Int8 => row
             .try_get::<_, Option<Vec<Option<i64>>>>(index)
             .ok()
-            .map(|value| optional_array_to_json(value, |value| json!(value)))
+            .map(|value| optional_array_to_json(value, int8_to_json))
             .unwrap_or(Value::Null),
         ArrayCellKind::Float4 => row
             .try_get::<_, Option<Vec<Option<f32>>>>(index)
@@ -6618,6 +6618,10 @@ where
         ),
         None => Value::Null,
     }
+}
+
+fn int8_to_json(value: i64) -> Value {
+    Value::String(value.to_string())
 }
 
 fn bytes_to_hex(bytes: &[u8]) -> String {
@@ -8262,6 +8266,10 @@ services:
             json!([1, null, 3])
         );
         assert_eq!(
+            optional_array_to_json(Some(vec![Some(3_i64), None, Some(i64::MAX)]), int8_to_json),
+            json!(["3", null, "9223372036854775807"])
+        );
+        assert_eq!(
             optional_array_to_json(Some(vec![Some(uuid), None]), |value| Value::String(
                 value.to_string()
             )),
@@ -8292,6 +8300,17 @@ services:
         assert_eq!(
             optional_array_to_json::<String, _>(None, Value::String),
             Value::Null
+        );
+    }
+
+    #[test]
+    fn serializes_int8_aggregate_counts_as_json_strings() {
+        assert_eq!(int8_to_json(3), json!("3"));
+        assert_eq!(int8_to_json(-1), json!("-1"));
+        assert_eq!(int8_to_json(i64::MIN), json!("-9223372036854775808"));
+        assert_eq!(
+            int8_to_json(9_223_372_036_854_775_807),
+            json!("9223372036854775807")
         );
     }
 
