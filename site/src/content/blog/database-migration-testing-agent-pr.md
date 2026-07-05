@@ -31,6 +31,8 @@ The useful workflow is:
 
 PGSandbox MCP turns that into an MCP workflow instead of a pile of shell commands. The information-gain point is the PR gate: a migration is not "tested" because the agent ran something. It is tested when the reviewer can see what changed in a real Postgres database, under a task-scoped role, with cleanup accounted for.
 
+When the same seed state is needed across several migration tasks, use a local template deliberately rather than keeping a long-lived test database around. The [Postgres template database vs task sandbox](https://pgsandbox-mcp.lvtd.dev/blog/postgres-template-database-vs-task-sandbox/) comparison explains when a reusable template state should restore into a fresh sandbox with its own role and TTL.
+
 ## What should database migration testing prove?
 
 Database migration testing should prove four things before review:
