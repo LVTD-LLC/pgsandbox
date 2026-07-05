@@ -212,7 +212,6 @@ async fn run_suite(
             postgres_version: None,
             database_id: Some(database_id.to_string()),
             database_name: None,
-            include_legacy_aliases: None,
         })
         .await?;
     assert!(described.relation_counts.tables >= 1);
@@ -268,7 +267,7 @@ async fn run_suite(
             postgres_version: None,
             database_id: Some(database_id.to_string()),
             database_name: None,
-            base_digest: pgsandbox_mcp::postgres::SchemaDiffBaseDigest::Response(before),
+            base_digest: before,
         })
         .await?;
     assert!(diff.changed);

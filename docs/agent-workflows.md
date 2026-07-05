@@ -75,7 +75,26 @@ cannot compute a diff.
   "tool": "schema_diff",
   "arguments": {
     "databaseId": "<databaseId>",
-    "baseDigest": "<full schema_digest response JSON>"
+    "baseDigest": {
+      "databaseId": "<databaseId>",
+      "databaseName": "<databaseName>",
+      "digestVersion": 3,
+      "checksum": "<checksum>",
+      "relationCounts": {
+        "tables": 0,
+        "partitionedTables": 0,
+        "views": 0,
+        "materializedViews": 0,
+        "foreignTables": 0,
+        "other": 0
+      },
+      "columnCount": 0,
+      "constraintCount": 0,
+      "indexCount": 0,
+      "extensionCount": 0,
+      "tables": [],
+      "extensions": []
+    }
   }
 }
 ```
@@ -120,7 +139,7 @@ For a compact stored baseline, prefer snapshots:
 ```
 
 Use `returnedRowCount`, `affectedRowCount`, `totalRowCountKnown`, and
-`truncated` instead of inferring from `rowCount`.
+`truncated` for result-size and mutation checks.
 
 ## Repo Command Validation
 

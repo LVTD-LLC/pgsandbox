@@ -485,9 +485,7 @@ scripts are allowed when invoked directly, for example `["./scripts/seed.sh"]`
 after `chmod +x scripts/seed.sh` if needed.
 Schema inspection includes relation-kind counts, constraints, column defaults
 and generated expressions, view definition hashes, compact canonical field
-names, and semantic constraint types such as `not_null`. `describe_schema` can
-include legacy catalog aliases with `includeLegacyAliases` when compatibility
-requires them. `run_sql` returns common
+names, and semantic constraint types such as `not_null`. `run_sql` returns common
 Postgres arrays such as `text[]`, integer arrays, `uuid[]`, `jsonb[]`, and
 `timestamptz[]` as JSON arrays. `int8` values, including `count(*)` aggregate
 results, and `numeric` values are serialized as JSON strings to preserve
@@ -497,7 +495,7 @@ Unsupported non-null Postgres result types return a structured object with the
 original type name and a cast-to-text hint; unsupported SQL `NULL` values remain
 JSON `null`.
 It also reports `returnedRowCount`, `affectedRowCount`, `totalRowCountKnown`,
-and `truncated` so agents do not infer row-count semantics from `rowCount`.
+and `truncated`.
 Creation tools return `connectionStringRedacted` for safe summaries and task
 trackers. Full sandbox connection strings are returned only by
 `get_connection_string`; call it only when a tool or command needs the actual

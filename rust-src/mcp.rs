@@ -230,11 +230,7 @@ impl PgsandboxServer {
         &self,
         Parameters(input): Parameters<DescribeSchemaInput>,
     ) -> Result<CallToolResult, ErrorData> {
-        let mut event_properties = selector_properties(&DatabaseSelector::from(&input));
-        event_properties.insert(
-            "includeLegacyAliases".to_string(),
-            json!(input.include_legacy_aliases.unwrap_or(false)),
-        );
+        let event_properties = selector_properties(&DatabaseSelector::from(&input));
         self.tracked_tool(
             "describe_schema",
             event_properties,
@@ -729,25 +725,6 @@ impl ToolErrorResponse {
         } else if let Some(body) = stringly_sql_error_body(&lower, &chain) {
             // Fallback for Postgres-shaped messages when no typed DbError is in the chain.
             body
-        } else if lower.contains("basedigest string must contain")
-            || lower.contains("basedigest must be a schema_digest response")
-        {
-            ToolErrorBody {
-                code: "invalid_base_digest",
-                category: "validation",
-                message: chain,
-                hint: "Pass baseDigest as the full schema_digest response object or a JSON string containing that full object. A checksum alone cannot compute a diff; use schema snapshots for compact stored baselines.".to_string(),
-                sqlstate: None,
-                requested_version: None,
-                source_version: None,
-                target_version: None,
-                detected_versions: Vec::new(),
-                detail_handle: Some(json!({
-                    "type": "tool-contract",
-                    "tool": "schema_diff",
-                    "field": "baseDigest"
-                })),
-            }
         } else if lower.contains("invalid_ttl") {
             ToolErrorBody {
                 code: "invalid_ttl",
@@ -1195,11 +1172,6 @@ mod tests {
                 "db error: ERROR: syntax error at or near \"fromm\"",
                 "syntax_error",
                 "sql_syntax",
-            ),
-            (
-                "baseDigest must be a schema_digest response: baseDigest string must contain the full JSON schema_digest response, not only the checksum",
-                "invalid_base_digest",
-                "validation",
             ),
             (
                 "invalid_ttl: ttlMinutes must be at least 1 minute for profile default",

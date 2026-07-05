@@ -133,7 +133,6 @@ pub struct DescribeSchemaInput {
     pub postgres_version: Option<String>,
     pub database_id: Option<String>,
     pub database_name: Option<String>,
-    pub include_legacy_aliases: Option<bool>,
 }
 
 impl From<DescribeSchemaInput> for DatabaseSelector {
@@ -196,9 +195,9 @@ pub struct SchemaDiffInput {
     pub database_id: Option<String>,
     pub database_name: Option<String>,
     #[schemars(
-        description = "Full schema_digest response object, or a JSON string containing that full object. A checksum string alone is not enough to compute a diff; use schema snapshots for compact stored baselines."
+        description = "Full schema_digest response object. A checksum string alone is not enough to compute a diff; use schema snapshots for compact stored baselines."
     )]
-    pub base_digest: SchemaDiffBaseDigest,
+    pub base_digest: SchemaDigestOutput,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -471,7 +470,6 @@ pub struct ConnectionStringOutput {
 pub struct RunSqlOutput {
     pub database_id: String,
     pub database_name: String,
-    pub row_count: Option<u64>,
     pub returned_row_count: usize,
     pub affected_row_count: Option<u64>,
     pub total_row_count_known: bool,
@@ -514,7 +512,6 @@ pub struct SchemaDigestOutput {
     pub database_name: String,
     pub digest_version: u32,
     pub checksum: String,
-    pub table_count: usize,
     #[serde(default)]
     pub relation_counts: SchemaRelationCounts,
     pub column_count: usize,
@@ -606,25 +603,6 @@ pub struct SchemaDigestExtension {
     pub version: String,
 }
 
-#[derive(Debug, Deserialize, JsonSchema)]
-#[serde(untagged)]
-pub enum SchemaDiffBaseDigest {
-    Response(SchemaDigestOutput),
-    SerializedResponse(String),
-}
-
-impl SchemaDiffBaseDigest {
-    fn into_schema_digest(self) -> anyhow::Result<SchemaDigestOutput> {
-        match self {
-            Self::Response(digest) => Ok(digest),
-            Self::SerializedResponse(raw) => serde_json::from_str::<SchemaDigestOutput>(&raw)
-                .context(
-                    "baseDigest string must contain the full JSON schema_digest response, not only the checksum",
-                ),
-        }
-    }
-}
-
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SchemaDiffOutput {
@@ -668,8 +646,6 @@ pub struct WorkflowEnvelope<T: Serialize> {
     pub detail_handles: Vec<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub result: Option<T>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub created_sandbox: Option<T>,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -931,7 +907,6 @@ struct SandboxRecord {
 }
 
 struct QueryExecutionResult {
-    row_count: Option<u64>,
     returned_row_count: usize,
     affected_row_count: Option<u64>,
     total_row_count_known: bool,
@@ -1751,7 +1726,6 @@ impl PostgresSandboxManager {
         Ok(RunSqlOutput {
             database_id: connection.database_id,
             database_name: connection.database_name,
-            row_count: result.row_count,
             returned_row_count: result.returned_row_count,
             affected_row_count: result.affected_row_count,
             total_row_count_known: result.total_row_count_known,
@@ -1765,24 +1739,13 @@ impl PostgresSandboxManager {
         &self,
         input: DescribeSchemaInput,
     ) -> anyhow::Result<DescribeSchemaOutput> {
-        let include_legacy_aliases = input.include_legacy_aliases.unwrap_or(false);
         let connection = self.get_connection_string(input.into()).await?;
         let (client, connection_task) = connect_url(&connection.connection_string).await?;
 
         let tables = client
             .query(
                 r#"
-                  SELECT n.nspname AS table_schema,
-                         c.relname AS table_name,
-                         CASE c.relkind
-                           WHEN 'r' THEN 'table'
-                           WHEN 'p' THEN 'partitioned_table'
-                           WHEN 'v' THEN 'view'
-                           WHEN 'm' THEN 'materialized_view'
-                           WHEN 'f' THEN 'foreign_table'
-                           ELSE c.relkind::text
-                         END AS relation_kind,
-                         n.nspname AS "tableSchema",
+                  SELECT n.nspname AS "tableSchema",
                          c.relname AS "tableName",
                          CASE c.relkind
                            WHEN 'r' THEN 'table'
@@ -1804,15 +1767,7 @@ impl PostgresSandboxManager {
         let columns = client
             .query(
                 r#"
-                  SELECT n.nspname AS table_schema,
-                         c.relname AS table_name,
-                         a.attname AS column_name,
-                         pg_catalog.format_type(a.atttypid, a.atttypmod) AS data_type,
-                         CASE WHEN a.attnotnull THEN 'NO' ELSE 'YES' END AS is_nullable,
-                         CASE WHEN a.attgenerated = '' THEN pg_get_expr(ad.adbin, ad.adrelid) ELSE NULL END AS column_default,
-                         CASE WHEN a.attgenerated = '' THEN NULL ELSE a.attgenerated::text END AS generated_kind,
-                         CASE WHEN a.attgenerated = '' THEN NULL ELSE pg_get_expr(ad.adbin, ad.adrelid) END AS generation_expression,
-                         n.nspname AS "tableSchema",
+                  SELECT n.nspname AS "tableSchema",
                          c.relname AS "tableName",
                          a.attname AS "columnName",
                          pg_catalog.format_type(a.atttypid, a.atttypmod) AS "dataType",
@@ -1836,36 +1791,7 @@ impl PostgresSandboxManager {
         let constraints = client
             .query(
                 r#"
-                  SELECT n.nspname AS table_schema,
-                         c.relname AS table_name,
-                         con.conname AS constraint_name,
-                         CASE con.contype
-                           WHEN 'p' THEN 'primary_key'
-                           WHEN 'u' THEN 'unique'
-                           WHEN 'f' THEN 'foreign_key'
-                           WHEN 'c' THEN 'check'
-                           WHEN 'x' THEN 'exclusion'
-                           WHEN 'n' THEN 'not_null'
-                           ELSE con.contype::text
-                         END AS constraint_type,
-                         pg_get_constraintdef(con.oid, true) AS definition,
-                         CASE con.confupdtype
-                           WHEN 'a' THEN 'no_action'
-                           WHEN 'r' THEN 'restrict'
-                           WHEN 'c' THEN 'cascade'
-                           WHEN 'n' THEN 'set_null'
-                           WHEN 'd' THEN 'set_default'
-                           ELSE NULL
-                         END AS update_action,
-                         CASE con.confdeltype
-                           WHEN 'a' THEN 'no_action'
-                           WHEN 'r' THEN 'restrict'
-                           WHEN 'c' THEN 'cascade'
-                           WHEN 'n' THEN 'set_null'
-                           WHEN 'd' THEN 'set_default'
-                           ELSE NULL
-                         END AS delete_action,
-                         n.nspname AS "tableSchema",
+                  SELECT n.nspname AS "tableSchema",
                          c.relname AS "tableName",
                          con.conname AS "constraintName",
                          CASE con.contype
@@ -1907,11 +1833,7 @@ impl PostgresSandboxManager {
         let indexes = client
             .query(
                 r#"
-                  SELECT schemaname,
-                         tablename,
-                         indexname,
-                         indexdef,
-                         schemaname AS "schemaName",
+                  SELECT schemaname AS "schemaName",
                          tablename AS "tableName",
                          indexname AS "indexName",
                          indexdef AS "definition"
@@ -1925,14 +1847,7 @@ impl PostgresSandboxManager {
         let views = client
             .query(
                 r#"
-                  SELECT n.nspname AS table_schema,
-                         c.relname AS table_name,
-                         CASE c.relkind
-                           WHEN 'v' THEN 'view'
-                           WHEN 'm' THEN 'materialized_view'
-                         END AS relation_kind,
-                         pg_get_viewdef(c.oid, true) AS definition,
-                         n.nspname AS "tableSchema",
+                  SELECT n.nspname AS "tableSchema",
                          c.relname AS "tableName",
                          CASE c.relkind
                            WHEN 'v' THEN 'view'
@@ -1951,9 +1866,7 @@ impl PostgresSandboxManager {
         let extensions = client
             .query(
                 r#"
-                  SELECT extname,
-                         extversion,
-                         extname AS "name",
+                  SELECT extname AS "name",
                          extversion AS "version"
                   FROM pg_extension
                   ORDER BY extname
@@ -1970,16 +1883,12 @@ impl PostgresSandboxManager {
             database_id: connection.database_id,
             database_name: connection.database_name,
             relation_counts,
-            tables: schema_rows_to_json(tables, TABLE_LEGACY_ALIASES, include_legacy_aliases)?,
-            columns: schema_rows_to_json(columns, COLUMN_LEGACY_ALIASES, include_legacy_aliases)?,
-            constraints: constraint_rows_to_json(constraints, include_legacy_aliases)?,
-            indexes: schema_rows_to_json(indexes, INDEX_LEGACY_ALIASES, include_legacy_aliases)?,
-            views: schema_rows_to_json(views, VIEW_LEGACY_ALIASES, include_legacy_aliases)?,
-            extensions: schema_rows_to_json(
-                extensions,
-                EXTENSION_LEGACY_ALIASES,
-                include_legacy_aliases,
-            )?,
+            tables: rows_to_json(tables)?,
+            columns: rows_to_json(columns)?,
+            constraints: rows_to_json(constraints)?,
+            indexes: rows_to_json(indexes)?,
+            views: rows_to_json(views)?,
+            extensions: rows_to_json(extensions)?,
         })
     }
 
@@ -2004,10 +1913,7 @@ impl PostgresSandboxManager {
     }
 
     pub async fn schema_diff(&self, input: SchemaDiffInput) -> anyhow::Result<SchemaDiffOutput> {
-        let before = input
-            .base_digest
-            .into_schema_digest()
-            .context("baseDigest must be a schema_digest response")?;
+        let before = input.base_digest;
         let after = self
             .schema_digest(DatabaseSelector {
                 profile: input.profile,
@@ -2911,7 +2817,7 @@ impl PostgresSandboxManager {
             connection_string: created.connection_string,
             template_name: template_name.clone(),
         };
-        let mut envelope = workflow_success(
+        Ok(workflow_success(
             format!(
                 "Sandbox created from template `{}`.",
                 metadata.template_name
@@ -2920,9 +2826,7 @@ impl PostgresSandboxManager {
             vec![metadata.privacy_warning.clone()],
             vec![template_detail_handle(&profile.name, &template_name)],
             created_sandbox.clone(),
-        );
-        envelope.created_sandbox = Some(created_sandbox);
-        Ok(envelope)
+        ))
     }
 
     pub async fn list_templates(
@@ -3295,7 +3199,6 @@ fn workflow_success<T: Serialize>(
         errors: Vec::new(),
         detail_handles,
         result: Some(result),
-        created_sandbox: None,
     }
 }
 
@@ -3321,7 +3224,6 @@ fn workflow_failure_with_changes<T: Serialize>(
         errors: vec![error],
         detail_handles: Vec::new(),
         result,
-        created_sandbox: None,
     }
 }
 
@@ -5332,7 +5234,6 @@ async fn schema_digest_for_connection(
         })
         .collect::<Vec<_>>();
 
-    let table_count = relation_counts.tables + relation_counts.partitioned_tables;
     let column_count = tables.iter().map(|table| table.columns.len()).sum();
     let constraint_count = tables.iter().map(|table| table.constraints.len()).sum();
     let index_count = tables.iter().map(|table| table.indexes.len()).sum();
@@ -5344,7 +5245,6 @@ async fn schema_digest_for_connection(
         database_name,
         digest_version: SCHEMA_DIGEST_VERSION,
         checksum,
-        table_count,
         relation_counts,
         column_count,
         constraint_count,
@@ -5371,128 +5271,6 @@ fn default_relation_kind() -> String {
     "table".to_string()
 }
 
-const TABLE_LEGACY_ALIASES: &[(&str, &str)] = &[
-    ("table_schema", "tableSchema"),
-    ("table_name", "tableName"),
-    ("relation_kind", "relationKind"),
-];
-
-const COLUMN_LEGACY_ALIASES: &[(&str, &str)] = &[
-    ("table_schema", "tableSchema"),
-    ("table_name", "tableName"),
-    ("column_name", "columnName"),
-    ("data_type", "dataType"),
-    ("is_nullable", "isNullable"),
-    ("column_default", "columnDefault"),
-    ("generated_kind", "generatedKind"),
-    ("generation_expression", "generationExpression"),
-];
-
-const CONSTRAINT_LEGACY_ALIASES: &[(&str, &str)] = &[
-    ("table_schema", "tableSchema"),
-    ("table_name", "tableName"),
-    ("constraint_name", "constraintName"),
-    ("constraint_type", "constraintType"),
-    ("update_action", "updateAction"),
-    ("delete_action", "deleteAction"),
-];
-
-const INDEX_LEGACY_ALIASES: &[(&str, &str)] = &[
-    ("schemaname", "schemaName"),
-    ("tablename", "tableName"),
-    ("indexname", "indexName"),
-    ("indexdef", "definition"),
-];
-
-const VIEW_LEGACY_ALIASES: &[(&str, &str)] = &[
-    ("table_schema", "tableSchema"),
-    ("table_name", "tableName"),
-    ("relation_kind", "relationKind"),
-];
-
-const EXTENSION_LEGACY_ALIASES: &[(&str, &str)] = &[("extname", "name"), ("extversion", "version")];
-
-fn schema_rows_to_json(
-    rows: Vec<Row>,
-    legacy_aliases: &[(&str, &str)],
-    include_legacy_aliases: bool,
-) -> anyhow::Result<Vec<Value>> {
-    rows.iter()
-        .map(|row| {
-            row_to_json(row).map(|value| {
-                canonical_schema_json_object(value, legacy_aliases, include_legacy_aliases)
-            })
-        })
-        .collect()
-}
-
-fn constraint_rows_to_json(
-    rows: Vec<Row>,
-    include_legacy_aliases: bool,
-) -> anyhow::Result<Vec<Value>> {
-    rows.iter()
-        .map(|row| {
-            row_to_json(row)
-                .map(|value| canonical_constraint_schema_json_object(value, include_legacy_aliases))
-        })
-        .collect()
-}
-
-fn canonical_schema_json_object(
-    value: Value,
-    legacy_aliases: &[(&str, &str)],
-    include_legacy_aliases: bool,
-) -> Value {
-    let Value::Object(mut object) = value else {
-        return value;
-    };
-
-    for (legacy_key, canonical_key) in legacy_aliases {
-        if !object.contains_key(*canonical_key) {
-            if let Some(value) = object.get(*legacy_key).cloned() {
-                object.insert((*canonical_key).to_string(), value);
-            }
-        }
-    }
-
-    if include_legacy_aliases {
-        for (legacy_key, canonical_key) in legacy_aliases {
-            if let Some(value) = object.get(*canonical_key).cloned() {
-                object.insert((*legacy_key).to_string(), value);
-            }
-        }
-    } else {
-        for (legacy_key, _) in legacy_aliases {
-            object.remove(*legacy_key);
-        }
-    }
-
-    Value::Object(object)
-}
-
-fn canonical_constraint_schema_json_object(value: Value, include_legacy_aliases: bool) -> Value {
-    let value =
-        canonical_schema_json_object(value, CONSTRAINT_LEGACY_ALIASES, include_legacy_aliases);
-    let Value::Object(mut object) = value else {
-        return value;
-    };
-
-    normalize_constraint_type_field(&mut object, "constraintType");
-    if include_legacy_aliases {
-        if let Some(value) = object.get("constraintType").cloned() {
-            object.insert("constraint_type".to_string(), value);
-        }
-    }
-
-    Value::Object(object)
-}
-
-fn normalize_constraint_type_field(object: &mut serde_json::Map<String, Value>, key: &str) {
-    if let Some(Value::String(raw)) = object.get_mut(key) {
-        *raw = normalized_constraint_type(raw).to_string();
-    }
-}
-
 fn normalized_constraint_type(raw: &str) -> &str {
     match raw {
         "p" => "primary_key",
@@ -5508,7 +5286,7 @@ fn normalized_constraint_type(raw: &str) -> &str {
 fn relation_counts_from_rows(rows: &[Row]) -> SchemaRelationCounts {
     let mut counts = SchemaRelationCounts::default();
     for row in rows {
-        increment_relation_count(&mut counts, row.get::<_, String>("relation_kind").as_str());
+        increment_relation_count(&mut counts, row.get::<_, String>("relationKind").as_str());
     }
     counts
 }
@@ -6208,11 +5986,6 @@ async fn run_cursor_query(
     let visible_rows = rows.into_iter().take(row_limit).collect::<Vec<_>>();
     let returned_row_count = visible_rows.len();
     Ok(QueryExecutionResult {
-        row_count: if truncated {
-            None
-        } else {
-            Some(returned_row_count as u64)
-        },
         returned_row_count,
         affected_row_count: None,
         total_row_count_known: !truncated,
@@ -6234,11 +6007,6 @@ async fn run_typed_query(
     let visible_rows = rows.into_iter().take(row_limit).collect::<Vec<_>>();
     let returned_row_count = visible_rows.len();
     Ok(QueryExecutionResult {
-        row_count: if truncated {
-            None
-        } else {
-            Some(returned_row_count as u64)
-        },
         returned_row_count,
         affected_row_count: None,
         total_row_count_known: !truncated,
@@ -6360,11 +6128,6 @@ fn format_simple_query_result(
         0
     };
     QueryExecutionResult {
-        row_count: if final_had_rows && truncated {
-            None
-        } else {
-            final_row_count
-        },
         returned_row_count,
         affected_row_count: if final_had_rows {
             None
@@ -6518,7 +6281,7 @@ fn protect_role_password(password: &str, profile: &SandboxProfile) -> anyhow::Re
 
 fn unprotect_role_password(value: &str, profile: &SandboxProfile) -> anyhow::Result<String> {
     let Some(rest) = value.strip_prefix(&format!("{ENCRYPTED_PASSWORD_PREFIX}:")) else {
-        return Ok(value.to_string());
+        anyhow::bail!("stored sandbox role password is not encrypted");
     };
     let Some((nonce, encrypted)) = rest.split_once(':') else {
         anyhow::bail!("stored sandbox role password is malformed");
@@ -6593,13 +6356,6 @@ fn record_summary_to_json(row: &Row) -> Value {
         "createdAt": created_at,
         "expiresAt": expires_at,
         "deletedAt": deleted_at,
-        "database_id": database_id,
-        "profile_name": profile_name,
-        "database_name": database_name,
-        "role_name": role_name,
-        "created_at": created_at,
-        "expires_at": expires_at,
-        "deleted_at": deleted_at,
     })
 }
 
@@ -7257,7 +7013,6 @@ mod tests {
             database_name: "sandbox_a".to_string(),
             digest_version: SCHEMA_DIGEST_VERSION,
             checksum: schema_digest_checksum(&tables, &extensions).unwrap(),
-            table_count: 1,
             relation_counts: relation_counts_for_digest_tables(&tables),
             column_count: 1,
             constraint_count: 0,
@@ -7271,7 +7026,6 @@ mod tests {
             database_name: "sandbox_b".to_string(),
             digest_version: SCHEMA_DIGEST_VERSION,
             checksum: schema_digest_checksum(&tables, &extensions).unwrap(),
-            table_count: 1,
             relation_counts: relation_counts_for_digest_tables(&tables),
             column_count: 1,
             constraint_count: 0,
@@ -7390,61 +7144,6 @@ mod tests {
         let error = diff_schema_digests(&before, &after).unwrap_err();
 
         assert!(error.to_string().contains("schema digest versions differ"));
-    }
-
-    #[test]
-    fn schema_diff_base_digest_accepts_serialized_schema_digest_response() {
-        let digest = test_digest("base");
-        let raw = serde_json::to_string(&digest).unwrap();
-        let parsed = serde_json::from_value::<SchemaDiffBaseDigest>(json!(raw)).unwrap();
-
-        assert_eq!(parsed.into_schema_digest().unwrap(), digest);
-    }
-
-    #[test]
-    fn describe_schema_compacts_to_canonical_fields_by_default() {
-        let compact = canonical_constraint_schema_json_object(
-            json!({
-                "table_schema": "public",
-                "table_name": "accounts",
-                "constraint_name": "accounts_email_not_null",
-                "constraint_type": "n",
-                "tableSchema": "public",
-                "tableName": "accounts",
-                "constraintName": "accounts_email_not_null",
-                "constraintType": "n",
-                "definition": "NOT NULL"
-            }),
-            false,
-        );
-
-        assert_eq!(compact["tableSchema"], "public");
-        assert_eq!(compact["tableName"], "accounts");
-        assert_eq!(compact["constraintName"], "accounts_email_not_null");
-        assert_eq!(compact["constraintType"], "not_null");
-        assert!(compact.get("table_schema").is_none());
-        assert!(compact.get("table_name").is_none());
-        assert!(compact.get("constraint_name").is_none());
-        assert!(compact.get("constraint_type").is_none());
-    }
-
-    #[test]
-    fn describe_schema_can_include_normalized_legacy_aliases() {
-        let aliased = canonical_constraint_schema_json_object(
-            json!({
-                "table_schema": "public",
-                "table_name": "accounts",
-                "constraint_name": "accounts_email_not_null",
-                "constraint_type": "n",
-                "definition": "NOT NULL"
-            }),
-            true,
-        );
-
-        assert_eq!(aliased["tableSchema"], "public");
-        assert_eq!(aliased["table_schema"], "public");
-        assert_eq!(aliased["constraintType"], "not_null");
-        assert_eq!(aliased["constraint_type"], "not_null");
     }
 
     #[test]
@@ -7905,6 +7604,7 @@ mod tests {
             unprotect_role_password(&stored, &profile).unwrap(),
             "sandbox-secret"
         );
+        assert!(unprotect_role_password("sandbox-secret", &profile).is_err());
     }
 
     #[test]
@@ -8101,24 +7801,20 @@ mod tests {
             connection_string_redacted: mask_connection_string(connection_string),
             template_name: "seeded".to_string(),
         };
-        let mut envelope = workflow_success(
+        let envelope = workflow_success(
             "Sandbox created from template `seeded`.",
             None,
             Vec::new(),
             Vec::new(),
             created_sandbox.clone(),
         );
-        envelope.created_sandbox = Some(created_sandbox);
 
         let payload = serde_json::to_value(envelope).unwrap();
         assert!(payload
             .get("result")
             .and_then(|result| result.get("connectionString"))
             .is_none());
-        assert!(payload
-            .get("createdSandbox")
-            .and_then(|result| result.get("connectionString"))
-            .is_none());
+        assert!(payload.get("createdSandbox").is_none());
         assert!(!payload.to_string().contains("secret"));
     }
 
@@ -8878,7 +8574,7 @@ services:
         let guarded_default =
             format!("CASE WHEN a.attgenerated = '' THEN {pg_get_expr} ELSE NULL END");
 
-        assert!(source.matches(&guarded_default).count() >= 4);
+        assert!(source.matches(&guarded_default).count() >= 3);
         assert!(!source.contains(&format!("{pg_get_expr} AS column_default")));
         assert!(!source.contains(&format!("{pg_get_expr} AS default_expression")));
         assert!(!source.contains(&format!("{pg_get_expr} AS \"columnDefault\"")));
@@ -8961,7 +8657,6 @@ services:
             database_name: format!("sandbox_{database_id}"),
             digest_version: SCHEMA_DIGEST_VERSION,
             checksum: "before-checksum".to_string(),
-            table_count: 1,
             relation_counts: relation_counts_for_digest_tables(&tables),
             column_count: 1,
             constraint_count: 0,
