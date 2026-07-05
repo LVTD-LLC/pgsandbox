@@ -12,12 +12,14 @@ managed local default, requesting a version such as `"18"` starts or reuses the
 isolated `local-pg18` cluster when matching local Postgres binaries are
 installed.
 
-Workflow-oriented tools return a compact result envelope:
+Every MCP tool response returns JSON text in the same compact envelope. The
+`Returns` sections below describe the tool-specific `result` payload inside
+that envelope.
 
-- `ok`: whether the requested workflow completed
+- `ok`: whether the requested operation completed
 - `summary`: short human-readable outcome
 - `changedObjects`: optional counts for schema changes
-- `warnings`: bounded warnings
+- `warnings`: bounded warnings; present on every envelope, even when empty
 - `errors`: structured `code`, `category`, `message`, and optional `hint`
 - `detailHandles`: opaque pointers agents can use in follow-up calls
 - `result`: workflow-specific output when available
@@ -29,17 +31,17 @@ the actual credential, and do not echo that value into chat, logs, or durable
 datasets.
 
 Tool failures are returned as MCP tool errors whose text content is a safe JSON
-object with `ok: false`, `error.code`, `error.category`, `error.message`, and
-`error.hint`. Passwords and full connection strings are masked. Postgres errors
-include `error.sqlstate` when it is available. Expected failure classes use
-stable categories such as `sql_analysis`, `sql_syntax`,
+object using the same envelope shape: `ok: false`, `summary`, `warnings: []`,
+`errors`, and `detailHandles`. Passwords and full connection strings are
+masked. Postgres errors include `errors[].sqlstate` when it is available.
+Expected failure classes use stable categories such as `sql_analysis`, `sql_syntax`,
 `constraint_violation`, `readonly_violation`, `database_not_found`,
 `version_mismatch`, `restore_incompatible`, `template_not_found`, and
 `timeout`. Profile selection failures use `code: "unknown_profile"` with
-category `validation` and a `detailHandle` that points to `list_profiles`,
+category `validation` and a `detailHandles` entry that points to `list_profiles`,
 names the invalid profile, and includes a bounded `knownProfiles` list. Version
 diagnostics may also include `requestedVersion`, `sourceVersion`,
-`targetVersion`, `detectedVersions`, and a `detailHandle` pointing to
+`targetVersion`, `detectedVersions`, and a `detailHandles` entry pointing to
 `list_profiles` or `doctor` instead of embedding long local path traces.
 Typical codes include `undefined_column`, `undefined_table`, `syntax_error`,
 `permission_denied`, `lock_timeout`, `statement_timeout`,
@@ -298,9 +300,12 @@ Inputs:
 
 - `profile`: optional Postgres profile name
 - `databaseId` or `databaseName`
-- `baseDigest`: a previous `schema_digest` response object. A checksum string
-  alone is not enough to compute a diff; use schema snapshots for compact
-  stored baselines.
+- `baseDigest`: a previous `schema_digest` result object or the full MCP
+  envelope that contains it under `result`. A JSON string containing either
+  shape is also accepted for agent workflows that pass tool output through
+  string-only storage. A checksum string alone is not enough to compute a diff;
+  checksum-only input returns `code: "invalid_base_digest"` with a hint to pass
+  the full object or use schema snapshots.
 
 Example:
 
@@ -510,8 +515,8 @@ Inputs:
   sandbox. `ttlMinutes` follows the same positive-only validation as
   `create_database`.
 
-If `databaseId`/`databaseName` is omitted, this tool creates a sandbox and the
-response states `createdSandbox`. Failed validations delete that auto-created
+If `databaseId`/`databaseName` is omitted, this tool creates a sandbox and sets
+`result.createdSandbox: true`. Failed validations delete that auto-created
 sandbox when cleanup succeeds; successful validations return the created
 sandbox id so callers can inspect it or delete it explicitly.
 

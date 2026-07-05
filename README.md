@@ -468,9 +468,10 @@ For repo-backed database work, an agent can:
 6. Save reusable state with `create_schema_snapshot` or
    `create_template_from_sandbox`.
 
-Workflow tools use compact envelopes with `ok`, `summary`, structured
-`errors`, bounded output, and optional `changedObjects`. Command and tool
-errors include stable categories such as `sql_analysis`, `sql_syntax`,
+MCP tools use compact envelopes with `ok`, `summary`, `warnings`, structured
+`errors`, `detailHandles`, and a tool-specific `result`. Command and tool
+errors use the same envelope shape with `ok: false` and include stable
+categories such as `sql_analysis`, `sql_syntax`,
 `database_not_found`, `version_mismatch`, `restore_incompatible`,
 `constraint_violation`, `readonly_violation`, and `template_not_found` so
 agents can branch without parsing prose. Postgres errors include SQLSTATE when

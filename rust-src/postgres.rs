@@ -195,9 +195,9 @@ pub struct SchemaDiffInput {
     pub database_id: Option<String>,
     pub database_name: Option<String>,
     #[schemars(
-        description = "Full schema_digest response object. A checksum string alone is not enough to compute a diff; use schema snapshots for compact stored baselines."
+        description = "schema_digest result object, full MCP envelope containing it, or a JSON string containing either shape. A checksum string alone is not enough to compute a diff; use schema snapshots for compact stored baselines."
     )]
-    pub base_digest: SchemaDigestOutput,
+    pub base_digest: SchemaDiffBaseDigest,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -603,6 +603,44 @@ pub struct SchemaDigestExtension {
     pub version: String,
 }
 
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(untagged)]
+pub enum SchemaDiffBaseDigest {
+    Response(SchemaDigestOutput),
+    Envelope(SchemaDigestResponseEnvelope),
+    SerializedResponse(String),
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SchemaDigestResponseEnvelope {
+    pub result: SchemaDigestOutput,
+}
+
+impl SchemaDiffBaseDigest {
+    fn into_schema_digest(self) -> anyhow::Result<SchemaDigestOutput> {
+        match self {
+            Self::Response(digest) => Ok(digest),
+            Self::Envelope(envelope) => Ok(envelope.result),
+            Self::SerializedResponse(raw) => schema_digest_from_serialized_response(&raw),
+        }
+    }
+}
+
+fn schema_digest_from_serialized_response(raw: &str) -> anyhow::Result<SchemaDigestOutput> {
+    let value = serde_json::from_str::<Value>(raw).context(
+        "baseDigest string must contain the schema_digest result or full MCP envelope, not only the checksum",
+    )?;
+    serde_json::from_value::<SchemaDigestOutput>(value.clone())
+        .or_else(|_| {
+            serde_json::from_value::<SchemaDigestResponseEnvelope>(value)
+                .map(|envelope| envelope.result)
+        })
+        .context(
+            "baseDigest string must contain the schema_digest result or full MCP envelope, not only the checksum",
+        )
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SchemaDiffOutput {
@@ -851,7 +889,7 @@ pub struct CreateTemplateOutput {
     pub metadata: TemplateMetadata,
 }
 
-#[derive(Clone, Serialize)]
+#[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateSandboxFromTemplateOutput {
     pub database_id: String,
@@ -1913,7 +1951,10 @@ impl PostgresSandboxManager {
     }
 
     pub async fn schema_diff(&self, input: SchemaDiffInput) -> anyhow::Result<SchemaDiffOutput> {
-        let before = input.base_digest;
+        let before = input
+            .base_digest
+            .into_schema_digest()
+            .context("baseDigest must be a schema_digest result or MCP envelope")?;
         let after = self
             .schema_digest(DatabaseSelector {
                 profile: input.profile,
@@ -2825,7 +2866,7 @@ impl PostgresSandboxManager {
             None,
             vec![metadata.privacy_warning.clone()],
             vec![template_detail_handle(&profile.name, &template_name)],
-            created_sandbox.clone(),
+            created_sandbox,
         ))
     }
 
@@ -7191,6 +7232,48 @@ mod tests {
     }
 
     #[test]
+    fn schema_diff_base_digest_accepts_serialized_schema_digest_response() {
+        let digest = test_digest("base");
+        let raw = serde_json::to_string(&digest).unwrap();
+        let parsed = serde_json::from_value::<SchemaDiffBaseDigest>(json!(raw)).unwrap();
+
+        assert_eq!(parsed.into_schema_digest().unwrap(), digest);
+    }
+
+    #[test]
+    fn schema_diff_base_digest_accepts_mcp_envelope_response() {
+        let digest = test_digest("base");
+        let parsed = serde_json::from_value::<SchemaDiffBaseDigest>(json!({
+            "ok": true,
+            "summary": "Tool completed successfully.",
+            "warnings": [],
+            "errors": [],
+            "detailHandles": [],
+            "result": digest
+        }))
+        .unwrap();
+
+        assert_eq!(parsed.into_schema_digest().unwrap(), test_digest("base"));
+    }
+
+    #[test]
+    fn schema_diff_base_digest_accepts_serialized_mcp_envelope_response() {
+        let digest = test_digest("base");
+        let raw = serde_json::to_string(&json!({
+            "ok": true,
+            "summary": "Tool completed successfully.",
+            "warnings": [],
+            "errors": [],
+            "detailHandles": [],
+            "result": digest
+        }))
+        .unwrap();
+        let parsed = serde_json::from_value::<SchemaDiffBaseDigest>(json!(raw)).unwrap();
+
+        assert_eq!(parsed.into_schema_digest().unwrap(), test_digest("base"));
+    }
+
+    #[test]
     fn unknown_postgres_version_mentions_configured_profile_and_managed_local_repair() {
         let manager = PostgresSandboxManager::new(test_config());
         let error = manager.resolve_profile(None, Some("18")).unwrap_err();
@@ -7850,7 +7933,7 @@ mod tests {
             None,
             Vec::new(),
             Vec::new(),
-            created_sandbox.clone(),
+            created_sandbox,
         );
 
         let payload = serde_json::to_value(envelope).unwrap();

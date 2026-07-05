@@ -7,7 +7,7 @@ use pgsandbox_mcp::{
         CreateSchemaSnapshotInput, CreateTemplateFromSandboxInput, DatabaseSelector,
         DeleteTemplateInput, DescribeSchemaInput, DiffSchemaSnapshotInput, ExplainQueryInput,
         ListDatabasesInput, ListSchemaSnapshotsInput, ListTemplatesInput, PostgresSandboxManager,
-        RunSqlInput, SchemaDiffInput, ValidateSchemaChangeInput,
+        RunSqlInput, SchemaDiffBaseDigest, SchemaDiffInput, ValidateSchemaChangeInput,
     },
 };
 use serde_json::json;
@@ -267,7 +267,7 @@ async fn run_suite(
             postgres_version: None,
             database_id: Some(database_id.to_string()),
             database_name: None,
-            base_digest: before,
+            base_digest: SchemaDiffBaseDigest::Response(before),
         })
         .await?;
     assert!(diff.changed);
