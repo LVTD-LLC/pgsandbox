@@ -130,6 +130,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: refs/pull/${{ github.event.issue.number }}/head
       # Use the ReviewGate action's documented invocation here.
 ```
 
