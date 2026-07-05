@@ -67,7 +67,9 @@ pgsandbox_<slug>_<short_id>
 ```
 
 The admin connection is used only for lifecycle operations. Tool calls that run user SQL connect using the generated sandbox role.
-Sandbox role passwords are encrypted before being persisted in the metadata table; existing plaintext metadata rows remain readable for compatibility.
+Sandbox role passwords are encrypted before being persisted in the metadata table.
+Metadata setup encrypts older unencrypted local rows in place before strict
+password reads.
 
 ## Telemetry
 

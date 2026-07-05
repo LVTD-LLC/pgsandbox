@@ -336,7 +336,7 @@ async fn smoke_test(args: &[String]) -> anyhow::Result<u8> {
             })
             .await?;
         anyhow::ensure!(
-            updated.row_count == Some(1) && updated.rows.is_empty(),
+            updated.affected_row_count == Some(1) && updated.rows.is_empty(),
             "DML with 'returning' inside a string literal was not handled as a direct query"
         );
         println!("{}", serde_json::to_string_pretty(&updated)?);

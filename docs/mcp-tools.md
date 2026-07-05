@@ -21,9 +21,6 @@ Workflow-oriented tools return a compact result envelope:
 - `errors`: structured `code`, `category`, `message`, and optional `hint`
 - `detailHandles`: opaque pointers agents can use in follow-up calls
 - `result`: workflow-specific output when available
-- `createdSandbox`: for `create_sandbox_from_template`, the same secret-free
-  created sandbox payload is also exposed at the top level so agents do not
-  need to special-case the workflow envelope.
 
 Full sandbox connection strings are returned only by `get_connection_string`.
 Creation-style tools return `connectionStringRedacted` for safe summaries and
@@ -246,17 +243,11 @@ Inputs:
 - `profile`: optional Postgres profile name
 - `postgresVersion`: optional Postgres major version
 - `databaseId` or `databaseName`
-- `includeLegacyAliases`: optional boolean, defaults to false. When true,
-  response objects also include the legacy catalog/source aliases that were
-  previously returned alongside canonical fields.
 
 Returns:
 
 - structured schema summary with compact canonical camelCase keys such as
   `tableName`, `tableSchema`, `columnName`, `dataType`, and `isNullable`.
-  Legacy aliases such as `table_name`, `column_default`, `constraint_type`,
-  `schemaname`, and `extname` are returned only when
-  `includeLegacyAliases: true`.
 - `relationCounts`: split counts for `tables`, `partitionedTables`, `views`,
   `materializedViews`, `foreignTables`, and `other`.
 - `tables`: relations with `relationKind` values such as `table`, `view`, and
@@ -289,8 +280,7 @@ Returns:
 - `digestVersion`
 - `checksum`
 - `relationCounts`: split counts for tables, partitioned tables, views,
-  materialized views, foreign tables, and other relation kinds. `tableCount`
-  remains the table plus partitioned-table count for compatibility.
+  materialized views, foreign tables, and other relation kinds.
 - object counts for tables, columns, constraints, indexes, and extensions
 - compact tables with relation kind, column type/nullability/default/generated
   metadata, constraint definition hashes, index definition hashes, and view
@@ -308,12 +298,9 @@ Inputs:
 
 - `profile`: optional Postgres profile name
 - `databaseId` or `databaseName`
-- `baseDigest`: a previous `schema_digest` response object. A JSON string that
-  contains the full serialized `schema_digest` response is also accepted for
-  agent workflows that pass tool output through string-only storage. A checksum
-  string alone is not enough to compute a diff; checksum-only input returns
-  `code: "invalid_base_digest"` with a hint to pass the full object or use
-  schema snapshots.
+- `baseDigest`: a previous `schema_digest` response object. A checksum string
+  alone is not enough to compute a diff; use schema snapshots for compact
+  stored baselines.
 
 Example:
 
@@ -325,7 +312,6 @@ Example:
     "databaseName": "pgsandbox_app_abc12345",
     "digestVersion": 3,
     "checksum": "...",
-    "tableCount": 1,
     "relationCounts": {
       "tables": 1,
       "partitionedTables": 0,
@@ -598,10 +584,9 @@ Inputs:
 - `owner`
 - `labels`
 
-Returns the new sandbox metadata and `connectionStringRedacted`. The workflow
-envelope includes the same secret-free payload under both `result` and
-`createdSandbox`. Call `get_connection_string` with the returned `databaseId`
-only when the full connection string is explicitly needed.
+Returns the new sandbox metadata under `result` with
+`connectionStringRedacted`. Call `get_connection_string` with the returned
+`databaseId` only when the full connection string is explicitly needed.
 
 ### `list_templates`
 
@@ -638,10 +623,9 @@ Returns:
 
 - `scope`: `"profile"` or `"allVersions"`
 - `profiles`: profiles included in the listing
-- `databases`: database metadata without full secrets. New callers should use
-  camelCase keys such as `databaseId`, `databaseName`, `roleName`, `profile`,
-  `createdAt`, and `expiresAt`. Legacy snake_case aliases remain present for
-  compatibility.
+- `databases`: database metadata without full secrets, using camelCase keys
+  such as `databaseId`, `databaseName`, `roleName`, `profile`, `createdAt`, and
+  `expiresAt`.
 - `truncated`: whether more matching records exist beyond the returned page
 - `failures`: profile-level failures for all-version listings. Each entry has
   `profile`, `category: "profile_unavailable"`, and a safe `message`.
