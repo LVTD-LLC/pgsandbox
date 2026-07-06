@@ -49,6 +49,8 @@ Typical codes include `undefined_column`, `undefined_table`, `syntax_error`,
 `command_timeout`, `postgres_auth_failed`, `postgres_connection_failed`,
 `unknown_profile`, `postgres_version_unavailable`,
 `local_postgres_unavailable`, and `invalid_ttl`.
+`explain_query` multi-statement input returns `single_statement_required` with
+category `validation` and a hint to pass exactly one SQL statement.
 
 When selecting a local major version, omit `profile` and pass only
 `postgresVersion`, for example `{ "postgresVersion": "18" }`. Supplying both is
@@ -367,6 +369,9 @@ database, plus a compact summary of node types, relations, cost, and estimated
 rows. The tool does not use `ANALYZE`; it rejects multi-statement SQL,
 transaction/session controls, and statements outside SELECT/WITH/VALUES/TABLE
 or DML forms that Postgres can plan without executing.
+Multi-statement SQL fails with `code: "single_statement_required"` and
+`category: "validation"`; trim the input to exactly one statement before
+retrying.
 
 Inputs:
 

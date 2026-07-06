@@ -780,6 +780,23 @@ impl ToolErrorResponse {
             body
         } else if let Some(body) = unknown_profile_error_body(error) {
             body
+        } else if lower.contains("explainquery only accepts a single sql statement") {
+            ToolErrorBody {
+                code: "single_statement_required",
+                category: "validation",
+                message: chain,
+                hint: "Pass exactly one SQL statement in sql. Remove extra semicolon-separated statements before retrying explain_query.".to_string(),
+                sqlstate: None,
+                requested_version: None,
+                source_version: None,
+                target_version: None,
+                detected_versions: Vec::new(),
+                detail_handle: Some(json!({
+                    "type": "tool-contract",
+                    "tool": "explain_query",
+                    "field": "sql"
+                })),
+            }
         } else if let Some(body) = stringly_sql_error_body(&lower, &chain) {
             // Fallback for Postgres-shaped messages when no typed DbError is in the chain.
             body
@@ -1449,6 +1466,29 @@ mod tests {
             .as_str()
             .unwrap()
             .contains("positive ttlMinutes"));
+    }
+
+    #[test]
+    fn explain_query_multi_statement_errors_are_validation_failures() {
+        let result = tool_json::<()>(Err(anyhow::anyhow!(
+            "explainQuery only accepts a single SQL statement."
+        )))
+        .unwrap();
+        let text = result.content[0].as_text().unwrap().text.clone();
+        let value = serde_json::from_str::<Value>(&text).unwrap();
+
+        assert_eq!(first_error(&value)["code"], "single_statement_required");
+        assert_eq!(first_error(&value)["category"], "validation");
+        assert!(first_error(&value)["hint"]
+            .as_str()
+            .unwrap()
+            .contains("exactly one SQL statement"));
+        assert!(!first_error(&value)["hint"]
+            .as_str()
+            .unwrap()
+            .contains("doctor"));
+        assert_eq!(value["detailHandles"][0]["tool"], "explain_query");
+        assert_eq!(value["detailHandles"][0]["field"], "sql");
     }
 
     #[tokio::test]
