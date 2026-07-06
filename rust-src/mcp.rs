@@ -848,7 +848,6 @@ impl ToolErrorResponse {
                 detected_versions: Vec::new(),
                 detail_handle: Some(json!({
                     "type": "tool-contract",
-                    "tool": "run_sql",
                     "field": "rowLimit"
                 })),
             }
