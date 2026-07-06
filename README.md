@@ -645,6 +645,10 @@ Result behavior:
 - returns `affectedRowCount` for DML/DDL command tags when available
 - reports `totalRowCountKnown`
 - reports `truncated`
+- returns ordered `resultSets` for multi-statement SQL with 1-based
+  `statementIndex` values. Top-level `rows` and row metadata summarize the last
+  row-returning statement, or the last statement when no statement returned
+  rows. The row limit applies independently to each row-returning result set.
 - preserves `int8` and `numeric` values as JSON strings
 - serializes `json`/`jsonb` as nested JSON
 - serializes common Postgres arrays as JSON arrays

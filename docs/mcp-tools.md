@@ -220,7 +220,12 @@ Inputs:
 
 Returns:
 
-- rows for result-producing statements
+- `rows`: rows from the last row-returning statement, or an empty array when no
+  statement returned rows
+- `resultSets`: ordered per-statement results. Each entry includes 1-based
+  `statementIndex`, `rows`, `returnedRowCount`, `affectedRowCount`,
+  `totalRowCountKnown`, and `truncated`. The row limit applies independently to
+  each row-returning result set.
 - affected row count for mutations
 - `returnedRowCount`: number of rows included in `rows`
 - `affectedRowCount`: affected rows for DML/DDL command tags when applicable
@@ -235,7 +240,9 @@ returned as strings to preserve precision. `timestamp`, `timestamptz`, and
 as nested JSON. Common Postgres arrays such as `text[]`, integer arrays,
 `uuid[]`, `jsonb[]`, and `timestamptz[]` return JSON arrays with SQL `NULL`
 elements preserved as JSON `null`; `int8[]` elements follow the same string
-serialization rule. Unsupported non-null Postgres result types return a
+serialization rule. Multi-statement SQL is split into ordered statements and
+each row-returning statement is serialized with the same typed rules as a
+single-statement query. Unsupported non-null Postgres result types return a
 structured object with `unsupportedPostgresType` and a cast-to-text `hint`;
 unsupported SQL `NULL` values remain JSON `null`. With `readonly: true`,
 mutating statements are blocked by a read-only transaction; readonly violations

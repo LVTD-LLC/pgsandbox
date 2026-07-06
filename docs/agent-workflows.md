@@ -139,7 +139,9 @@ For a compact stored baseline, prefer snapshots:
 ```
 
 Use `returnedRowCount`, `affectedRowCount`, `totalRowCountKnown`, and
-`truncated` for result-size and mutation checks.
+`truncated` for result-size and mutation checks. For multi-statement SQL, read
+the ordered `resultSets` array when you need each statement's result; top-level
+`rows` mirrors the last row-returning statement.
 
 ## Repo Command Validation
 

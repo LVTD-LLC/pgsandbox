@@ -28,7 +28,7 @@ use tokio::{
 use tokio_postgres::{
     error::SqlState,
     types::{FromSql, ToSql, Type},
-    Client, NoTls, Row, SimpleQueryMessage,
+    Client, NoTls, Row,
 };
 use url::Url;
 use uuid::Uuid;
@@ -566,8 +566,20 @@ pub struct RunSqlOutput {
     pub affected_row_count: Option<u64>,
     pub total_row_count_known: bool,
     pub rows: Vec<Value>,
+    pub result_sets: Vec<RunSqlResultSet>,
     pub truncated: bool,
     pub elapsed_ms: u128,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct RunSqlResultSet {
+    pub statement_index: usize,
+    pub returned_row_count: usize,
+    pub affected_row_count: Option<u64>,
+    pub total_row_count_known: bool,
+    pub rows: Vec<Value>,
+    pub truncated: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -1047,7 +1059,39 @@ struct QueryExecutionResult {
     affected_row_count: Option<u64>,
     total_row_count_known: bool,
     rows: Vec<Value>,
+    result_sets: Vec<RunSqlResultSet>,
     truncated: bool,
+}
+
+impl QueryExecutionResult {
+    fn from_result_sets(result_sets: Vec<RunSqlResultSet>) -> Self {
+        let summary = result_sets
+            .iter()
+            .rev()
+            .find(|result_set| result_set.affected_row_count.is_none())
+            .cloned()
+            .or_else(|| result_sets.last().cloned());
+
+        let Some(summary) = summary else {
+            return Self {
+                returned_row_count: 0,
+                affected_row_count: None,
+                total_row_count_known: true,
+                rows: Vec::new(),
+                result_sets,
+                truncated: false,
+            };
+        };
+
+        Self {
+            returned_row_count: summary.returned_row_count,
+            affected_row_count: summary.affected_row_count,
+            total_row_count_known: summary.total_row_count_known,
+            rows: summary.rows.clone(),
+            result_sets,
+            truncated: summary.truncated,
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -1865,6 +1909,7 @@ impl PostgresSandboxManager {
             affected_row_count: result.affected_row_count,
             total_row_count_known: result.total_row_count_known,
             rows: result.rows,
+            result_sets: result.result_sets,
             truncated: result.truncated,
             elapsed_ms: started.elapsed().as_millis(),
         })
@@ -6134,6 +6179,25 @@ async fn run_sql_body(
     row_limit: usize,
     cursor_owns_transaction: bool,
 ) -> anyhow::Result<QueryExecutionResult> {
+    let statements = split_sql_statements(sql);
+    let mut result_sets = Vec::with_capacity(statements.len());
+
+    for (index, statement) in statements.iter().enumerate() {
+        let mut result_set =
+            run_sql_statement(client, statement, row_limit, cursor_owns_transaction).await?;
+        result_set.statement_index = index + 1;
+        result_sets.push(result_set);
+    }
+
+    Ok(QueryExecutionResult::from_result_sets(result_sets))
+}
+
+async fn run_sql_statement(
+    client: &Client,
+    sql: &str,
+    row_limit: usize,
+    cursor_owns_transaction: bool,
+) -> anyhow::Result<RunSqlResultSet> {
     match query_mode(sql) {
         QueryMode::Cursor => {
             run_cursor_query(client, sql, row_limit, cursor_owns_transaction).await
@@ -6148,7 +6212,7 @@ async fn run_cursor_query(
     sql: &str,
     row_limit: usize,
     owns_transaction: bool,
-) -> anyhow::Result<QueryExecutionResult> {
+) -> anyhow::Result<RunSqlResultSet> {
     let cursor_name = format!("pgsandbox_cursor_{}", Uuid::new_v4().simple());
     let quoted_cursor = quote_ident(&cursor_name)?;
     if owns_transaction {
@@ -6194,7 +6258,8 @@ async fn run_cursor_query(
     let truncated = rows.len() > row_limit;
     let visible_rows = rows.into_iter().take(row_limit).collect::<Vec<_>>();
     let returned_row_count = visible_rows.len();
-    Ok(QueryExecutionResult {
+    Ok(RunSqlResultSet {
+        statement_index: 0,
         returned_row_count,
         affected_row_count: None,
         total_row_count_known: !truncated,
@@ -6207,7 +6272,7 @@ async fn run_typed_query(
     client: &Client,
     sql: &str,
     row_limit: usize,
-) -> anyhow::Result<QueryExecutionResult> {
+) -> anyhow::Result<RunSqlResultSet> {
     let limited_sql = dml_returning_limit_sql(sql, row_limit);
     let rows = client
         .query(limited_sql.as_deref().unwrap_or(sql), &[])
@@ -6215,7 +6280,8 @@ async fn run_typed_query(
     let truncated = rows.len() > row_limit;
     let visible_rows = rows.into_iter().take(row_limit).collect::<Vec<_>>();
     let returned_row_count = visible_rows.len();
-    Ok(QueryExecutionResult {
+    Ok(RunSqlResultSet {
+        statement_index: 0,
         returned_row_count,
         affected_row_count: None,
         total_row_count_known: !truncated,
@@ -6282,71 +6348,17 @@ fn returning_limit_alias(sql: &str) -> String {
 async fn run_direct_query(
     client: &Client,
     sql: &str,
-    row_limit: usize,
-) -> anyhow::Result<QueryExecutionResult> {
-    let messages = client.simple_query(sql).await?;
-    Ok(format_simple_query_result(messages, row_limit))
-}
-
-fn format_simple_query_result(
-    messages: Vec<SimpleQueryMessage>,
-    row_limit: usize,
-) -> QueryExecutionResult {
-    let mut current_rows = Vec::new();
-    let mut current_had_rows = false;
-    let mut final_rows = Vec::new();
-    let mut final_had_rows = false;
-    let mut final_row_count = None;
-
-    for message in messages {
-        match message {
-            SimpleQueryMessage::Row(row) => {
-                if !current_had_rows {
-                    current_rows.clear();
-                    current_had_rows = true;
-                }
-                let mut object = serde_json::Map::new();
-                for (index, column) in row.columns().iter().enumerate() {
-                    object.insert(
-                        column.name().to_string(),
-                        row.get(index)
-                            .map_or(Value::Null, |value| Value::String(value.to_string())),
-                    );
-                }
-                current_rows.push(Value::Object(object));
-            }
-            SimpleQueryMessage::CommandComplete(count) => {
-                final_row_count = Some(count);
-                final_had_rows = current_had_rows;
-                final_rows = if current_had_rows {
-                    std::mem::take(&mut current_rows)
-                } else {
-                    Vec::new()
-                };
-                current_had_rows = false;
-            }
-            _ => {}
-        }
-    }
-
-    let truncated = final_rows.len() > row_limit;
-    let visible_rows = final_rows.into_iter().take(row_limit).collect::<Vec<_>>();
-    let returned_row_count = if final_had_rows {
-        visible_rows.len()
-    } else {
-        0
-    };
-    QueryExecutionResult {
-        returned_row_count,
-        affected_row_count: if final_had_rows {
-            None
-        } else {
-            final_row_count
-        },
-        total_row_count_known: !final_had_rows || !truncated,
-        rows: visible_rows,
-        truncated,
-    }
+    _row_limit: usize,
+) -> anyhow::Result<RunSqlResultSet> {
+    let affected_row_count = client.execute(sql, &[]).await?;
+    Ok(RunSqlResultSet {
+        statement_index: 0,
+        returned_row_count: 0,
+        affected_row_count: Some(affected_row_count),
+        total_row_count_known: true,
+        rows: Vec::new(),
+        truncated: false,
+    })
 }
 
 fn query_mode(sql: &str) -> QueryMode {
@@ -6357,6 +6369,36 @@ fn query_mode(sql: &str) -> QueryMode {
         return QueryMode::TypedRows;
     }
     QueryMode::Simple
+}
+
+fn split_sql_statements(sql: &str) -> Vec<String> {
+    let bytes = sql.as_bytes();
+    let mut index = 0;
+    let mut start = 0;
+    let mut statements = Vec::new();
+
+    while index < bytes.len() {
+        if skip_sql_noise(bytes, &mut index) {
+            continue;
+        }
+        if bytes[index] == b';' {
+            push_sql_statement(&mut statements, &sql[start..index]);
+            index += 1;
+            start = index;
+            continue;
+        }
+        index += 1;
+    }
+
+    push_sql_statement(&mut statements, &sql[start..]);
+    statements
+}
+
+fn push_sql_statement(statements: &mut Vec<String>, statement: &str) {
+    let trimmed = statement.trim();
+    if !trimmed.is_empty() && first_sql_keyword(trimmed).is_some() {
+        statements.push(trimmed.to_string());
+    }
 }
 
 fn first_sql_keyword(sql: &str) -> Option<String> {
@@ -7846,6 +7888,68 @@ mod tests {
             query_mode("create table users(id int)"),
             QueryMode::Simple
         ));
+    }
+
+    #[test]
+    fn splits_sql_statements_on_semicolons_outside_literals_and_comments() {
+        let statements = split_sql_statements(
+            r#"
+            -- leading semicolon noise ;
+            SELECT ';' AS literal;
+            CREATE FUNCTION demo() RETURNS void AS $$
+            BEGIN
+                PERFORM 1;
+            END
+            $$ LANGUAGE plpgsql;
+            /* ignored ; */ SELECT 2;
+            "#,
+        );
+
+        assert_eq!(
+            statements,
+            vec![
+                "-- leading semicolon noise ;\n            SELECT ';' AS literal",
+                "CREATE FUNCTION demo() RETURNS void AS $$\n            BEGIN\n                PERFORM 1;\n            END\n            $$ LANGUAGE plpgsql",
+                "/* ignored ; */ SELECT 2",
+            ]
+        );
+
+        assert!(split_sql_statements(" ; -- just a comment\n /* and another */ ; ").is_empty());
+    }
+
+    #[test]
+    fn run_sql_summary_prefers_last_row_returning_result_set() {
+        let result = QueryExecutionResult::from_result_sets(vec![
+            RunSqlResultSet {
+                statement_index: 1,
+                returned_row_count: 0,
+                affected_row_count: Some(0),
+                total_row_count_known: true,
+                rows: Vec::new(),
+                truncated: false,
+            },
+            RunSqlResultSet {
+                statement_index: 2,
+                returned_row_count: 1,
+                affected_row_count: None,
+                total_row_count_known: true,
+                rows: vec![json!({ "ignored": 1 })],
+                truncated: false,
+            },
+            RunSqlResultSet {
+                statement_index: 3,
+                returned_row_count: 1,
+                affected_row_count: None,
+                total_row_count_known: true,
+                rows: vec![json!({ "row_count": 2 })],
+                truncated: false,
+            },
+        ]);
+
+        assert_eq!(result.returned_row_count, 1);
+        assert_eq!(result.affected_row_count, None);
+        assert_eq!(result.rows, vec![json!({ "row_count": 2 })]);
+        assert_eq!(result.result_sets.len(), 3);
     }
 
     #[test]
