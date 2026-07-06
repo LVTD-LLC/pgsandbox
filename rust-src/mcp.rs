@@ -23,6 +23,8 @@ use crate::{
 };
 
 const TOOL_ENVELOPE_MARKER: &str = "__pgsandboxEnvelope";
+const ADMIN_AUTH_HINT: &str = "Run `pgsandbox-mcp doctor` to identify the active config source. If an MCP client config has a stale explicit PGSANDBOX_ADMIN_DATABASE_URL, run `pgsandbox-mcp setup --client <client>` without --admin-url, restart the MCP client, and retry.";
+const SOURCE_DATABASE_URL_HINT: &str = "Check `sourceDatabaseUrl` credentials, source database name, host/port reachability, and permissions. This failure happened while inspecting or reading the source database for clone_database.";
 
 pub const PUBLIC_MCP_TOOLS: &[&str] = &[
     "list_profiles",
@@ -776,7 +778,12 @@ impl ToolErrorResponse {
     fn from_error(error: &anyhow::Error) -> Self {
         let chain = sanitize_error_message(&format!("{error:#}"));
         let lower = chain.to_ascii_lowercase();
-        let body = if let Some(body) = postgres_db_error_body(error, &chain) {
+        let postgres_sqlstate = postgres_error_sqlstate(error);
+        let body = if let Some(body) =
+            source_database_url_error_body(&lower, &chain, postgres_sqlstate.clone())
+        {
+            body
+        } else if let Some(body) = postgres_db_error_body(error, &chain) {
             body
         } else if let Some(body) = unknown_profile_error_body(error) {
             body
@@ -858,7 +865,7 @@ impl ToolErrorResponse {
                 code: "postgres_auth_failed",
                 category: "postgres",
                 message: chain,
-                hint: "Run `pgsandbox-mcp doctor` to identify the active config source. If an MCP client config has a stale explicit PGSANDBOX_ADMIN_DATABASE_URL, run `pgsandbox-mcp setup --client <client>` without --admin-url, restart the MCP client, and retry.".to_string(),
+                hint: ADMIN_AUTH_HINT.to_string(),
                 sqlstate: None,
                 requested_version: None,
                 source_version: None,
@@ -1058,11 +1065,67 @@ fn unknown_profile_error_body(error: &anyhow::Error) -> Option<ToolErrorBody> {
 }
 
 fn postgres_db_error_body(error: &anyhow::Error, message: &str) -> Option<ToolErrorBody> {
+    let sqlstate = postgres_error_sqlstate(error)?;
+    sqlstate_error_body(&sqlstate, message.to_string())
+}
+
+fn postgres_error_sqlstate(error: &anyhow::Error) -> Option<String> {
     let postgres_error = error
         .chain()
         .find_map(|cause| cause.downcast_ref::<tokio_postgres::Error>())?;
     let db_error = postgres_error.as_db_error()?;
-    sqlstate_error_body(db_error.code().code(), message.to_string())
+    Some(db_error.code().code().to_string())
+}
+
+fn source_database_url_error_body(
+    lower: &str,
+    message: &str,
+    sqlstate: Option<String>,
+) -> Option<ToolErrorBody> {
+    if !is_source_database_url_context(lower) {
+        return None;
+    }
+
+    if lower.contains("password authentication failed") || lower.contains("authentication failed") {
+        return Some(postgres_error_body(
+            "postgres_auth_failed",
+            "postgres",
+            message,
+            SOURCE_DATABASE_URL_HINT,
+            sqlstate,
+        ));
+    }
+
+    if lower.contains("connection refused")
+        || lower.contains("connection timed out")
+        || lower.contains("failed to connect")
+    {
+        return Some(postgres_error_body(
+            "postgres_connection_failed",
+            "postgres",
+            message,
+            SOURCE_DATABASE_URL_HINT,
+            sqlstate,
+        ));
+    }
+
+    if lower.contains("permission denied") {
+        return Some(postgres_error_body(
+            "permission_denied",
+            "permission_denied",
+            message,
+            SOURCE_DATABASE_URL_HINT,
+            sqlstate,
+        ));
+    }
+
+    None
+}
+
+fn is_source_database_url_context(lower: &str) -> bool {
+    lower.contains("failed to inspect source postgres version before clone")
+        || lower.contains("sourcedatabaseurl")
+        || lower.contains("pg_dump failed")
 }
 
 fn stringly_sql_error_body(lower: &str, message: &str) -> Option<ToolErrorBody> {
@@ -1134,18 +1197,34 @@ fn sqlstate_error_body(sqlstate: &str, message: String) -> Option<ToolErrorBody>
         _ => return None,
     };
 
-    Some(ToolErrorBody {
+    Some(postgres_error_body(
         code,
         category,
-        message,
+        &message,
+        hint,
+        Some(sqlstate.to_string()),
+    ))
+}
+
+fn postgres_error_body(
+    code: &'static str,
+    category: &'static str,
+    message: &str,
+    hint: &str,
+    sqlstate: Option<String>,
+) -> ToolErrorBody {
+    ToolErrorBody {
+        code,
+        category,
+        message: message.to_string(),
         hint: hint.to_string(),
-        sqlstate: Some(sqlstate.to_string()),
+        sqlstate,
         requested_version: None,
         source_version: None,
         target_version: None,
         detected_versions: Vec::new(),
         detail_handle: None,
-    })
+    }
 }
 
 fn detected_postgres_versions() -> Vec<String> {
@@ -1411,6 +1490,39 @@ mod tests {
             .unwrap()
             .contains("pgsandbox-mcp doctor"));
         assert!(!text.contains("postgres:postgres@"));
+    }
+
+    #[test]
+    fn clone_source_auth_errors_hint_at_source_database_url() {
+        let result = tool_json::<()>(Err(anyhow::anyhow!(
+            "failed to inspect source Postgres version before clone: db error: FATAL: password authentication failed for user \"source_user\""
+        )))
+        .unwrap();
+        let text = result.content[0].as_text().unwrap().text.clone();
+        let value = serde_json::from_str::<Value>(&text).unwrap();
+        let hint = first_error(&value)["hint"].as_str().unwrap();
+
+        assert_eq!(first_error(&value)["code"], "postgres_auth_failed");
+        assert!(hint.contains("sourceDatabaseUrl"));
+        assert!(hint.contains("credentials"));
+        assert!(hint.contains("host/port"));
+        assert!(hint.contains("permissions"));
+        assert!(!hint.contains("PGSANDBOX_ADMIN_DATABASE_URL"));
+        assert!(!hint.contains("setup --client"));
+    }
+
+    #[test]
+    fn clone_source_error_hint_preserves_typed_sqlstate() {
+        let error = source_database_url_error_body(
+            "failed to inspect source postgres version before clone: db error: error: permission denied for schema public",
+            "failed to inspect source Postgres version before clone: db error: ERROR: permission denied for schema public",
+            Some("42501".to_string()),
+        )
+        .unwrap();
+
+        assert_eq!(error.code, "permission_denied");
+        assert_eq!(error.sqlstate.as_deref(), Some("42501"));
+        assert!(error.hint.contains("sourceDatabaseUrl"));
     }
 
     #[test]

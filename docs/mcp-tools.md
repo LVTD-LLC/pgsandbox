@@ -170,6 +170,11 @@ Notes:
 - If restore fails, PGSandbox attempts to delete the newly created sandbox.
 - Do not paste production URLs into prompts when a secret input or local
   environment variable can provide them.
+- Source inspection, source auth, source connection, and `pg_dump` permission
+  failures point their hint at `sourceDatabaseUrl` credentials, database name,
+  host/port reachability, and permissions. Admin config remediation hints are
+  reserved for failures involving the target sandbox profile or admin
+  connection.
 
 ## `delete_database`
 
