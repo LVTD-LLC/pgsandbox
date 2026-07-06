@@ -1,4 +1,8 @@
-use std::collections::BTreeMap;
+use std::{
+    collections::BTreeMap,
+    io::ErrorKind,
+    process::{Command, Stdio},
+};
 
 use anyhow::Context;
 
@@ -78,8 +82,14 @@ async fn setup(args: &[String]) -> anyhow::Result<u8> {
     let cwd = std::env::current_dir()?;
     let targets = resolve_targets(client, scope, &cwd)?;
 
-    if admin_url.is_none() {
-        eprintln!("No PGSANDBOX_ADMIN_DATABASE_URL was written. The MCP server will use the managed local Postgres cluster by default.");
+    if setup_should_prepare_managed_local(admin_url, dry_run) {
+        ensure_setup_managed_local(options.get("postgres-version").map(String::as_str))?;
+    } else if admin_url.is_none() {
+        println!(
+            "Dry run: managed local Postgres was not checked or started. Omit --dry-run to prepare it."
+        );
+    } else {
+        println!("Using explicit admin URL; managed local Postgres setup was skipped.");
     }
 
     for target in targets {
@@ -552,6 +562,99 @@ fn parse_options(args: &[String]) -> anyhow::Result<BTreeMap<String, String>> {
     Ok(options)
 }
 
+fn setup_should_prepare_managed_local(admin_url: Option<&str>, dry_run: bool) -> bool {
+    admin_url.is_none() && !dry_run
+}
+
+fn ensure_setup_managed_local(postgres_version: Option<&str>) -> anyhow::Result<()> {
+    println!("Checking managed local Postgres runtime...");
+    let cluster = LocalPostgresCluster::from_env_for_version(postgres_version)?;
+
+    match cluster.ensure_started() {
+        Ok(config) => {
+            println!("Local Postgres: running");
+            print_local_config(&config, &cluster);
+            Ok(())
+        }
+        Err(error) if setup_error_is_missing_local_postgres(&error) => {
+            install_local_postgres_with_homebrew(postgres_version)?;
+            let config = cluster
+                .ensure_started()
+                .context("failed to start managed local Postgres after installing PostgreSQL")?;
+            println!("Local Postgres: running");
+            print_local_config(&config, &cluster);
+            Ok(())
+        }
+        Err(error) => Err(error).context("failed to start managed local Postgres"),
+    }
+}
+
+fn setup_error_is_missing_local_postgres(error: &anyhow::Error) -> bool {
+    error.chain().any(|cause| {
+        cause
+            .to_string()
+            .starts_with("could not find local Postgres")
+    })
+}
+
+fn install_local_postgres_with_homebrew(postgres_version: Option<&str>) -> anyhow::Result<()> {
+    let package = homebrew_postgres_package(postgres_version)?;
+    ensure_homebrew_available()?;
+
+    println!("Postgres server binaries were not found.");
+    println!("Installing PostgreSQL with Homebrew: brew install {package}");
+
+    let status = Command::new("brew")
+        .arg("install")
+        .arg(&package)
+        .status()
+        .with_context(|| format!("failed to run `brew install {package}`"))?;
+    if !status.success() {
+        anyhow::bail!("`brew install {package}` failed with {status}");
+    }
+    Ok(())
+}
+
+fn ensure_homebrew_available() -> anyhow::Result<()> {
+    match Command::new("brew")
+        .arg("--version")
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+    {
+        Ok(status) if status.success() => Ok(()),
+        Ok(status) => anyhow::bail!(
+            "Homebrew is installed, but `brew --version` failed with {status}"
+        ),
+        Err(error) if error.kind() == ErrorKind::NotFound => anyhow::bail!(
+            "Postgres server binaries are missing and Homebrew is not available. Install Homebrew and rerun `pgsandbox-mcp setup`, or install PostgreSQL manually and set PGSANDBOX_POSTGRES_BIN_DIR."
+        ),
+        Err(error) => Err(error).context("failed to run `brew --version`"),
+    }
+}
+
+fn homebrew_postgres_package(postgres_version: Option<&str>) -> anyhow::Result<String> {
+    match postgres_version
+        .map(normalize_setup_postgres_version)
+        .transpose()?
+    {
+        Some(version) => Ok(format!("postgresql@{version}")),
+        None => Ok("postgresql".to_string()),
+    }
+}
+
+fn normalize_setup_postgres_version(value: &str) -> anyhow::Result<String> {
+    let value = value.trim();
+    let major = value
+        .chars()
+        .take_while(|character| character.is_ascii_digit())
+        .collect::<String>();
+    if major.is_empty() {
+        anyhow::bail!("postgres-version must start with a numeric major version");
+    }
+    Ok(major)
+}
+
 fn next_value<'a>(args: &'a [String], index: usize, flag: &str) -> anyhow::Result<&'a str> {
     args.get(index)
         .map(String::as_str)
@@ -610,7 +713,7 @@ fn help_text() -> String {
 Usage:
   pgsandbox-mcp                      Start the MCP server over stdio
   pgsandbox-mcp stdio                Start the MCP server over stdio
-  pgsandbox-mcp setup [options]      Write MCP client config
+  pgsandbox-mcp setup [options]      Check and start managed local Postgres, then write MCP client config
   pgsandbox-mcp doctor [options]     Check config and Postgres connectivity
   pgsandbox-mcp local init [options] Initialize the managed local Postgres cluster
   pgsandbox-mcp local start [options] Start the managed local Postgres cluster
@@ -625,7 +728,7 @@ Setup options:
   --postgres-version <major>          Managed local Postgres version, for example 16
   --command <command>                Command MCP clients should run
   --name <name>                      Server name in MCP config
-  --dry-run                          Print config without writing
+  --dry-run                          Print config without writing or preparing local Postgres
 "#
     )
 }
@@ -674,5 +777,43 @@ mod tests {
         assert!(help.contains("pgsandbox-mcp local start"));
         assert!(help.contains("pgsandbox-mcp local stop"));
         assert!(help.contains("pgsandbox-mcp local status"));
+    }
+
+    #[test]
+    fn setup_prepares_managed_local_runtime_by_default() {
+        assert!(setup_should_prepare_managed_local(None, false));
+    }
+
+    #[test]
+    fn setup_skips_managed_local_runtime_for_explicit_admin_url() {
+        assert!(!setup_should_prepare_managed_local(
+            Some("postgres://admin:secret@127.0.0.1/postgres"),
+            false
+        ));
+    }
+
+    #[test]
+    fn setup_skips_managed_local_runtime_for_dry_run() {
+        assert!(!setup_should_prepare_managed_local(None, true));
+    }
+
+    #[test]
+    fn setup_installs_unversioned_homebrew_postgres_by_default() {
+        assert_eq!(homebrew_postgres_package(None).unwrap(), "postgresql");
+    }
+
+    #[test]
+    fn setup_installs_requested_homebrew_postgres_major_version() {
+        assert_eq!(
+            homebrew_postgres_package(Some("18.4")).unwrap(),
+            "postgresql@18"
+        );
+    }
+
+    #[test]
+    fn help_text_describes_setup_preflight() {
+        let help = help_text();
+
+        assert!(help.contains("Check and start managed local Postgres"));
     }
 }

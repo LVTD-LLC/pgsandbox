@@ -145,9 +145,9 @@ fn doctor_config_error_lines(message: &str, available_versions: &[String]) -> Ve
         lines.push(available_versions_line(available_versions));
         lines.push(match requested_version {
             Some(version) => format!(
-                "Hint: install PostgreSQL {version} locally, set PGSANDBOX_POSTGRES_{version}_BIN_DIR or PGSANDBOX_POSTGRES_BIN_DIR, or choose an available version."
+                "Hint: run `pgsandbox-mcp setup --client <client> --postgres-version {version}` to let setup prepare the local runtime. If setup cannot install PostgreSQL automatically, set PGSANDBOX_POSTGRES_{version}_BIN_DIR or PGSANDBOX_POSTGRES_BIN_DIR, or choose an available version."
             ),
-            None => "Hint: install PostgreSQL locally, set PGSANDBOX_POSTGRES_BIN_DIR, or choose an available version.".to_string(),
+            None => "Hint: run `pgsandbox-mcp setup --client <client>` to let setup prepare the local runtime. If setup cannot install PostgreSQL automatically, set PGSANDBOX_POSTGRES_BIN_DIR or choose an available version.".to_string(),
         });
         return lines;
     }
@@ -281,6 +281,7 @@ mod tests {
 
         assert!(text.contains("Local Postgres 99 binaries are unavailable."));
         assert!(text.contains("Available local Postgres versions: 16, 18"));
+        assert!(text.contains("pgsandbox-mcp setup --client <client> --postgres-version 99"));
         assert!(text.contains("PGSANDBOX_POSTGRES_99_BIN_DIR"));
         assert!(!text.contains("Tried:"));
         assert!(!text.contains("/very/long/path"));

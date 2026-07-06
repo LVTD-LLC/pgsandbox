@@ -67,8 +67,9 @@ shared developer database.
 For normal end-user installation:
 
 - macOS or Linux on `x86_64` or `aarch64`
-- Local PostgreSQL server binaries for the managed local runtime:
-  `initdb`, `pg_ctl`, and `postgres`
+- Local PostgreSQL server binaries for the managed local runtime. `setup`
+  checks for them, installs PostgreSQL through Homebrew when available, and
+  starts the managed local cluster.
 - Optional PostgreSQL dump tools for clone/template workflows:
   `pg_dump` and `pg_restore`
 - One MCP client: Codex, Cursor, VS Code, Claude Desktop, or another client
@@ -85,20 +86,10 @@ For repository development:
 - PostgreSQL server binaries available on `PATH`, in a common package-manager
   location, or through `PGSANDBOX_POSTGRES_BIN_DIR`
 
-On macOS with Homebrew, a practical local Postgres setup is:
-
-```bash
-brew install postgresql@17
-```
-
 PGSandbox checks `PATH`, common Homebrew locations such as
-`/opt/homebrew/opt/postgresql@17/bin`, Postgres.app locations, and explicit bin
-dir environment variables. Homebrew kegs do not need to be linked globally if
-PGSandbox can discover the `opt` path.
-
-On Linux, install PostgreSQL through your distribution package manager and make
-sure the server binaries are available. The exact package names vary by
-distribution and Postgres repository.
+`/opt/homebrew/opt/postgresql/bin` and `/opt/homebrew/opt/postgresql@18/bin`,
+Postgres.app locations, and explicit bin dir environment variables. Homebrew
+kegs do not need to be linked globally if PGSandbox can discover the `opt` path.
 
 Docker is not required. `docker-compose.example.yml` is only a demo helper for
 users who intentionally want an external local Postgres profile.
@@ -109,37 +100,7 @@ These steps are for a normal user who wants to install the released
 `pgsandbox-mcp` binary and use it from an MCP client. You do not need to clone
 this repository, install Rust, or run Cargo for the standard setup.
 
-### 1. Install PostgreSQL Binaries
-
-PGSandbox manages its own local Postgres cluster by default, but it does not
-install Postgres itself. The managed local runtime needs these server binaries:
-
-```bash
-initdb --version
-pg_ctl --version
-postgres --version
-```
-
-On macOS with Homebrew:
-
-```bash
-brew install postgresql@17
-```
-
-PGSandbox can discover Homebrew's `opt` paths, so the keg does not need to be
-globally linked. If your Postgres binaries are installed somewhere custom, set:
-
-```bash
-export PGSANDBOX_POSTGRES_BIN_DIR="/path/to/postgres/bin"
-```
-
-For version-specific local profiles, use a version-specific bin dir:
-
-```bash
-export PGSANDBOX_POSTGRES_18_BIN_DIR="/opt/homebrew/opt/postgresql@18/bin"
-```
-
-### 2. Install PGSandbox MCP
+### 1. Install PGSandbox MCP
 
 Homebrew is the recommended install path:
 
@@ -163,7 +124,7 @@ Verify the installed binary:
 pgsandbox-mcp --version
 ```
 
-### 3. Configure Your MCP Client
+### 2. Run Setup
 
 Pick the client you use:
 
@@ -173,6 +134,15 @@ pgsandbox-mcp setup --client cursor
 pgsandbox-mcp setup --client vscode
 pgsandbox-mcp setup --client claude-desktop
 ```
+
+`setup` does the normal local setup work for you:
+
+- checks for the PostgreSQL server binaries the managed runtime needs
+- installs PostgreSQL with Homebrew when those binaries are missing and
+  Homebrew is available
+- initializes and starts the managed local Postgres cluster under
+  `~/.pgsandbox/`
+- writes the MCP client config
 
 For Cursor or VS Code project-local config:
 
@@ -192,7 +162,21 @@ local/private Postgres admin profile:
 pgsandbox-mcp setup --client codex --admin-url "$PGSANDBOX_ADMIN_DATABASE_URL"
 ```
 
-### 4. Verify The Local Runtime
+### 3. Restart Your MCP Client
+
+Restart Codex, Cursor, VS Code, or Claude Desktop after setup. MCP clients cache
+server metadata and usually do not notice a newly configured server until
+restart.
+
+In Codex, run:
+
+```text
+/mcp
+```
+
+Verify that the `pgsandbox` server appears.
+
+### 4. Optional Verification
 
 Run diagnostics:
 
@@ -219,21 +203,7 @@ pgsandbox-mcp local start
 The runtime starts at port `65432` and scans upward for a free port. It should
 not collide with Docker or another developer Postgres already using `5432`.
 
-### 5. Restart Your MCP Client
-
-Restart Codex, Cursor, VS Code, or Claude Desktop after setup. MCP clients cache
-server metadata and usually do not notice a newly configured server until
-restart.
-
-In Codex, run:
-
-```text
-/mcp
-```
-
-Verify that the `pgsandbox` server appears.
-
-### 6. Use A Sandbox
+### 5. Use A Sandbox
 
 Ask your agent to create a disposable Postgres sandbox for the task. A typical
 agent workflow is:
@@ -791,7 +761,8 @@ Telemetry never blocks CLI or MCP tool results. See
 
 PGSandbox is designed as local/private infrastructure:
 
-- It does not install or manage Postgres packages.
+- It installs PostgreSQL packages only during explicit `setup` runs when
+  Homebrew is available.
 - It does not require Docker.
 - It does not stop Docker containers.
 - It does not bind `localhost:5432` by default.
@@ -1035,12 +1006,12 @@ CLI commands after installation:
 |---------|-------------|
 | `pgsandbox-mcp` | Start stdio MCP server. |
 | `pgsandbox-mcp stdio` | Start stdio MCP server explicitly. |
-| `pgsandbox-mcp setup --client codex` | Write user-scoped Codex MCP config. |
-| `pgsandbox-mcp setup --client cursor --scope project` | Write project `.cursor/mcp.json`. |
-| `pgsandbox-mcp setup --client vscode --scope project` | Write project `.vscode/mcp.json`. |
-| `pgsandbox-mcp setup --client claude-desktop` | Write Claude Desktop user config. |
-| `pgsandbox-mcp setup --client all` | Write supported user-scoped configs. |
-| `pgsandbox-mcp setup --client codex --dry-run` | Print intended config without writing. |
+| `pgsandbox-mcp setup --client codex` | Prepare managed local Postgres and write user-scoped Codex MCP config. |
+| `pgsandbox-mcp setup --client cursor --scope project` | Prepare managed local Postgres and write project `.cursor/mcp.json`. |
+| `pgsandbox-mcp setup --client vscode --scope project` | Prepare managed local Postgres and write project `.vscode/mcp.json`. |
+| `pgsandbox-mcp setup --client claude-desktop` | Prepare managed local Postgres and write Claude Desktop user config. |
+| `pgsandbox-mcp setup --client all` | Prepare managed local Postgres and write supported user-scoped configs. |
+| `pgsandbox-mcp setup --client codex --dry-run` | Print intended config without writing or preparing local Postgres. |
 | `pgsandbox-mcp doctor` | Check config and Postgres connectivity. |
 | `pgsandbox-mcp doctor --postgres-version 18` | Check a requested managed local major version. |
 | `pgsandbox-mcp local init` | Initialize managed local Postgres without starting it. |
@@ -1413,21 +1384,28 @@ This is optional. Runtime code must not require Docker.
 
 ### `could not find local Postgres binaries`
 
-Install PostgreSQL server binaries and make `initdb`, `pg_ctl`, and `postgres`
-discoverable.
+Rerun setup first. It checks the local runtime, installs PostgreSQL through
+Homebrew when available, starts the managed local cluster, and writes MCP config:
 
 ```bash
-brew install postgresql@17
-export PGSANDBOX_POSTGRES_BIN_DIR="/opt/homebrew/opt/postgresql@17/bin"
+pgsandbox-mcp setup --client codex
+```
+
+If setup cannot install PostgreSQL automatically, install the server binaries
+with your system package manager and point PGSandbox at their bin directory:
+
+```bash
+export PGSANDBOX_POSTGRES_BIN_DIR="/path/to/postgres/bin"
+pgsandbox-mcp setup --client codex
 pgsandbox-mcp doctor
 ```
 
-For a requested major version:
+For a requested major version on Homebrew:
 
 ```bash
 brew install postgresql@18
 export PGSANDBOX_POSTGRES_18_BIN_DIR="/opt/homebrew/opt/postgresql@18/bin"
-pgsandbox-mcp doctor --postgres-version 18
+pgsandbox-mcp setup --client codex --postgres-version 18
 ```
 
 ### Requested Postgres Version Is Missing
