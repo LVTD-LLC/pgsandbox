@@ -1579,6 +1579,17 @@ All running versions:
 { "includeAllVersions": true, "dryRun": true }
 ```
 
+Only sandboxes matching the current owner and task labels:
+
+```json
+{
+  "includeAllVersions": true,
+  "dryRun": true,
+  "owner": "codex-run-1",
+  "labels": { "task": "PGS-043" }
+}
+```
+
 Then run without `dryRun` to delete selected expired sandboxes.
 
 ### Local State Permissions

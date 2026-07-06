@@ -55,6 +55,7 @@ const DEFAULT_WORKFLOW_TIMEOUT_SECONDS: u64 = 120;
 const MAX_WORKFLOW_TIMEOUT_SECONDS: u64 = 600;
 const DEFAULT_SCHEMA_OPERATION_TIMEOUT_SECONDS: u64 = 30;
 const CONNECTION_TASK_CLOSE_TIMEOUT_SECONDS: u64 = 2;
+const CLEANUP_EXPIRED_LIMIT: usize = 50;
 const MAX_COMMAND_OUTPUT_BYTES: usize = 8_000;
 const MAX_WORKFLOW_COMMAND_PARTS: usize = 16;
 const MAX_WORKFLOW_COMMAND_TOTAL_BYTES: usize = 2_048;
@@ -224,6 +225,8 @@ pub struct CleanupExpiredInput {
     pub postgres_version: Option<String>,
     pub include_all_versions: Option<bool>,
     pub dry_run: Option<bool>,
+    pub owner: Option<String>,
+    pub labels: Option<BTreeMap<String, Value>>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -612,9 +615,36 @@ pub struct CleanupExpiredOutput {
     pub profiles: Vec<String>,
     pub remaining_profiles: Vec<String>,
     pub dry_run: bool,
+    pub filters: CleanupExpiredFilters,
     pub selected: Option<Vec<Value>>,
     pub deleted: Option<Vec<String>>,
     pub failures: Option<Vec<Value>>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct CleanupExpiredFilters {
+    pub owner: Option<String>,
+    pub labels: BTreeMap<String, Value>,
+}
+
+impl CleanupExpiredFilters {
+    fn from_input(input: &CleanupExpiredInput) -> Self {
+        Self {
+            owner: input.owner.clone(),
+            labels: input.labels.clone().unwrap_or_default(),
+        }
+    }
+
+    fn label_filter_value(&self) -> anyhow::Result<Option<Value>> {
+        if self.labels.is_empty() {
+            return Ok(None);
+        }
+
+        serde_json::to_value(&self.labels)
+            .map(Some)
+            .context("failed to serialize cleanup label filters")
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, JsonSchema, Clone, PartialEq, Eq)]
@@ -3058,6 +3088,7 @@ impl PostgresSandboxManager {
         input: CleanupExpiredInput,
     ) -> anyhow::Result<CleanupExpiredOutput> {
         let dry_run = input.dry_run.unwrap_or(false);
+        let filters = CleanupExpiredFilters::from_input(&input);
         if all_versions_requested(
             input.postgres_version.as_deref(),
             input.include_all_versions,
@@ -3076,7 +3107,10 @@ impl PostgresSandboxManager {
             let mut deleted = Vec::new();
             let mut failures = Vec::new();
             for profile in &profiles {
-                match self.cleanup_expired_for_profile(profile, dry_run).await {
+                match self
+                    .cleanup_expired_for_profile(profile, dry_run, &filters)
+                    .await
+                {
                     Ok(result) => {
                         if let Some(profile_selected) = result.selected {
                             selected.extend(profile_selected);
@@ -3097,6 +3131,7 @@ impl PostgresSandboxManager {
                 profiles: profile_names,
                 remaining_profiles: Vec::new(),
                 dry_run,
+                filters,
                 selected: dry_run.then_some(selected),
                 deleted: (!dry_run).then_some(deleted),
                 failures: (!failures.is_empty() || !dry_run).then_some(failures),
@@ -3105,7 +3140,9 @@ impl PostgresSandboxManager {
 
         let profile =
             self.resolve_profile(input.profile.as_deref(), input.postgres_version.as_deref())?;
-        let mut result = self.cleanup_expired_for_profile(&profile, dry_run).await?;
+        let mut result = self
+            .cleanup_expired_for_profile(&profile, dry_run, &filters)
+            .await?;
         result.remaining_profiles = self
             .profile_names_for_scope_hint()
             .into_iter()
@@ -3118,26 +3155,20 @@ impl PostgresSandboxManager {
         &self,
         profile: &SandboxProfile,
         dry_run: bool,
+        filters: &CleanupExpiredFilters,
     ) -> anyhow::Result<CleanupExpiredOutput> {
         let (client, connection_task) = connect_admin(profile).await?;
         ensure_metadata_table(&client, profile).await?;
-        let expired = client
-            .query(
-                &format!(
-                    r#"
-                      SELECT *
-                      FROM {}
-                      WHERE profile_name = $1
-                        AND deleted_at IS NULL
-                        AND expires_at <= now()
-                      ORDER BY expires_at ASC
-                      LIMIT 50
-                    "#,
-                    quote_ident(METADATA_TABLE)?
-                ),
-                &[&profile.name],
-            )
-            .await?;
+        let sql = cleanup_expired_selection_sql(filters)?;
+        let label_filter = filters.label_filter_value()?;
+        let mut params = vec![&profile.name as &(dyn ToSql + Sync)];
+        if let Some(owner) = filters.owner.as_ref() {
+            params.push(owner);
+        }
+        if let Some(label_filter) = label_filter.as_ref() {
+            params.push(label_filter);
+        }
+        let expired = client.query(&sql, &params).await?;
         let records = expired
             .iter()
             .map(sandbox_record_from_row)
@@ -3152,6 +3183,7 @@ impl PostgresSandboxManager {
                 profiles: vec![profile.name.clone()],
                 remaining_profiles: Vec::new(),
                 dry_run: true,
+                filters: filters.clone(),
                 selected: Some(records.iter().map(record_to_json).collect()),
                 deleted: None,
                 failures: None,
@@ -3231,6 +3263,7 @@ impl PostgresSandboxManager {
             profiles: vec![profile.name.clone()],
             remaining_profiles: Vec::new(),
             dry_run: false,
+            filters: filters.clone(),
             selected: None,
             deleted: Some(deleted),
             failures: Some(failures),
@@ -5198,6 +5231,37 @@ fn active_owner_quota_sql() -> anyhow::Result<String> {
             AND expires_at > now()
         "#,
         quote_ident(METADATA_TABLE)?
+    ))
+}
+
+fn cleanup_expired_selection_sql(filters: &CleanupExpiredFilters) -> anyhow::Result<String> {
+    let mut predicates = vec![
+        "profile_name = $1".to_string(),
+        "deleted_at IS NULL".to_string(),
+        "expires_at <= now()".to_string(),
+    ];
+    let mut next_param = 2;
+
+    if filters.owner.is_some() {
+        predicates.push(format!("owner = ${next_param}"));
+        next_param += 1;
+    }
+
+    if !filters.labels.is_empty() {
+        predicates.push(format!("labels @> ${next_param}::jsonb"));
+    }
+
+    Ok(format!(
+        r#"
+                      SELECT *
+                      FROM {}
+                      WHERE {}
+                      ORDER BY expires_at ASC
+                      LIMIT {}
+                    "#,
+        quote_ident(METADATA_TABLE)?,
+        predicates.join("\n                        AND "),
+        CLEANUP_EXPIRED_LIMIT
     ))
 }
 
@@ -7636,6 +7700,8 @@ mod tests {
                 postgres_version: None,
                 include_all_versions: Some(true),
                 dry_run: Some(true),
+                owner: None,
+                labels: None,
             })
             .await
             .unwrap();
@@ -7797,6 +7863,48 @@ mod tests {
 
         assert!(sql.contains("deleted_at IS NULL"));
         assert!(sql.contains("expires_at > now()"));
+    }
+
+    #[test]
+    fn cleanup_expired_selection_sql_scopes_by_owner_and_label_filters() {
+        let filters = CleanupExpiredFilters {
+            owner: Some("codex-run-1".to_string()),
+            labels: BTreeMap::from([
+                ("task".to_string(), json!("PGS-043")),
+                ("run".to_string(), json!("e2e")),
+            ]),
+        };
+
+        let sql = cleanup_expired_selection_sql(&filters).unwrap();
+
+        assert!(sql.contains("profile_name = $1"));
+        assert!(sql.contains("owner = $2"));
+        assert!(sql.contains("labels @> $3::jsonb"));
+        assert!(sql.contains("LIMIT 50"));
+    }
+
+    #[test]
+    fn cleanup_expired_filters_report_applied_owner_and_labels() {
+        let input = CleanupExpiredInput {
+            profile: None,
+            postgres_version: None,
+            include_all_versions: None,
+            dry_run: Some(true),
+            owner: Some("codex-run-1".to_string()),
+            labels: Some(BTreeMap::from([("task".to_string(), json!("PGS-043"))])),
+        };
+
+        let filters = CleanupExpiredFilters::from_input(&input);
+
+        assert_eq!(
+            serde_json::to_value(filters).unwrap(),
+            json!({
+                "owner": "codex-run-1",
+                "labels": {
+                    "task": "PGS-043"
+                }
+            })
+        );
     }
 
     #[test]

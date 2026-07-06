@@ -679,6 +679,12 @@ Inputs:
   profiles and running managed-local version profiles. Do not combine with
   `profile`.
 - `dryRun`: optional boolean
+- `owner`: optional owner filter. When supplied, cleanup only selects expired
+  sandboxes whose stored owner exactly matches this value.
+- `labels`: optional label filter object. When supplied, cleanup only selects
+  expired sandboxes whose stored labels contain every provided key/value pair.
+  Sandboxes may have additional labels. When `owner` and `labels` are both
+  supplied, both filters must match.
 
 Returns:
 
@@ -687,9 +693,12 @@ Returns:
 - `profiles`: profiles included in the cleanup
 - `remainingProfiles`: other known profiles when cleanup was scoped to one
   profile, so agents know whether another cleanup call may be needed
-- resources selected
-- resources deleted
-- failures. All-version cleanup reports profile-level failures with `profile`,
+- `dryRun`: whether the call only selected candidates
+- `filters`: applied cleanup filters with `owner` and `labels`
+- `selected`: resources selected when `dryRun` is true
+- `deleted`: deleted database ids when `dryRun` is false
+- `failures`: deletion or profile-level failures. All-version cleanup reports
+  profile-level failures with `profile`,
   `category: "profile_unavailable"`, and a safe `message` while continuing with
   other profiles.
 
