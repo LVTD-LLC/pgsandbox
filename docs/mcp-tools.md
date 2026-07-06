@@ -22,11 +22,12 @@ Workflow-oriented tools return a compact result envelope:
 - `detailHandles`: opaque pointers agents can use in follow-up calls
 - `result`: workflow-specific output when available
 
-Full sandbox connection strings are returned only by `get_connection_string`.
 Creation-style tools return `connectionStringRedacted` for safe summaries and
-task trackers. Call `get_connection_string` only when a tool or command needs
-the actual credential, and do not echo that value into chat, logs, or durable
-datasets.
+task trackers. `get_connection_string` also returns only
+`connectionStringRedacted` by default. Pass `includeCredentials: true` only
+when a tool or command needs the actual credential-bearing `connectionString`,
+and do not echo that sensitive value into chat, logs, PR comments, issues, or
+durable datasets.
 
 Tool failures are returned as MCP tool errors whose text content is a safe JSON
 object with `ok: false`, `error.code`, `error.category`, `error.message`, and
@@ -182,18 +183,24 @@ Returns:
 
 ## `get_connection_string`
 
-Returns the connection string for a database created by this MCP.
+Returns the redacted connection string for a database created by this MCP. The
+raw credential-bearing `connectionString` is sensitive and is only returned
+when `includeCredentials` is true.
 
 Inputs:
 
 - `profile`: optional Postgres profile name
 - `postgresVersion`: optional Postgres major version
 - `databaseId` or `databaseName`
+- `includeCredentials`: optional boolean, defaults to false. When true, the
+  response includes raw `connectionString` with sandbox role credentials.
 
 Returns:
 
-- `connectionString`
-- `connectionStringRedacted`
+- `connectionStringRedacted`: safe display value for logs, task trackers, and
+  summaries
+- `connectionString`: present only when `includeCredentials` is true; sensitive
+  credential-bearing value for direct database clients and commands
 - `expiresAt`
 
 ## `run_sql`
@@ -586,7 +593,8 @@ Inputs:
 
 Returns the new sandbox metadata under `result` with
 `connectionStringRedacted`. Call `get_connection_string` with the returned
-`databaseId` only when the full connection string is explicitly needed.
+`databaseId` and `includeCredentials: true` only when the full connection string
+is explicitly needed.
 
 ### `list_templates`
 

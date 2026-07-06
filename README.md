@@ -497,9 +497,10 @@ JSON `null`.
 It also reports `returnedRowCount`, `affectedRowCount`, `totalRowCountKnown`,
 and `truncated`.
 Creation tools return `connectionStringRedacted` for safe summaries and task
-trackers. Full sandbox connection strings are returned only by
-`get_connection_string`; call it only when a tool or command needs the actual
-credential, and avoid echoing that value into chat, logs, or durable datasets.
+trackers. `get_connection_string` also returns only `connectionStringRedacted`
+by default. Pass `includeCredentials: true` only when a tool or command needs
+the actual credential-bearing `connectionString`, and avoid echoing that
+sensitive value into chat, logs, PR comments, issues, or durable datasets.
 Use `doctor` from MCP when a client cannot shell out to `pgsandbox-mcp doctor`.
 
 By default, `list_databases` and `cleanup_expired` are scoped to the selected

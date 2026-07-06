@@ -17,7 +17,7 @@ use chrono::{DateTime, Duration, NaiveDate, NaiveDateTime, NaiveTime, Utc};
 use postgres_native_tls::MakeTlsConnector;
 use regex::Regex;
 use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
+use serde::{ser::SerializeStruct, Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use tokio::{
@@ -124,6 +124,41 @@ pub struct DatabaseSelector {
     pub postgres_version: Option<String>,
     pub database_id: Option<String>,
     pub database_name: Option<String>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ConnectionStringInput {
+    pub profile: Option<String>,
+    pub postgres_version: Option<String>,
+    pub database_id: Option<String>,
+    pub database_name: Option<String>,
+    #[schemars(
+        description = "When true, include the raw credential-bearing connectionString in the response. Defaults to false so the response contains only connectionStringRedacted."
+    )]
+    pub include_credentials: Option<bool>,
+}
+
+impl From<ConnectionStringInput> for DatabaseSelector {
+    fn from(input: ConnectionStringInput) -> Self {
+        Self {
+            profile: input.profile,
+            postgres_version: input.postgres_version,
+            database_id: input.database_id,
+            database_name: input.database_name,
+        }
+    }
+}
+
+impl From<&ConnectionStringInput> for DatabaseSelector {
+    fn from(input: &ConnectionStringInput) -> Self {
+        Self {
+            profile: input.profile.clone(),
+            postgres_version: input.postgres_version.clone(),
+            database_id: input.database_id.clone(),
+            database_name: input.database_name.clone(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
@@ -455,14 +490,71 @@ pub struct DeleteDatabaseOutput {
     pub deleted: bool,
 }
 
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
 pub struct ConnectionStringOutput {
     pub database_id: String,
     pub database_name: String,
     pub expires_at: DateTime<Utc>,
     pub connection_string: String,
     pub connection_string_redacted: String,
+    include_credentials: bool,
+}
+
+impl ConnectionStringOutput {
+    fn new(
+        database_id: String,
+        database_name: String,
+        expires_at: DateTime<Utc>,
+        connection_string: String,
+    ) -> Self {
+        Self {
+            database_id,
+            database_name,
+            expires_at,
+            connection_string_redacted: mask_connection_string(&connection_string),
+            connection_string,
+            include_credentials: false,
+        }
+    }
+
+    pub fn with_credentials_in_response(mut self, include_credentials: bool) -> Self {
+        self.include_credentials = include_credentials;
+        self
+    }
+}
+
+impl fmt::Debug for ConnectionStringOutput {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("ConnectionStringOutput")
+            .field("database_id", &self.database_id)
+            .field("database_name", &self.database_name)
+            .field("expires_at", &self.expires_at)
+            .field("connection_string", &"<redacted>")
+            .field(
+                "connection_string_redacted",
+                &self.connection_string_redacted,
+            )
+            .field("include_credentials", &self.include_credentials)
+            .finish()
+    }
+}
+
+impl Serialize for ConnectionStringOutput {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let field_count = if self.include_credentials { 5 } else { 4 };
+        let mut state = serializer.serialize_struct("ConnectionStringOutput", field_count)?;
+        state.serialize_field("databaseId", &self.database_id)?;
+        state.serialize_field("databaseName", &self.database_name)?;
+        state.serialize_field("expiresAt", &self.expires_at)?;
+        if self.include_credentials {
+            state.serialize_field("connectionString", &self.connection_string)?;
+        }
+        state.serialize_field("connectionStringRedacted", &self.connection_string_redacted)?;
+        state.end()
+    }
 }
 
 #[derive(Debug, Serialize, PartialEq)]
@@ -1595,13 +1687,12 @@ impl PostgresSandboxManager {
             &unprotect_role_password(&record.role_password, &profile)?,
         )?;
 
-        Ok(ConnectionStringOutput {
-            database_id: record.database_id,
-            database_name: record.database_name.clone(),
-            expires_at: record.expires_at,
-            connection_string_redacted: mask_connection_string(&connection_string),
+        Ok(ConnectionStringOutput::new(
+            record.database_id,
+            record.database_name.clone(),
+            record.expires_at,
             connection_string,
-        })
+        ))
     }
 
     pub async fn list_databases(
@@ -2435,13 +2526,12 @@ impl PostgresSandboxManager {
                 })
                 .await?;
             created_profile = Some(created.profile.clone());
-            ConnectionStringOutput {
-                database_id: created.database_id,
-                database_name: created.database_name,
-                expires_at: created.expires_at,
-                connection_string_redacted: mask_connection_string(&created.connection_string),
-                connection_string: created.connection_string,
-            }
+            ConnectionStringOutput::new(
+                created.database_id,
+                created.database_name,
+                created.expires_at,
+                created.connection_string,
+            )
         } else {
             self.get_connection_string(DatabaseSelector {
                 profile: input.profile,
@@ -7863,15 +7953,38 @@ mod tests {
     }
 
     #[test]
-    fn explicit_connection_string_lookup_serializes_full_connection_string() {
+    fn connection_string_lookup_serializes_only_redacted_by_default() {
         let connection_string = "postgres://role:secret@localhost:5432/sandbox";
-        let output = serde_json::to_value(ConnectionStringOutput {
-            database_id: "db-id".to_string(),
-            database_name: "sandbox".to_string(),
-            expires_at: Utc::now(),
-            connection_string: connection_string.to_string(),
-            connection_string_redacted: mask_connection_string(connection_string),
-        })
+        let output = serde_json::to_value(ConnectionStringOutput::new(
+            "db-id".to_string(),
+            "sandbox".to_string(),
+            Utc::now(),
+            connection_string.to_string(),
+        ))
+        .unwrap();
+
+        assert!(output.get("connectionString").is_none());
+        assert_eq!(
+            output
+                .get("connectionStringRedacted")
+                .and_then(Value::as_str),
+            Some("postgres://role:****@localhost:5432/sandbox")
+        );
+        assert!(!output.to_string().contains("secret"));
+    }
+
+    #[test]
+    fn connection_string_lookup_serializes_full_string_only_when_requested() {
+        let connection_string = "postgres://role:secret@localhost:5432/sandbox";
+        let output = serde_json::to_value(
+            ConnectionStringOutput::new(
+                "db-id".to_string(),
+                "sandbox".to_string(),
+                Utc::now(),
+                connection_string.to_string(),
+            )
+            .with_credentials_in_response(true),
+        )
         .unwrap();
 
         assert_eq!(
@@ -7921,11 +8034,19 @@ mod tests {
             connection_string_redacted: mask_connection_string(connection_string),
             template_name: "seeded".to_string(),
         };
+        let lookup = ConnectionStringOutput::new(
+            "db-id".to_string(),
+            "sandbox".to_string(),
+            expires_at,
+            connection_string.to_string(),
+        )
+        .with_credentials_in_response(true);
 
         for debug_output in [
             format!("{created:?}"),
             format!("{cloned:?}"),
             format!("{restored:?}"),
+            format!("{lookup:?}"),
         ] {
             assert!(!debug_output.contains("secret"));
             assert!(!debug_output.contains(connection_string));

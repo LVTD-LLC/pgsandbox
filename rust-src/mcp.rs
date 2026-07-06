@@ -11,7 +11,7 @@ use crate::{
     config::SandboxConfig,
     doctor::run_doctor,
     postgres::{
-        CleanupExpiredInput, CloneDatabaseInput, CreateDatabaseInput,
+        CleanupExpiredInput, CloneDatabaseInput, ConnectionStringInput, CreateDatabaseInput,
         CreateSandboxFromTemplateInput, CreateSchemaSnapshotInput, CreateTemplateFromSandboxInput,
         DatabaseSelector, DeleteSchemaSnapshotInput, DeleteTemplateInput, DescribeSchemaInput,
         DiffSchemaSnapshotInput, ExplainQueryInput, ListDatabasesInput, ListProfilesInput,
@@ -193,17 +193,23 @@ impl PgsandboxServer {
         .await
     }
 
-    #[tool(description = "Return the connection string for a sandbox database.")]
+    #[tool(
+        description = "Return a redacted sandbox connection string by default; pass includeCredentials=true to include the raw credential-bearing connectionString."
+    )]
     async fn get_connection_string(
         &self,
-        Parameters(input): Parameters<DatabaseSelector>,
+        Parameters(input): Parameters<ConnectionStringInput>,
     ) -> Result<CallToolResult, ErrorData> {
-        let event_properties = selector_properties(&input);
-        self.tracked_tool(
-            "get_connection_string",
-            event_properties,
-            self.manager.get_connection_string(input),
-        )
+        let include_credentials = input.include_credentials.unwrap_or(false);
+        let selector = DatabaseSelector::from(&input);
+        let mut event_properties = selector_properties(&selector);
+        event_properties.insert("includeCredentials".to_string(), json!(include_credentials));
+        self.tracked_tool("get_connection_string", event_properties, async {
+            self.manager
+                .get_connection_string(selector)
+                .await
+                .map(|output| output.with_credentials_in_response(include_credentials))
+        })
         .await
     }
 

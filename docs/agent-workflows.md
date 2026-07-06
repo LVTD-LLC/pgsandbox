@@ -250,6 +250,7 @@ repair cases include:
   conflicting operation ends.
 
 Creation tools return `connectionStringRedacted` for summaries, task trackers,
-and logs. Call `get_connection_string` only when a command or database client
-needs the actual credential, and do not echo that full value into chat, logs, or
-durable datasets.
+and logs. `get_connection_string` also returns only `connectionStringRedacted`
+by default. Pass `includeCredentials: true` only when a command or database
+client needs the actual credential-bearing `connectionString`, and do not echo
+that full value into chat, logs, PR comments, issues, or durable datasets.
