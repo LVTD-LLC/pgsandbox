@@ -10,10 +10,11 @@ The managed local runtime requires `initdb`, `pg_ctl`, and `postgres`. The
 when they are missing and Homebrew is available, initializes and starts the
 managed local cluster, then writes MCP client config. PGSandbox also checks
 `PATH`, common Homebrew and Postgres.app install locations such as
-`/opt/homebrew/opt/postgresql/bin` and `/opt/homebrew/opt/postgresql@18/bin`,
-and explicit bin directory environment variables. The `clone_database` MCP tool
-additionally requires `pg_dump` and `pg_restore` because it streams a source
-database dump into a new sandbox.
+`/opt/homebrew/opt/postgresql/bin` and versioned locations from
+`postgresql@18` through `postgresql@13`, and explicit bin directory
+environment variables. The `clone_database` MCP tool additionally requires
+`pg_dump` and `pg_restore` because it streams a source database dump into a new
+sandbox.
 
 ## Agent-Assisted Setup
 
@@ -287,7 +288,9 @@ pgsandbox-mcp local status --postgres-version 18
 PGSandbox keeps each requested major version in separate local state, such as
 `~/.pgsandbox/postgres/versions/18/`, and uses profile names like `local-pg18`.
 It discovers binaries from `PATH`, common package-manager locations,
-`PGSANDBOX_POSTGRES_BIN_DIR`, or `PGSANDBOX_POSTGRES_18_BIN_DIR`.
+`PGSANDBOX_POSTGRES_BIN_DIR`, or `PGSANDBOX_POSTGRES_18_BIN_DIR`. Common-path
+version discovery includes installed Postgres 18, 17, 16, 15, 14, and 13
+binaries.
 
 ## Repo Workflow Recipe
 
@@ -324,7 +327,7 @@ repo command for the task and pass it as a short argv array.
   `PGSANDBOX_POSTGRES_BIN_DIR`.
 - Missing a requested Postgres version: install that version locally or set
   `PGSANDBOX_POSTGRES_<major>_BIN_DIR`, for example
-  `PGSANDBOX_POSTGRES_18_BIN_DIR=/opt/homebrew/opt/postgresql@18/bin`.
+  `PGSANDBOX_POSTGRES_13_BIN_DIR=/opt/homebrew/opt/postgresql@13/bin`.
 - Missing `pg_dump` or `pg_restore`: install PostgreSQL client tools before
   using `clone_database` or template tools.
 - Occupied local ports: run `pgsandbox-mcp local start`; the managed runtime

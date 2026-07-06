@@ -723,7 +723,8 @@ Unversioned `list_databases` and `cleanup_expired` are scoped to the selected
 default profile. Use `includeAllVersions=true` or `postgresVersion: "*"` when an
 agent needs a cross-version view or cleanup pass.
 
-Major-only version strings such as `"16"`, `"17"`, and `"18"` are canonical.
+Major-only version strings such as `"13"`, `"14"`, `"15"`, `"16"`, `"17"`,
+and `"18"` are canonical.
 Patch versions such as `"18.4"` are normalized to the major version for local
 profile selection.
 

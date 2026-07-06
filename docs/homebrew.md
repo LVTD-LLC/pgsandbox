@@ -20,8 +20,9 @@ This avoids asking users to install Node, npm, or a package manager runtime for 
 The formula installs only `pgsandbox-mcp`; users still need local PostgreSQL
 server binaries such as `initdb`, `pg_ctl`, and `postgres` for the managed local
 runtime. PGSandbox checks `PATH` plus common Homebrew and Postgres.app install
-locations, so a keg-only `postgresql@18` install can still work without a
-shell-specific PATH edit.
+locations, so keg-only installs from `postgresql@18` through `postgresql@13`
+can still work without a shell-specific PATH edit when their server binaries
+are present.
 
 ## Formula Template
 

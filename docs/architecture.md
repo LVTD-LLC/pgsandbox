@@ -98,7 +98,9 @@ separate profile and state root. Postgres 18, for example, uses profile
 `~/.pgsandbox/postgres/versions/18/`. PGSandbox discovers installed binaries
 from a version-specific bin dir env var such as `PGSANDBOX_POSTGRES_18_BIN_DIR`,
 the generic `PGSANDBOX_POSTGRES_BIN_DIR`, common package-manager locations, or
-`PATH`.
+`PATH`. Common-path discovery probes installed Postgres 18, 17, 16, 15, 14,
+and 13 binaries; explicit bin-dir settings can still target any numeric major
+version that reports matching binaries.
 
 The local runtime starts at port `65432` and scans upward for a free high port,
 so a Docker container or developer database on `5432` is not disturbed. It also

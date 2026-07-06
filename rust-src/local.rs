@@ -26,6 +26,7 @@ const DEFAULT_LOCAL_PORT: u16 = 65432;
 #[cfg(test)]
 const REQUIRED_LOCAL_BINARIES: &[&str] = &["initdb", "pg_ctl", "postgres"];
 const HOMEBREW_OPT_ROOTS: &[&str] = &["/opt/homebrew/opt", "/usr/local/opt"];
+const COMMON_POSTGRES_MAJOR_VERSIONS: &[&str] = &["18", "17", "16", "15", "14", "13"];
 const COMMON_LOCAL_POSTGRES_BIN_DIRS: &[&str] = &[
     "/opt/homebrew/opt/postgresql/bin",
     "/usr/local/opt/postgresql/bin",
@@ -845,6 +846,12 @@ fn discovered_common_postgres_bin_dirs() -> Vec<PathBuf> {
     let mut dirs = Vec::new();
     let mut seen = BTreeSet::new();
 
+    for version in COMMON_POSTGRES_MAJOR_VERSIONS {
+        for path in common_postgres_bin_dirs(version) {
+            push_unique_dir(&mut dirs, &mut seen, path);
+        }
+    }
+
     push_child_bin_dirs(
         &mut dirs,
         &mut seen,
@@ -1306,6 +1313,30 @@ mod tests {
         assert_eq!(dirs[0], directory.path().join("postgresql@19/bin"));
         assert_eq!(dirs[1], directory.path().join("postgresql@17/bin"));
         assert_eq!(dirs[2], directory.path().join("postgresql/bin"));
+    }
+
+    #[test]
+    fn common_discovery_probes_postgres_versions_through_13() {
+        let dirs = discovered_common_postgres_bin_dirs();
+
+        for version in ["18", "17", "16", "15", "14", "13"] {
+            assert!(
+                dirs.contains(&PathBuf::from(format!(
+                    "/opt/homebrew/opt/postgresql@{version}/bin"
+                ))),
+                "expected Homebrew probe for Postgres {version}"
+            );
+            assert!(
+                dirs.contains(&PathBuf::from(format!(
+                    "/Applications/Postgres.app/Contents/Versions/{version}/bin"
+                ))),
+                "expected Postgres.app probe for Postgres {version}"
+            );
+            assert!(
+                dirs.contains(&PathBuf::from(format!("/usr/lib/postgresql/{version}/bin"))),
+                "expected Debian/Ubuntu probe for Postgres {version}"
+            );
+        }
     }
 
     #[cfg(unix)]

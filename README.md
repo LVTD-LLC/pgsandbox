@@ -87,9 +87,10 @@ For repository development:
   location, or through `PGSANDBOX_POSTGRES_BIN_DIR`
 
 PGSandbox checks `PATH`, common Homebrew locations such as
-`/opt/homebrew/opt/postgresql/bin` and `/opt/homebrew/opt/postgresql@18/bin`,
-Postgres.app locations, and explicit bin dir environment variables. Homebrew
-kegs do not need to be linked globally if PGSandbox can discover the `opt` path.
+`/opt/homebrew/opt/postgresql/bin` and versioned kegs from
+`postgresql@18` through `postgresql@13`, Postgres.app locations, and explicit
+bin dir environment variables. Homebrew kegs do not need to be linked globally
+if PGSandbox can discover the `opt` path.
 
 Docker is not required. `docker-compose.example.yml` is only a demo helper for
 users who intentionally want an external local Postgres profile.
@@ -471,6 +472,11 @@ Start a specific installed version:
 pgsandbox-mcp local start --postgres-version 18
 ```
 
+PGSandbox probes common local install paths for installed Postgres 18, 17, 16,
+15, 14, and 13 binaries. Explicit `PGSANDBOX_POSTGRES_<MAJOR>_BIN_DIR` settings
+can still target any numeric major version that reports matching server
+binaries.
+
 In MCP tools, agents should usually omit `profile` and pass only
 `postgresVersion`:
 
@@ -829,7 +835,8 @@ Telemetry opt-out environment variables are applied after config loading.
 
 Discovery order favors explicit version-specific settings, then other
 configured bin dirs, common package-manager locations, local `PATH` entries,
-and finally direct `PATH` command resolution.
+and finally direct `PATH` command resolution. Common-path version discovery
+includes installed Postgres 18, 17, 16, 15, 14, and 13 binaries.
 
 ### External Admin URL Policy
 
@@ -1421,12 +1428,20 @@ pgsandbox-mcp setup --client codex
 pgsandbox-mcp doctor
 ```
 
-For a requested major version on Homebrew:
+For a requested major version on Homebrew, install the formula when your
+Homebrew setup still provides it:
 
 ```bash
-brew install postgresql@18
-export PGSANDBOX_POSTGRES_18_BIN_DIR="/opt/homebrew/opt/postgresql@18/bin"
-pgsandbox-mcp setup --client codex --postgres-version 18
+brew install postgresql@14
+pgsandbox-mcp setup --client codex --postgres-version 14
+```
+
+For an older already-installed major such as Postgres 13, point PGSandbox at
+the existing server binaries:
+
+```bash
+export PGSANDBOX_POSTGRES_13_BIN_DIR="/opt/homebrew/opt/postgresql@13/bin"
+pgsandbox-mcp setup --client codex --postgres-version 13
 ```
 
 ### Requested Postgres Version Is Missing
