@@ -616,6 +616,11 @@ impl PgsandboxServer {
                 ),
             ),
             ("dryRun", json!(input.dry_run.unwrap_or(false))),
+            ("hasOwnerFilter", json!(input.owner.is_some())),
+            (
+                "labelFilterCount",
+                json!(input.labels.as_ref().map_or(0, |labels| labels.len())),
+            ),
         ]);
         self.tracked_tool(
             "cleanup_expired",
