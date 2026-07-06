@@ -5,9 +5,13 @@ Postgres cluster under `~/.pgsandbox/` and chooses a high local port such as
 `127.0.0.1:65432`, leaving Docker or another developer database on `5432`
 untouched.
 
-The managed local runtime requires `initdb`, `pg_ctl`, and `postgres`. It first
-checks `PATH`, then common Homebrew and Postgres.app install locations such as
-`/opt/homebrew/opt/postgresql@18/bin`. The `clone_database` MCP tool
+The managed local runtime requires `initdb`, `pg_ctl`, and `postgres`. The
+`setup` command checks for those binaries, installs PostgreSQL with Homebrew
+when they are missing and Homebrew is available, initializes and starts the
+managed local cluster, then writes MCP client config. PGSandbox also checks
+`PATH`, common Homebrew and Postgres.app install locations such as
+`/opt/homebrew/opt/postgresql/bin` and `/opt/homebrew/opt/postgresql@18/bin`,
+and explicit bin directory environment variables. The `clone_database` MCP tool
 additionally requires `pg_dump` and `pg_restore` because it streams a source
 database dump into a new sandbox.
 
@@ -20,9 +24,10 @@ PGSandbox MCP for you:
 Install and configure PGSandbox MCP on this machine.
 
 PGSandbox MCP is a local stdio MCP server for disposable Postgres databases. It
-uses a PG Sandbox-managed local Postgres cluster by default. It requires local
-Postgres server binaries such as `initdb`, `pg_ctl`, and `postgres` on `PATH`,
-but it does not use Docker or touch any existing Postgres service on port 5432.
+uses a PGSandbox-managed local Postgres cluster by default. The setup command
+checks for local Postgres server binaries such as `initdb`, `pg_ctl`, and
+`postgres`, installs PostgreSQL through Homebrew when possible, and does not use
+Docker or touch any existing Postgres service on port 5432.
 
 Do the following:
 1. Detect my OS, shell, available package managers, and MCP client. Supported
@@ -41,24 +46,23 @@ Do the following:
    If another pgsandbox-mcp appears earlier in PATH and is missing, broken, or a
    different version, use the absolute path to the healthy installed binary in
    the setup command with --command.
-4. Verify the managed local runtime:
-   pgsandbox-mcp local start
-   pgsandbox-mcp doctor
-   If `initdb`, `pg_ctl`, or `postgres` is missing, explain that local
-   PostgreSQL server binaries must be installed. Do not start Docker, stop
-   Docker containers, or bind `localhost:5432`.
-5. Configure the MCP client without an admin URL unless I explicitly gave one:
+4. Configure the MCP client without an admin URL unless I explicitly gave one:
    pgsandbox-mcp setup --client <client>
+   Let setup check/start the managed local runtime. If PostgreSQL server
+   binaries are missing and Homebrew is available, setup should install them. If
+   setup cannot install them automatically, explain the exact package-manager or
+   `PGSANDBOX_POSTGRES_BIN_DIR` action needed. Do not start Docker, stop Docker
+   containers, or bind `localhost:5432`.
    Use --scope project for Cursor or VS Code only if I ask for project-local
    config. Otherwise use the default user scope.
-6. Verify configuration and Postgres connectivity:
+5. Verify configuration and Postgres connectivity:
    pgsandbox-mcp doctor
    If this fails, explain whether the CLI, local Postgres runtime, MCP config,
    or explicit external Postgres connection failed.
-7. Run the disposable end-to-end check:
+6. Run the disposable end-to-end check:
    pgsandbox-mcp smoke-test
    This should create, query, and delete a sandbox database.
-8. Tell me exactly which MCP client config was updated and that I need to restart
+7. Tell me exactly which MCP client config was updated and that I need to restart
    the MCP client. After restart, help me verify that the pgsandbox server is
    available.
 
@@ -83,6 +87,8 @@ pgsandbox-mcp setup --client codex
 ```
 
 This uses the [LVTD-LLC/homebrew-tap](https://github.com/LVTD-LLC/homebrew-tap) repository, which Homebrew addresses as `LVTD-LLC/tap`.
+If PostgreSQL server binaries are missing, `setup` installs the Homebrew
+`postgresql` package before starting the managed local runtime.
 
 ## GitHub Install Script
 
@@ -95,7 +101,9 @@ pgsandbox-mcp setup --client codex
 
 The installer fetches the latest GitHub release for the current OS and CPU,
 installs `pgsandbox-mcp` to `~/.local/bin`, and verifies checksums when the
-release includes `pgsandbox-mcp-<version>-checksums.txt`.
+release includes `pgsandbox-mcp-<version>-checksums.txt`. The install script
+installs the PGSandbox binary; `pgsandbox-mcp setup` owns the local Postgres
+runtime check/start flow after that.
 
 Pin a version or install somewhere else with environment variables:
 
@@ -104,7 +112,11 @@ curl -fsSL https://raw.githubusercontent.com/LVTD-LLC/pgsandbox-mcp/main/scripts
 curl -fsSL https://raw.githubusercontent.com/LVTD-LLC/pgsandbox-mcp/main/scripts/install.sh | PGSANDBOX_INSTALL_DIR=/usr/local/bin sh
 ```
 
-## From Source
+## Install From Source For Development
+
+Normal users should prefer Homebrew or the GitHub release installer above.
+Source installs are for contribution work, testing a local checkout, or
+validating unreleased changes.
 
 ```bash
 cargo install --path .
@@ -303,9 +315,13 @@ repo command for the task and pass it as a short argv array.
 
 ## Troubleshooting
 
-- Missing `initdb`, `pg_ctl`, or `postgres`: install local PostgreSQL server
-  binaries. PGSandbox checks `PATH`, common Homebrew locations, and Postgres.app
-  before failing; it will not install or run Docker for you.
+- Missing `initdb`, `pg_ctl`, or `postgres`: rerun
+  `pgsandbox-mcp setup --client <client>` first. Setup checks `PATH`, common
+  Homebrew locations, Postgres.app, and explicit bin dir environment variables;
+  when Homebrew is available it installs PostgreSQL for you before starting the
+  managed local runtime. If setup cannot install automatically, install local
+  PostgreSQL server binaries with your system package manager or set
+  `PGSANDBOX_POSTGRES_BIN_DIR`.
 - Missing a requested Postgres version: install that version locally or set
   `PGSANDBOX_POSTGRES_<major>_BIN_DIR`, for example
   `PGSANDBOX_POSTGRES_18_BIN_DIR=/opt/homebrew/opt/postgresql@18/bin`.
