@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-07-06
+
+- Added the Astro Markdown blog post "How to Use Postgres Schema Snapshots for Agent Migration Reviews" with SEO ledger, link inventory, and inbound blog links.
+
 ## 2026-07-05
 
 - Released `pgsandbox-mcp` v0.4.2 with safer connection-string redaction, schema command timeout hardening, repo command validation polish, normalized `run_sql` int8 serialization, unsupported-type nullability handling, invalid TTL rejection, and simpler schema introspection payloads.

@@ -158,6 +158,8 @@ The [MCP tool contract](https://pgsandbox-mcp.lvtd.dev/docs/mcp-tools/) supports
 
 This works best for small to medium local states: a baseline schema, a few fixture accounts, a reproduced bug shape, or a post-migration known-good state. It is not a production-data import workflow. PGSandbox's template warning is explicit: do not create templates from production or sensitive data unless you have sanitized it.
 
+When the reusable state becomes the baseline for a migration task, pair it with a named schema checkpoint. The [Postgres schema snapshots for agent migration reviews](https://pgsandbox-mcp.lvtd.dev/blog/postgres-schema-snapshots-agent-migration-reviews/) guide shows how to restore a known state into a fresh sandbox, capture the before snapshot, run the migration command, and turn the schema diff into review evidence.
+
 ## Common mistakes
 
 The first mistake is treating a native template database as safe just because it is temporary. If an agent can create databases from a sensitive template, the data boundary is already broken.

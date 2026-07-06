@@ -101,6 +101,8 @@ That diff is the proof artifact the PR needs. A human reviewer can compare it ag
 
 If the schema diff surprises the agent, the agent should fix the migration before opening the PR.
 
+For a deeper version of this review artifact, use the [Postgres schema snapshots for agent migration reviews](https://pgsandbox-mcp.lvtd.dev/blog/postgres-schema-snapshots-agent-migration-reviews/) workflow. It focuses on named before/after checkpoints, compact object diffs, invalid-index checks, bounded data checks, and the exact PR evidence block a reviewer can trust.
+
 ## Step 4: seed the data cases that make the migration risky
 
 Most dangerous migrations are dangerous because of data, not syntax.
