@@ -484,9 +484,12 @@ example `["npm", "run", "migrate"]`,
 `["psql", "-Atc", "SELECT current_database(), current_user"]`. Executable repo
 scripts are allowed when invoked directly, for example `["./scripts/seed.sh"]`
 after `chmod +x scripts/seed.sh` if needed.
-Schema inspection includes relation-kind counts, constraints, column defaults
-and generated expressions, view definition hashes, compact canonical field
-names, and semantic constraint types such as `not_null`. `run_sql` returns common
+Schema inspection includes relation-kind counts, split relation arrays,
+constraints, column defaults and generated expressions, view definitions,
+compact canonical field names, and semantic constraint types such as
+`not_null`. In `describe_schema`, `relations` is the complete relation list,
+while `tables`, `partitionedTables`, `foreignTables`, `views`, and
+`materializedViews` are filtered by `relationKind`. `run_sql` returns common
 Postgres arrays such as `text[]`, integer arrays, `uuid[]`, `jsonb[]`, and
 `timestamptz[]` as JSON arrays. `int8` values, including `count(*)` aggregate
 results, and `numeric` values are serialized as JSON strings to preserve

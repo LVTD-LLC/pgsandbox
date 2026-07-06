@@ -175,7 +175,7 @@ async fn run_suite(
             postgres_version: None,
             database_id: Some(database_id.to_string()),
             database_name: None,
-            sql: "CREATE TABLE accounts(id serial PRIMARY KEY, email text UNIQUE); INSERT INTO accounts(email) VALUES ('a@example.com'), ('b@example.com'), ('c@example.com');".to_string(),
+            sql: "CREATE TABLE accounts(id serial PRIMARY KEY, email text UNIQUE, active boolean NOT NULL DEFAULT true); INSERT INTO accounts(email) VALUES ('a@example.com'), ('b@example.com'), ('c@example.com'); CREATE VIEW active_accounts AS SELECT id, email FROM accounts WHERE active;".to_string(),
             readonly: None,
             row_limit: None,
         })
@@ -215,6 +215,27 @@ async fn run_suite(
         })
         .await?;
     assert!(described.relation_counts.tables >= 1);
+    assert!(described
+        .relations
+        .iter()
+        .any(|relation| relation["tableName"] == "active_accounts"
+            && relation["relationKind"] == "view"));
+    assert!(
+        described
+            .tables
+            .iter()
+            .any(|relation| relation["tableName"] == "accounts"
+                && relation["relationKind"] == "table")
+    );
+    assert!(described
+        .views
+        .iter()
+        .any(|relation| relation["tableName"] == "active_accounts"
+            && relation["relationKind"] == "view"));
+    assert!(!described
+        .tables
+        .iter()
+        .any(|relation| relation["tableName"] == "active_accounts"));
 
     let plan = manager
         .explain_query(ExplainQueryInput {

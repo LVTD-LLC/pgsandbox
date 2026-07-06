@@ -576,11 +576,15 @@ pub struct DescribeSchemaOutput {
     pub database_id: String,
     pub database_name: String,
     pub relation_counts: SchemaRelationCounts,
+    pub relations: Vec<Value>,
     pub tables: Vec<Value>,
+    pub partitioned_tables: Vec<Value>,
+    pub foreign_tables: Vec<Value>,
+    pub views: Vec<Value>,
+    pub materialized_views: Vec<Value>,
     pub columns: Vec<Value>,
     pub constraints: Vec<Value>,
     pub indexes: Vec<Value>,
-    pub views: Vec<Value>,
     pub extensions: Vec<Value>,
 }
 
@@ -1873,7 +1877,7 @@ impl PostgresSandboxManager {
         let connection = self.get_connection_string(input.into()).await?;
         let (client, connection_task) = connect_url(&connection.connection_string).await?;
 
-        let tables = client
+        let relation_rows = client
             .query(
                 r#"
                   SELECT n.nspname AS "tableSchema",
@@ -1885,7 +1889,8 @@ impl PostgresSandboxManager {
                            WHEN 'm' THEN 'materialized_view'
                            WHEN 'f' THEN 'foreign_table'
                            ELSE c.relkind::text
-                         END AS "relationKind"
+                         END AS "relationKind",
+                         CASE WHEN c.relkind IN ('v', 'm') THEN pg_get_viewdef(c.oid, true) ELSE NULL END AS "definition"
                   FROM pg_class c
                   JOIN pg_namespace n ON n.oid = c.relnamespace
                   WHERE c.relkind IN ('r', 'p', 'v', 'm', 'f')
@@ -1975,25 +1980,6 @@ impl PostgresSandboxManager {
                 &[],
             )
             .await?;
-        let views = client
-            .query(
-                r#"
-                  SELECT n.nspname AS "tableSchema",
-                         c.relname AS "tableName",
-                         CASE c.relkind
-                           WHEN 'v' THEN 'view'
-                           WHEN 'm' THEN 'materialized_view'
-                         END AS "relationKind",
-                         pg_get_viewdef(c.oid, true) AS "definition"
-                  FROM pg_class c
-                  JOIN pg_namespace n ON n.oid = c.relnamespace
-                  WHERE c.relkind IN ('v', 'm')
-                    AND n.nspname NOT IN ('pg_catalog', 'information_schema')
-                  ORDER BY n.nspname, c.relname
-                "#,
-                &[],
-            )
-            .await?;
         let extensions = client
             .query(
                 r#"
@@ -2006,7 +1992,8 @@ impl PostgresSandboxManager {
             )
             .await?;
 
-        let relation_counts = relation_counts_from_rows(&tables);
+        let relation_counts = relation_counts_from_rows(&relation_rows);
+        let relations = split_describe_schema_relations(rows_to_json(relation_rows)?);
         drop(client);
         let _ = connection_task.await;
 
@@ -2014,11 +2001,15 @@ impl PostgresSandboxManager {
             database_id: connection.database_id,
             database_name: connection.database_name,
             relation_counts,
-            tables: rows_to_json(tables)?,
+            relations: relations.relations,
+            tables: relations.tables,
+            partitioned_tables: relations.partitioned_tables,
+            foreign_tables: relations.foreign_tables,
+            views: relations.views,
+            materialized_views: relations.materialized_views,
             columns: rows_to_json(columns)?,
             constraints: rows_to_json(constraints)?,
             indexes: rows_to_json(indexes)?,
-            views: rows_to_json(views)?,
             extensions: rows_to_json(extensions)?,
         })
     }
@@ -5450,6 +5441,45 @@ fn default_relation_kind() -> String {
     "table".to_string()
 }
 
+#[derive(Debug, Default)]
+struct DescribeSchemaRelations {
+    relations: Vec<Value>,
+    tables: Vec<Value>,
+    partitioned_tables: Vec<Value>,
+    foreign_tables: Vec<Value>,
+    views: Vec<Value>,
+    materialized_views: Vec<Value>,
+}
+
+fn split_describe_schema_relations(relations: Vec<Value>) -> DescribeSchemaRelations {
+    let mut split = DescribeSchemaRelations::default();
+
+    for mut relation in relations {
+        remove_null_relation_definition(&mut relation);
+        match relation.get("relationKind").and_then(Value::as_str) {
+            Some("table") => split.tables.push(relation.clone()),
+            Some("partitioned_table") => split.partitioned_tables.push(relation.clone()),
+            Some("foreign_table") => split.foreign_tables.push(relation.clone()),
+            Some("view") => split.views.push(relation.clone()),
+            Some("materialized_view") => split.materialized_views.push(relation.clone()),
+            _ => {}
+        }
+        split.relations.push(relation);
+    }
+
+    split
+}
+
+fn remove_null_relation_definition(relation: &mut Value) {
+    let Value::Object(object) = relation else {
+        return;
+    };
+
+    if object.get("definition") == Some(&Value::Null) {
+        object.remove("definition");
+    }
+}
+
 fn normalized_constraint_type(raw: &str) -> &str {
     match raw {
         "p" => "primary_key",
@@ -7365,6 +7395,75 @@ mod tests {
         let parsed = serde_json::from_value::<SchemaDiffBaseDigest>(json!(raw)).unwrap();
 
         assert_eq!(parsed.into_schema_digest().unwrap(), test_digest("base"));
+    }
+
+    #[test]
+    fn describe_schema_splits_relations_by_kind() {
+        let split = split_describe_schema_relations(vec![
+            json!({
+                "tableSchema": "public",
+                "tableName": "accounts",
+                "relationKind": "table",
+                "definition": null
+            }),
+            json!({
+                "tableSchema": "public",
+                "tableName": "accounts_by_region",
+                "relationKind": "partitioned_table"
+            }),
+            json!({
+                "tableSchema": "public",
+                "tableName": "active_accounts",
+                "relationKind": "view",
+                "definition": "SELECT id FROM accounts WHERE active"
+            }),
+            json!({
+                "tableSchema": "public",
+                "tableName": "account_rollups",
+                "relationKind": "materialized_view",
+                "definition": "SELECT count(*) FROM accounts"
+            }),
+            json!({
+                "tableSchema": "public",
+                "tableName": "remote_accounts",
+                "relationKind": "foreign_table"
+            }),
+        ]);
+
+        assert_eq!(
+            relation_names(&split.relations),
+            [
+                "accounts",
+                "accounts_by_region",
+                "active_accounts",
+                "account_rollups",
+                "remote_accounts"
+            ]
+        );
+        assert_eq!(relation_names(&split.tables), ["accounts"]);
+        assert_eq!(
+            relation_names(&split.partitioned_tables),
+            ["accounts_by_region"]
+        );
+        assert_eq!(relation_names(&split.views), ["active_accounts"]);
+        assert_eq!(
+            relation_names(&split.materialized_views),
+            ["account_rollups"]
+        );
+        assert_eq!(relation_names(&split.foreign_tables), ["remote_accounts"]);
+        assert!(split.tables[0].get("definition").is_none());
+        assert_eq!(
+            split.views[0].get("definition").and_then(Value::as_str),
+            Some("SELECT id FROM accounts WHERE active")
+        );
+    }
+
+    fn relation_names(relations: &[Value]) -> Vec<String> {
+        relations
+            .iter()
+            .filter_map(|relation| relation.get("tableName").and_then(Value::as_str))
+            .map(str::to_string)
+            .collect()
     }
 
     #[test]

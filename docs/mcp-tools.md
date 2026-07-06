@@ -259,15 +259,23 @@ Returns:
   `tableName`, `tableSchema`, `columnName`, `dataType`, and `isNullable`.
 - `relationCounts`: split counts for `tables`, `partitionedTables`, `views`,
   `materializedViews`, `foreignTables`, and `other`.
-- `tables`: relations with `relationKind` values such as `table`, `view`, and
-  `materialized_view`.
+- `relations`: all table-like, view-like, and foreign-table relations. Every
+  relation includes `relationKind`; views and materialized views also include a
+  `definition` string from Postgres.
+- `tables`: regular table relations only, with `relationKind: "table"`.
+- `partitionedTables`: partitioned table relations only, with
+  `relationKind: "partitioned_table"`.
+- `foreignTables`: foreign table relations only, with
+  `relationKind: "foreign_table"`.
+- `views`: view relations only, with `relationKind: "view"` and `definition`.
+- `materializedViews`: materialized view relations only, with
+  `relationKind: "materialized_view"` and `definition`.
 - `columns`: includes `columnDefault`, `generatedKind`, and
   `generationExpression` when Postgres exposes them.
 - `constraints`: primary key, unique, foreign key, check, exclusion, and
   not-null constraints with semantic `constraintType` values such as
   `primary_key`, `foreign_key`, and `not_null`; includes readable definitions
   and FK actions when applicable.
-- `views`: view and materialized view definitions.
 - `indexes` and `extensions`.
 
 ## `schema_digest`

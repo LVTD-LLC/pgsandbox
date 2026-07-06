@@ -232,7 +232,7 @@ impl PgsandboxServer {
     }
 
     #[tool(
-        description = "Inspect sandbox schema metadata for tables, views, relation kinds, columns, defaults, constraints, indexes, extensions, and migration review."
+        description = "Inspect sandbox schema metadata for relations split by kind, columns, defaults, constraints, indexes, extensions, and migration review."
     )]
     async fn describe_schema(
         &self,
