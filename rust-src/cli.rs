@@ -591,9 +591,11 @@ fn ensure_setup_managed_local(postgres_version: Option<&str>) -> anyhow::Result<
 
 fn setup_error_is_missing_local_postgres(error: &anyhow::Error) -> bool {
     error.chain().any(|cause| {
-        cause
-            .to_string()
-            .starts_with("could not find local Postgres")
+        let message = cause.to_string();
+        message.starts_with("could not find local Postgres")
+            || message.starts_with(
+                "Postgres server binaries `initdb`, `pg_ctl`, and `postgres` were not found",
+            )
     })
 }
 
@@ -808,6 +810,15 @@ mod tests {
             homebrew_postgres_package(Some("18.4")).unwrap(),
             "postgresql@18"
         );
+    }
+
+    #[test]
+    fn setup_treats_runtime_missing_binary_message_as_installable() {
+        let error = anyhow::anyhow!(
+            "Postgres server binaries `initdb`, `pg_ctl`, and `postgres` were not found together on PATH or in common local install locations."
+        );
+
+        assert!(setup_error_is_missing_local_postgres(&error));
     }
 
     #[test]
