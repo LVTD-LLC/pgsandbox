@@ -6065,7 +6065,7 @@ pub fn assert_safe_readonly_sql(sql: &str) -> anyhow::Result<()> {
                 .is_some_and(|next| matches!(next.as_str(), "session" | "transaction" | "local")))
         {
             anyhow::bail!(
-                "readonly SQL cannot include transaction-control or session-setting statements."
+                "readonly SQL cannot include transaction-control statements, RESET, or SET SESSION/TRANSACTION/LOCAL controls."
             );
         }
     }
@@ -7223,12 +7223,21 @@ mod tests {
         assert!(assert_safe_readonly_sql("select 'rollback' as stage").is_ok());
         assert!(assert_safe_readonly_sql("select $$commit$$ as stage").is_ok());
         assert!(assert_safe_readonly_sql("select 1 -- rollback").is_ok());
+        assert!(
+            assert_safe_readonly_sql("set search_path to public; select current_schema()").is_ok()
+        );
         assert!(assert_safe_readonly_sql("rollback; drop table users").is_err());
         assert!(
             assert_safe_readonly_sql("set session characteristics as transaction read write")
                 .is_err()
         );
         assert!(assert_safe_readonly_sql("set local statement_timeout = 1").is_err());
+    }
+
+    #[test]
+    fn readonly_guard_leaves_writes_for_postgres_readonly_transaction() {
+        assert!(assert_safe_readonly_sql("insert into users(name) values ('a')").is_ok());
+        assert!(assert_safe_readonly_sql("create temp table readonly_probe(id int)").is_ok());
     }
 
     #[test]
@@ -9024,6 +9033,17 @@ services:
         assert!(message.contains("readonly=true blocked INSERT statement"));
         assert!(message.contains("Database detail:"));
         assert!(!message.contains("blocked SELECT statement"));
+    }
+
+    #[test]
+    fn readonly_violation_message_names_temp_table_statement() {
+        let error =
+            anyhow::anyhow!("db error: cannot execute CREATE TABLE in a read-only transaction");
+        let message =
+            readonly_violation_message("create temp table readonly_probe(id int)", &error).unwrap();
+
+        assert!(message.contains("readonly=true blocked CREATE statement"));
+        assert!(message.contains("read-only transaction"));
     }
 
     #[test]

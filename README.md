@@ -658,8 +658,11 @@ Result behavior:
   cast-to-text hint
 - keeps SQL `NULL` as JSON `null`
 
-With `readonly: true`, PGSandbox runs the statement in a read-only transaction.
-Readonly violations are returned as structured errors.
+With `readonly: true`, PGSandbox runs SQL in a read-only transaction, rejects
+transaction-control escape hatches, and rolls the transaction back after
+execution. Mutating statements are returned as structured `readonly_violation`
+errors; harmless settings that Postgres permits inside the transaction, such as
+`SET search_path`, may still run.
 
 ### Repo Workflow Tools
 
@@ -1112,9 +1115,21 @@ PGSANDBOX_RUN_SQL_SERIALIZATION_E2E=1 \
   cargo test --test run_sql_serialization -- --nocapture
 ```
 
+Run the readonly transaction contract E2E test:
+
+```bash
+PGSANDBOX_RUN_SQL_READONLY_E2E=1 \
+  cargo test --test run_sql_serialization \
+  run_sql_readonly_contract_matches_postgres_transaction_when_enabled \
+  -- --nocapture
+```
+
 Each live test creates a sandbox and attempts cleanup at the end. If cleanup
 fails, the test prints the failure so you can remove the sandbox with the MCP
-tool or with `pgsandbox-mcp smoke-test`/manual diagnostics.
+tool or with `pgsandbox-mcp smoke-test`/manual diagnostics. Live tests use the
+normal PGSandbox config path: the managed local runtime when no explicit config
+is set, or the configured `PGSANDBOX_ADMIN_DATABASE_URL`/`PGSANDBOX_CONFIG`
+profile when present.
 
 ### Manual Runtime Checks
 
@@ -1550,9 +1565,11 @@ Use SQL filters, aggregates, or pagination for larger inspection tasks.
 
 ### Readonly SQL Fails
 
-With `readonly: true`, mutating statements are blocked by a read-only
-transaction. If the mutation is intentional, omit `readonly` or set it to
-`false`.
+With `readonly: true`, PGSandbox runs SQL in a read-only transaction and rolls
+it back after execution. Mutating statements such as `INSERT` or
+`CREATE TEMP TABLE` fail with `readonly_violation`; harmless settings that
+Postgres permits inside the transaction, such as `SET search_path`, may still
+run. If mutation is intentional, omit `readonly` or set it to `false`.
 
 ### Sandbox Was Not Found
 

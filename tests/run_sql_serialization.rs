@@ -184,6 +184,111 @@ async fn run_sql_returns_typed_ordered_result_sets_for_multi_statement_sql_when_
     result.expect("run_sql multi-statement result-set E2E");
 }
 
+#[tokio::test]
+async fn run_sql_readonly_contract_matches_postgres_transaction_when_enabled() {
+    if !run_sql_readonly_e2e_enabled() {
+        return;
+    }
+
+    let manager = PostgresSandboxManager::new(load_config().expect("load PGSandbox config"));
+    let owner = format!("pgsandbox-run-sql-readonly-{}", unique_suffix());
+    let created = manager
+        .create_database(CreateDatabaseInput {
+            profile: None,
+            postgres_version: None,
+            name_hint: Some("run sql readonly".to_string()),
+            ttl_minutes: Some(30),
+            owner: Some(owner),
+            labels: Some([("suite".to_string(), json!("run_sql_readonly"))].into()),
+        })
+        .await
+        .expect("create readonly sandbox");
+
+    let result = async {
+        manager
+            .run_sql(RunSqlInput {
+                profile: Some(created.profile.clone()),
+                postgres_version: None,
+                database_id: Some(created.database_id.clone()),
+                database_name: None,
+                sql: "CREATE TABLE readonly_probe(id integer PRIMARY KEY);".to_string(),
+                readonly: None,
+                row_limit: None,
+            })
+            .await?;
+
+        let search_path = manager
+            .run_sql(RunSqlInput {
+                profile: Some(created.profile.clone()),
+                postgres_version: None,
+                database_id: Some(created.database_id.clone()),
+                database_name: None,
+                sql: "SET search_path TO public; SELECT current_schema() AS schema_name"
+                    .to_string(),
+                readonly: Some(true),
+                row_limit: None,
+            })
+            .await?;
+        let row = search_path
+            .rows
+            .first()
+            .expect("current_schema returned one row");
+        assert_eq!(
+            row.get("schema_name").and_then(Value::as_str),
+            Some("public")
+        );
+
+        let insert_error = manager
+            .run_sql(RunSqlInput {
+                profile: Some(created.profile.clone()),
+                postgres_version: None,
+                database_id: Some(created.database_id.clone()),
+                database_name: None,
+                sql: "INSERT INTO readonly_probe(id) VALUES (1)".to_string(),
+                readonly: Some(true),
+                row_limit: None,
+            })
+            .await
+            .expect_err("readonly insert should fail");
+        let insert_message = format!("{insert_error:#}");
+        assert!(insert_message.contains("readonly=true blocked INSERT statement"));
+        assert!(insert_message.contains("read-only transaction"));
+
+        let temp_table_error = manager
+            .run_sql(RunSqlInput {
+                profile: Some(created.profile.clone()),
+                postgres_version: None,
+                database_id: Some(created.database_id.clone()),
+                database_name: None,
+                sql: "CREATE TEMP TABLE readonly_temp(id integer)".to_string(),
+                readonly: Some(true),
+                row_limit: None,
+            })
+            .await
+            .expect_err("readonly temp table creation should fail");
+        let temp_table_message = format!("{temp_table_error:#}");
+        assert!(temp_table_message.contains("readonly=true blocked CREATE statement"));
+        assert!(temp_table_message.contains("read-only transaction"));
+
+        anyhow::Ok(())
+    }
+    .await;
+
+    let cleanup = manager
+        .delete_database(DatabaseSelector {
+            profile: Some(created.profile),
+            postgres_version: None,
+            database_id: Some(created.database_id),
+            database_name: None,
+        })
+        .await;
+    if let Err(error) = cleanup {
+        eprintln!("run_sql readonly cleanup failed: {error:#}");
+    }
+
+    result.expect("run_sql readonly E2E");
+}
+
 fn run_sql_serialization_e2e_enabled() -> bool {
     if std::env::var("PGSANDBOX_RUN_SQL_SERIALIZATION_E2E")
         .ok()
@@ -196,6 +301,19 @@ fn run_sql_serialization_e2e_enabled() -> bool {
     eprintln!(
         "skipping run_sql serialization E2E; set PGSANDBOX_RUN_SQL_SERIALIZATION_E2E=1 to run"
     );
+    false
+}
+
+fn run_sql_readonly_e2e_enabled() -> bool {
+    if std::env::var("PGSANDBOX_RUN_SQL_READONLY_E2E")
+        .ok()
+        .as_deref()
+        == Some("1")
+    {
+        return true;
+    }
+
+    eprintln!("skipping run_sql readonly E2E; set PGSANDBOX_RUN_SQL_READONLY_E2E=1 to run");
     false
 }
 

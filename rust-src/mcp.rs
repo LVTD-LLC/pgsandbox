@@ -886,7 +886,7 @@ impl ToolErrorResponse {
                 code: "readonly_violation",
                 category: "readonly_violation",
                 message: chain,
-                hint: "The request attempted a write or session change through a readonly path. Retry with readonly=false only if mutation is intended.".to_string(),
+                hint: readonly_violation_hint().to_string(),
                 sqlstate: None,
                 requested_version: None,
                 source_version: None,
@@ -1129,7 +1129,7 @@ fn sqlstate_error_body(sqlstate: &str, message: String) -> Option<ToolErrorBody>
         "25006" => (
             "readonly_violation",
             "readonly_violation",
-            "The request attempted a write through a readonly path. Retry with readonly=false only if mutation is intended.",
+            readonly_violation_hint(),
         ),
         _ => return None,
     };
@@ -1146,6 +1146,10 @@ fn sqlstate_error_body(sqlstate: &str, message: String) -> Option<ToolErrorBody>
         detected_versions: Vec::new(),
         detail_handle: None,
     })
+}
+
+fn readonly_violation_hint() -> &'static str {
+    "readonly=true runs SQL in a read-only transaction. It blocks writes, rejects transaction-control escape hatches, and may still allow harmless settings such as SET search_path within the rolled-back transaction. Retry with readonly=false only if mutation is intended."
 }
 
 fn detected_postgres_versions() -> Vec<String> {
@@ -1636,6 +1640,8 @@ mod tests {
             sqlstate_error_body("42703", "ERROR: missing column".to_string()).unwrap();
         let syntax = sqlstate_error_body("42601", "ERROR: syntax error".to_string()).unwrap();
         let connection = sqlstate_error_body("08006", "connection failure".to_string()).unwrap();
+        let readonly =
+            sqlstate_error_body("25006", "ERROR: readonly violation".to_string()).unwrap();
 
         assert_eq!(undefined_column.code, "undefined_column");
         assert_eq!(undefined_column.sqlstate.as_deref(), Some("42703"));
@@ -1643,6 +1649,9 @@ mod tests {
         assert_eq!(syntax.category, "sql_syntax");
         assert!(!syntax.hint.contains("doctor is needed"));
         assert_eq!(connection.code, "postgres_connection_failed");
+        assert_eq!(readonly.code, "readonly_violation");
+        assert!(readonly.hint.contains("read-only transaction"));
+        assert!(!readonly.hint.contains("session change"));
     }
 
     #[test]

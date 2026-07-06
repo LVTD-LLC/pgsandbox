@@ -250,9 +250,11 @@ each row-returning statement is serialized with the same typed rules as a
 single-statement query. Unsupported non-null Postgres result types return a
 structured object with `unsupportedPostgresType` and a cast-to-text `hint`;
 unsupported SQL `NULL` values remain JSON `null`. With `readonly: true`,
-mutating statements are blocked by a read-only transaction; readonly violations
-are wrapped with an MCP-level message that names the attempted statement while
-preserving database detail.
+PGSandbox runs SQL in a read-only transaction, rejects transaction-control
+escape hatches, and rolls the transaction back after execution. Mutating
+statements such as `INSERT` or `CREATE TEMP TABLE` fail with
+`readonly_violation`; harmless settings that Postgres permits inside the
+transaction, such as `SET search_path`, may still run.
 
 ## `describe_schema`
 
