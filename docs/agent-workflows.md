@@ -254,8 +254,16 @@ repair cases include:
 - `statement_timeout` or `lock_timeout`: reduce scope or retry after the
   conflicting operation ends.
 
-Creation tools return `connectionStringRedacted` for summaries, task trackers,
-and logs. `get_connection_string` also returns only `connectionStringRedacted`
-by default. Pass `includeCredentials: true` only when a command or database
-client needs the actual credential-bearing `connectionString`, and do not echo
-that full value into chat, logs, PR comments, issues, or durable datasets.
+Creation tools return `connectionStringRedacted` and `connectionStringsRedacted`
+for summaries, task trackers, and logs. Use
+`connectionStringsRedacted.localContainer` only as a safe hint that a
+Dockerized local app should use the container variant.
+
+`get_connection_string` also returns only redacted values by default. Pass
+`includeCredentials: true` only when a command or database client needs the
+actual credential-bearing URL. For Dockerized app services running on the same
+machine as PGSandbox, pass `connectionStrings.localContainer` as `DATABASE_URL`.
+Docker Desktop supports `host.docker.internal` automatically; on Linux Docker,
+add `extra_hosts: ["host.docker.internal:host-gateway"]` to the service. Do not
+echo raw connection values into chat, logs, PR comments, issues, or durable
+datasets.

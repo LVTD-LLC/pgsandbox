@@ -67,6 +67,10 @@ const TEMPLATE_PRIVACY_WARNING: &str =
     "Templates are local PG Sandbox artifacts. Do not create templates from production or sensitive data unless you have explicitly sanitized it.";
 const UNSUPPORTED_TYPE_CAST_HINT: &str =
     "Cast this expression to text in SQL to render its display value, for example `expression::text`.";
+const DIRECT_CONNECTION_USAGE: &str =
+    "Use from host commands, MCP repo commands, and tools running directly on this machine.";
+const LOCAL_CONTAINER_CONNECTION_USAGE: &str =
+    "Use from Dockerized app services running on this machine. Docker Desktop supports host.docker.internal automatically; on Linux Docker add extra_hosts: [\"host.docker.internal:host-gateway\"] to the service.";
 
 static CURSOR_QUERY_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?is)^\s*(?:--[^\n]*(?:\n|$)|/\*.*?\*/\s*)*(select|with|values|table)\b")
@@ -532,6 +536,8 @@ pub struct CreateDatabaseOutput {
     #[serde(skip_serializing)]
     pub connection_string: String,
     pub connection_string_redacted: String,
+    pub connection_strings_redacted: ConnectionStringVariants,
+    pub connection_usage: ConnectionUsageHints,
     pub installed_extensions: Vec<String>,
 }
 
@@ -551,6 +557,11 @@ impl fmt::Debug for CreateDatabaseOutput {
                 "connection_string_redacted",
                 &self.connection_string_redacted,
             )
+            .field(
+                "connection_strings_redacted",
+                &self.connection_strings_redacted,
+            )
+            .field("connection_usage", &self.connection_usage)
             .field("installed_extensions", &self.installed_extensions)
             .finish()
     }
@@ -569,6 +580,8 @@ pub struct CloneDatabaseOutput {
     #[serde(skip_serializing)]
     pub connection_string: String,
     pub connection_string_redacted: String,
+    pub connection_strings_redacted: ConnectionStringVariants,
+    pub connection_usage: ConnectionUsageHints,
     pub source: String,
     pub schema_only: bool,
     pub installed_extensions: Vec<String>,
@@ -591,6 +604,11 @@ impl fmt::Debug for CloneDatabaseOutput {
                 "connection_string_redacted",
                 &self.connection_string_redacted,
             )
+            .field(
+                "connection_strings_redacted",
+                &self.connection_strings_redacted,
+            )
+            .field("connection_usage", &self.connection_usage)
             .field("source", &self.source)
             .field("schema_only", &self.schema_only)
             .field("installed_extensions", &self.installed_extensions)
@@ -599,6 +617,41 @@ impl fmt::Debug for CloneDatabaseOutput {
                 &self.excluded_source_extensions,
             )
             .finish()
+    }
+}
+
+#[derive(Clone, Debug, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ConnectionStringVariants {
+    pub direct: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub local_container: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ConnectionUsageHints {
+    pub direct: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub local_container: Option<String>,
+}
+
+impl ConnectionStringVariants {
+    fn redacted(&self) -> Self {
+        Self {
+            direct: mask_connection_string(&self.direct),
+            local_container: self.local_container.as_deref().map(mask_connection_string),
+        }
+    }
+
+    fn usage_hints(&self) -> ConnectionUsageHints {
+        ConnectionUsageHints {
+            direct: DIRECT_CONNECTION_USAGE.to_string(),
+            local_container: self
+                .local_container
+                .as_ref()
+                .map(|_| LOCAL_CONTAINER_CONNECTION_USAGE.to_string()),
+        }
     }
 }
 
@@ -664,15 +717,21 @@ impl Serialize for ConnectionStringOutput {
     where
         S: serde::Serializer,
     {
-        let field_count = if self.include_credentials { 5 } else { 4 };
+        let connection_strings = connection_string_variants(&self.connection_string);
+        let connection_strings_redacted = connection_strings.redacted();
+        let connection_usage = connection_strings.usage_hints();
+        let field_count = if self.include_credentials { 8 } else { 6 };
         let mut state = serializer.serialize_struct("ConnectionStringOutput", field_count)?;
         state.serialize_field("databaseId", &self.database_id)?;
         state.serialize_field("databaseName", &self.database_name)?;
         state.serialize_field("expiresAt", &self.expires_at)?;
         if self.include_credentials {
             state.serialize_field("connectionString", &self.connection_string)?;
+            state.serialize_field("connectionStrings", &connection_strings)?;
         }
         state.serialize_field("connectionStringRedacted", &self.connection_string_redacted)?;
+        state.serialize_field("connectionStringsRedacted", &connection_strings_redacted)?;
+        state.serialize_field("connectionUsage", &connection_usage)?;
         state.end()
     }
 }
@@ -1157,6 +1216,8 @@ pub struct CreateSandboxFromTemplateOutput {
     #[serde(skip_serializing)]
     pub connection_string: String,
     pub connection_string_redacted: String,
+    pub connection_strings_redacted: ConnectionStringVariants,
+    pub connection_usage: ConnectionUsageHints,
     pub template_name: String,
 }
 
@@ -1174,6 +1235,11 @@ impl fmt::Debug for CreateSandboxFromTemplateOutput {
                 "connection_string_redacted",
                 &self.connection_string_redacted,
             )
+            .field(
+                "connection_strings_redacted",
+                &self.connection_strings_redacted,
+            )
+            .field("connection_usage", &self.connection_usage)
             .field("template_name", &self.template_name)
             .finish()
     }
@@ -1877,6 +1943,8 @@ impl PostgresSandboxManager {
             role_name: names.role_name.clone(),
             expires_at,
             connection_string_redacted: mask_connection_string(&connection_string),
+            connection_strings_redacted: redacted_connection_string_variants(&connection_string),
+            connection_usage: connection_usage_hints(&connection_string),
             connection_string,
             installed_extensions: extensions,
         })
@@ -1963,6 +2031,10 @@ impl PostgresSandboxManager {
             role_name: created.role_name,
             expires_at: created.expires_at,
             connection_string_redacted: mask_connection_string(&created.connection_string),
+            connection_strings_redacted: redacted_connection_string_variants(
+                &created.connection_string,
+            ),
+            connection_usage: connection_usage_hints(&created.connection_string),
             connection_string: created.connection_string,
             source: "external".to_string(),
             schema_only,
@@ -3258,6 +3330,10 @@ impl PostgresSandboxManager {
             role_name: created.role_name,
             expires_at: created.expires_at,
             connection_string_redacted: mask_connection_string(&created.connection_string),
+            connection_strings_redacted: redacted_connection_string_variants(
+                &created.connection_string,
+            ),
+            connection_usage: connection_usage_hints(&created.connection_string),
             connection_string: created.connection_string,
             template_name: template_name.clone(),
         };
@@ -6179,6 +6255,39 @@ async fn list_installed_extensions(
             })
         })
         .collect()
+}
+
+fn connection_string_variants(connection_string: &str) -> ConnectionStringVariants {
+    ConnectionStringVariants {
+        direct: connection_string.to_string(),
+        local_container: local_container_connection_string(connection_string),
+    }
+}
+
+fn redacted_connection_string_variants(connection_string: &str) -> ConnectionStringVariants {
+    connection_string_variants(connection_string).redacted()
+}
+
+fn connection_usage_hints(connection_string: &str) -> ConnectionUsageHints {
+    connection_string_variants(connection_string).usage_hints()
+}
+
+fn local_container_connection_string(connection_string: &str) -> Option<String> {
+    let mut url = Url::parse(connection_string).ok()?;
+    let host = url.host_str()?;
+    if !is_loopback_host(host) {
+        return None;
+    }
+    url.set_host(Some("host.docker.internal")).ok()?;
+    Some(url.to_string())
+}
+
+fn is_loopback_host(host: &str) -> bool {
+    if host.eq_ignore_ascii_case("localhost") {
+        return true;
+    }
+    host.parse::<std::net::IpAddr>()
+        .is_ok_and(|address| address.is_loopback())
 }
 
 async fn install_extensions(
@@ -9133,6 +9242,8 @@ mod tests {
             expires_at,
             connection_string: connection_string.to_string(),
             connection_string_redacted: mask_connection_string(connection_string),
+            connection_strings_redacted: redacted_connection_string_variants(connection_string),
+            connection_usage: connection_usage_hints(connection_string),
             installed_extensions: Vec::new(),
         })
         .unwrap();
@@ -9143,6 +9254,26 @@ mod tests {
                 .and_then(Value::as_str),
             Some("postgres://role:****@localhost:5432/sandbox")
         );
+        assert_eq!(
+            created
+                .get("connectionStringsRedacted")
+                .and_then(|strings| strings.get("direct"))
+                .and_then(Value::as_str),
+            Some("postgres://role:****@localhost:5432/sandbox")
+        );
+        assert_eq!(
+            created
+                .get("connectionStringsRedacted")
+                .and_then(|strings| strings.get("localContainer"))
+                .and_then(Value::as_str),
+            Some("postgres://role:****@host.docker.internal:5432/sandbox")
+        );
+        assert!(created
+            .get("connectionUsage")
+            .and_then(|usage| usage.get("localContainer"))
+            .and_then(Value::as_str)
+            .is_some_and(|hint| hint.contains("extra_hosts")));
+        assert!(!created.to_string().contains("secret"));
         assert_eq!(
             created.get("resolvedProfile").and_then(Value::as_str),
             Some("default")
@@ -9164,6 +9295,8 @@ mod tests {
             expires_at,
             connection_string: connection_string.to_string(),
             connection_string_redacted: mask_connection_string(connection_string),
+            connection_strings_redacted: redacted_connection_string_variants(connection_string),
+            connection_usage: connection_usage_hints(connection_string),
             source: "external".to_string(),
             schema_only: false,
             installed_extensions: Vec::new(),
@@ -9177,6 +9310,14 @@ mod tests {
                 .and_then(Value::as_str),
             Some("postgres://role:****@localhost:5432/sandbox")
         );
+        assert_eq!(
+            cloned
+                .get("connectionStringsRedacted")
+                .and_then(|strings| strings.get("localContainer"))
+                .and_then(Value::as_str),
+            Some("postgres://role:****@host.docker.internal:5432/sandbox")
+        );
+        assert!(!cloned.to_string().contains("secret"));
         assert_eq!(
             cloned.get("resolvedProfile").and_then(Value::as_str),
             Some("default")
@@ -9200,6 +9341,8 @@ mod tests {
             expires_at: Utc::now(),
             connection_string: connection_string.to_string(),
             connection_string_redacted: mask_connection_string(connection_string),
+            connection_strings_redacted: redacted_connection_string_variants(connection_string),
+            connection_usage: connection_usage_hints(connection_string),
             template_name: "seeded".to_string(),
         };
         let envelope = workflow_success(
@@ -9231,12 +9374,25 @@ mod tests {
         .unwrap();
 
         assert!(output.get("connectionString").is_none());
+        assert!(output.get("connectionStrings").is_none());
         assert_eq!(
             output
                 .get("connectionStringRedacted")
                 .and_then(Value::as_str),
             Some("postgres://role:****@localhost:5432/sandbox")
         );
+        assert_eq!(
+            output
+                .get("connectionStringsRedacted")
+                .and_then(|strings| strings.get("localContainer"))
+                .and_then(Value::as_str),
+            Some("postgres://role:****@host.docker.internal:5432/sandbox")
+        );
+        assert!(output
+            .get("connectionUsage")
+            .and_then(|usage| usage.get("localContainer"))
+            .and_then(Value::as_str)
+            .is_some_and(|hint| hint.contains("host.docker.internal")));
         assert!(!output.to_string().contains("secret"));
     }
 
@@ -9260,10 +9416,49 @@ mod tests {
         );
         assert_eq!(
             output
+                .get("connectionStrings")
+                .and_then(|strings| strings.get("direct"))
+                .and_then(Value::as_str),
+            Some(connection_string)
+        );
+        assert_eq!(
+            output
+                .get("connectionStrings")
+                .and_then(|strings| strings.get("localContainer"))
+                .and_then(Value::as_str),
+            Some("postgres://role:secret@host.docker.internal:5432/sandbox")
+        );
+        assert_eq!(
+            output
                 .get("connectionStringRedacted")
                 .and_then(Value::as_str),
             Some("postgres://role:****@localhost:5432/sandbox")
         );
+        assert_eq!(
+            output
+                .get("connectionStringsRedacted")
+                .and_then(|strings| strings.get("localContainer"))
+                .and_then(Value::as_str),
+            Some("postgres://role:****@host.docker.internal:5432/sandbox")
+        );
+    }
+
+    #[test]
+    fn connection_string_variants_rewrite_loopback_hosts_for_local_containers() {
+        let variants = connection_string_variants("postgres://role:secret@127.0.0.1:65432/sandbox");
+
+        assert_eq!(
+            variants.local_container.as_deref(),
+            Some("postgres://role:secret@host.docker.internal:65432/sandbox")
+        );
+    }
+
+    #[test]
+    fn connection_string_variants_skip_local_container_for_routable_hosts() {
+        let variants =
+            connection_string_variants("postgres://role:secret@db.internal:5432/sandbox");
+
+        assert_eq!(variants.local_container, None);
     }
 
     #[test]
@@ -9281,6 +9476,8 @@ mod tests {
             expires_at,
             connection_string: connection_string.to_string(),
             connection_string_redacted: mask_connection_string(connection_string),
+            connection_strings_redacted: redacted_connection_string_variants(connection_string),
+            connection_usage: connection_usage_hints(connection_string),
             installed_extensions: Vec::new(),
         };
         let cloned = CloneDatabaseOutput {
@@ -9293,6 +9490,8 @@ mod tests {
             expires_at,
             connection_string: connection_string.to_string(),
             connection_string_redacted: mask_connection_string(connection_string),
+            connection_strings_redacted: redacted_connection_string_variants(connection_string),
+            connection_usage: connection_usage_hints(connection_string),
             source: "external".to_string(),
             schema_only: false,
             installed_extensions: Vec::new(),
@@ -9306,6 +9505,8 @@ mod tests {
             expires_at,
             connection_string: connection_string.to_string(),
             connection_string_redacted: mask_connection_string(connection_string),
+            connection_strings_redacted: redacted_connection_string_variants(connection_string),
+            connection_usage: connection_usage_hints(connection_string),
             template_name: "seeded".to_string(),
         };
         let lookup = ConnectionStringOutput::new(

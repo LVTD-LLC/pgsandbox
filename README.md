@@ -21,6 +21,8 @@ shared developer database.
   schema snapshots, and returns `EXPLAIN (FORMAT JSON)` plans.
 - Runs repo migration and seed commands with sandbox credentials injected
   through environment variables instead of rewriting project settings.
+- Returns host-local and Docker-friendly connection variants so containerized
+  local apps can reach a host-managed sandbox without guessing the right host.
 - Creates reusable local template artifacts from PGSandbox-owned sandboxes.
 - Writes MCP client config for Codex, Cursor, VS Code, and Claude Desktop.
 - Masks admin URLs and sandbox credentials in diagnostics and safe summaries.
@@ -214,6 +216,18 @@ agent workflow is:
 3. Inspect schema with `describe_schema` or `schema_digest`.
 4. Delete the sandbox with `delete_database`, or let TTL cleanup remove it
    later.
+
+If your application runs inside Docker while PGSandbox runs on the host, call
+`get_connection_string` with `includeCredentials: true` and pass
+`connectionStrings.localContainer` to the app service as `DATABASE_URL`. Keep
+the raw value out of chat, logs, issues, PR comments, and task trackers. Docker
+Desktop supports the returned `host.docker.internal` host automatically. On
+Linux Docker, add this to the service:
+
+```yaml
+extra_hosts:
+  - "host.docker.internal:host-gateway"
+```
 
 For direct CLI troubleshooting, this command starts the MCP server over stdio:
 
@@ -620,7 +634,7 @@ Postgres errors include SQLSTATE when available.
 | `create_database` | Create one isolated sandbox database and role, optionally installing requested extensions. |
 | `clone_database` | Clone an existing source database into a new sandbox with `pg_dump`/`pg_restore`, optionally installing target extensions and skipping source-only extension entries. |
 | `delete_database` | Delete a metadata-owned sandbox database and role. |
-| `get_connection_string` | Return a redacted connection string by default, or raw credentials when explicitly requested. |
+| `get_connection_string` | Return redacted direct/container connection variants by default, or raw credentials when explicitly requested. |
 | `run_sql` | Run SQL against a sandbox with bounded result rows. |
 | `describe_schema` | Return relation, column, constraint, index, view, materialized view, foreign table, and extension metadata. |
 | `schema_digest` | Return a compact checksummed schema summary. |

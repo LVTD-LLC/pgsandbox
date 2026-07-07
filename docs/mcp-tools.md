@@ -27,11 +27,27 @@ that envelope.
 - `result`: workflow-specific output when available
 
 Creation-style tools return `connectionStringRedacted` for safe summaries and
-task trackers. `get_connection_string` also returns only
-`connectionStringRedacted` by default. Pass `includeCredentials: true` only
-when a tool or command needs the actual credential-bearing `connectionString`,
-and do not echo that sensitive value into chat, logs, PR comments, issues, or
-durable datasets.
+task trackers. They also return `connectionStringsRedacted`, which always
+contains `direct` and may contain `localContainer` when a loopback host such as
+`localhost` or `127.0.0.1` can be rewritten for a local app container.
+`connectionUsage` explains which variant to use.
+
+`get_connection_string` also returns only redacted values by default. Pass
+`includeCredentials: true` only when a tool or command needs the actual
+credential-bearing connection string. In that mode, `connectionString` is the
+raw direct URL and `connectionStrings` contains the raw direct/container
+variants. Do not echo those sensitive values into chat, logs, PR comments,
+issues, or durable datasets.
+
+Use `connectionStrings.localContainer` for a Dockerized app service running on
+the same machine as PGSandbox. Docker Desktop supports `host.docker.internal`
+automatically. On Linux Docker, add this to the service before using the
+`localContainer` URL:
+
+```yaml
+extra_hosts:
+  - "host.docker.internal:host-gateway"
+```
 
 Tool failures are returned as MCP tool errors whose text content is a safe JSON
 object using the same envelope shape: `ok: false`, `summary`, `warnings: []`,
@@ -94,6 +110,11 @@ Returns:
 - `installedExtensions`: normalized extension names installed by the request
 - `connectionStringRedacted`: safe display value for logs, task trackers, and
   summaries
+- `connectionStringsRedacted`: redacted variants. `direct` is for host-local
+  tools, and `localContainer` is present for loopback profiles that can be
+  reached from local Docker containers through `host.docker.internal`.
+- `connectionUsage`: short guidance for the returned variants, including the
+  Linux Docker `extra_hosts` mapping when `localContainer` is present
 
 Extension installation runs after database creation using the generated sandbox
 role connection, not the admin connection. PGSandbox checks
@@ -269,6 +290,8 @@ Returns:
 - `roleName`
 - `expiresAt`
 - `connectionStringRedacted`
+- `connectionStringsRedacted`
+- `connectionUsage`
 - `source`: currently `external`
 - `schemaOnly`
 - `installedExtensions`: normalized extension names installed before restore
@@ -324,14 +347,21 @@ Inputs:
 - `postgresVersion`: optional Postgres major version
 - `databaseId` or `databaseName`
 - `includeCredentials`: optional boolean, defaults to false. When true, the
-  response includes raw `connectionString` with sandbox role credentials.
+  response includes raw `connectionString` and `connectionStrings` with
+  sandbox role credentials.
 
 Returns:
 
 - `connectionStringRedacted`: safe display value for logs, task trackers, and
   summaries
+- `connectionStringsRedacted`: redacted direct/container variants
+- `connectionUsage`: short guidance for the returned variants
 - `connectionString`: present only when `includeCredentials` is true; sensitive
   credential-bearing value for direct database clients and commands
+- `connectionStrings`: present only when `includeCredentials` is true;
+  sensitive credential-bearing direct/container variants. Use
+  `connectionStrings.localContainer` for Dockerized app services running on the
+  same machine as PGSandbox.
 - `expiresAt`
 
 ## `run_sql`
@@ -749,9 +779,10 @@ Inputs:
 - `labels`
 
 Returns the new sandbox metadata under `result` with
-`connectionStringRedacted`. Call `get_connection_string` with the returned
-`databaseId` and `includeCredentials: true` only when the full connection string
-is explicitly needed.
+`connectionStringRedacted`, `connectionStringsRedacted`, and
+`connectionUsage`. Call `get_connection_string` with the returned `databaseId`
+and `includeCredentials: true` only when the full direct/container connection
+strings are explicitly needed.
 
 ### `list_templates`
 
