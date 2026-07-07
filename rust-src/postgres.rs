@@ -47,6 +47,7 @@ const METADATA_TABLE: &str = "pgsandbox_databases";
 const AUDIT_TABLE: &str = "pgsandbox_events";
 const DEFAULT_ROW_LIMIT: usize = 100;
 const MAX_ROW_LIMIT: usize = 1000;
+const MAX_EXTENSION_COUNT: usize = 25;
 const LIST_DATABASES_LIMIT: usize = 100;
 const ENCRYPTED_PASSWORD_PREFIX: &str = "v1";
 const SCHEMA_DIGEST_VERSION: u32 = 3;
@@ -104,6 +105,10 @@ pub struct CreateDatabaseInput {
     pub ttl_minutes: Option<i64>,
     pub owner: Option<String>,
     pub labels: Option<BTreeMap<String, Value>>,
+    #[schemars(
+        description = "Optional extension names to install in the sandbox after creation. Names are normalized to lowercase and must be available on the selected Postgres profile."
+    )]
+    pub extensions: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -117,6 +122,10 @@ pub struct CloneDatabaseInput {
     pub owner: Option<String>,
     pub labels: Option<BTreeMap<String, Value>>,
     pub schema_only: Option<bool>,
+    #[schemars(
+        description = "Optional extension names to install in the target sandbox before pg_restore. Names are normalized to lowercase and must be available on the selected Postgres profile."
+    )]
+    pub extensions: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -434,6 +443,7 @@ pub struct CreateDatabaseOutput {
     #[serde(skip_serializing)]
     pub connection_string: String,
     pub connection_string_redacted: String,
+    pub installed_extensions: Vec<String>,
 }
 
 impl fmt::Debug for CreateDatabaseOutput {
@@ -450,6 +460,7 @@ impl fmt::Debug for CreateDatabaseOutput {
                 "connection_string_redacted",
                 &self.connection_string_redacted,
             )
+            .field("installed_extensions", &self.installed_extensions)
             .finish()
     }
 }
@@ -467,6 +478,7 @@ pub struct CloneDatabaseOutput {
     pub connection_string_redacted: String,
     pub source: String,
     pub schema_only: bool,
+    pub installed_extensions: Vec<String>,
 }
 
 impl fmt::Debug for CloneDatabaseOutput {
@@ -485,6 +497,7 @@ impl fmt::Debug for CloneDatabaseOutput {
             )
             .field("source", &self.source)
             .field("schema_only", &self.schema_only)
+            .field("installed_extensions", &self.installed_extensions)
             .finish()
     }
 }
@@ -1525,16 +1538,31 @@ impl PostgresSandboxManager {
         &self,
         input: CreateDatabaseInput,
     ) -> anyhow::Result<CreateDatabaseOutput> {
-        let profile =
-            self.resolve_profile(input.profile.as_deref(), input.postgres_version.as_deref())?;
-        let ttl_minutes = clamp_ttl(input.ttl_minutes, &profile)?;
-        let names = make_sandbox_names(&profile.database_prefix, input.name_hint.as_deref());
+        let CreateDatabaseInput {
+            profile,
+            postgres_version,
+            name_hint,
+            ttl_minutes,
+            owner,
+            labels,
+            extensions,
+        } = input;
+        let profile = self.resolve_profile(profile.as_deref(), postgres_version.as_deref())?;
+        let ttl_minutes = clamp_ttl(ttl_minutes, &profile)?;
+        let extensions = normalize_extension_names(extensions)?;
+        let names = make_sandbox_names(&profile.database_prefix, name_hint.as_deref());
         let role_password = format!("{}{}", Uuid::new_v4().simple(), Uuid::new_v4().simple());
         let expires_at = Utc::now() + Duration::minutes(ttl_minutes.into());
+        let connection_string = build_connection_string(
+            &profile.admin_url,
+            &names.database_name,
+            &names.role_name,
+            &role_password,
+        )?;
 
         let (client, connection_task) = connect_admin(&profile).await?;
         ensure_metadata_table(&client, &profile).await?;
-        enforce_owner_quota(&client, &profile, input.owner.as_deref()).await?;
+        enforce_owner_quota(&client, &profile, owner.as_deref()).await?;
 
         let mut created_role = false;
         let mut created_database = false;
@@ -1557,7 +1585,9 @@ impl PostgresSandboxManager {
                 .await?;
             created_database = true;
 
-            let labels = serde_json::to_value(input.labels.unwrap_or_default())?;
+            install_extensions(&connection_string, &profile.name, &extensions).await?;
+
+            let labels = serde_json::to_value(labels.unwrap_or_default())?;
             let stored_role_password = protect_role_password(&role_password, &profile)?;
             client
                 .execute(
@@ -1575,8 +1605,8 @@ impl PostgresSandboxManager {
                         &names.database_name,
                         &names.role_name,
                         &stored_role_password,
-                        &input.owner,
-                        &input.name_hint,
+                        &owner,
+                        &name_hint,
                         &labels,
                         &expires_at,
                     ],
@@ -1590,9 +1620,10 @@ impl PostgresSandboxManager {
                 &names.database_name,
                 Some(&names.role_name),
                 json!({
-                    "owner": input.owner,
-                    "purpose": input.name_hint,
+                    "owner": owner,
+                    "purpose": name_hint,
                     "expiresAt": expires_at,
+                    "installedExtensions": extensions,
                 }),
             )
             .await;
@@ -1645,13 +1676,6 @@ impl PostgresSandboxManager {
         drop(client);
         let _ = connection_task.await;
 
-        let connection_string = build_connection_string(
-            &profile.admin_url,
-            &names.database_name,
-            &names.role_name,
-            &role_password,
-        )?;
-
         Ok(CreateDatabaseOutput {
             database_id: names.database_id,
             profile: profile.name.clone(),
@@ -1660,6 +1684,7 @@ impl PostgresSandboxManager {
             expires_at,
             connection_string_redacted: mask_connection_string(&connection_string),
             connection_string,
+            installed_extensions: extensions,
         })
     }
 
@@ -1676,6 +1701,7 @@ impl PostgresSandboxManager {
             owner,
             labels,
             schema_only,
+            extensions,
         } = input;
         let schema_only = schema_only.unwrap_or(false);
         let target_profile =
@@ -1689,6 +1715,7 @@ impl PostgresSandboxManager {
                 ttl_minutes,
                 owner,
                 labels,
+                extensions,
             })
             .await?;
 
@@ -1729,6 +1756,7 @@ impl PostgresSandboxManager {
             connection_string: created.connection_string,
             source: "external".to_string(),
             schema_only,
+            installed_extensions: created.installed_extensions,
         })
     }
 
@@ -2636,6 +2664,7 @@ impl PostgresSandboxManager {
                     ttl_minutes: input.ttl_minutes,
                     owner: input.owner,
                     labels: input.labels,
+                    extensions: None,
                 })
                 .await?;
             created_profile = Some(created.profile.clone());
@@ -2980,6 +3009,7 @@ impl PostgresSandboxManager {
                 ttl_minutes: input.ttl_minutes,
                 owner: input.owner,
                 labels: input.labels,
+                extensions: None,
             })
             .await?;
         if let Err(error) =
@@ -5866,6 +5896,63 @@ fn build_connection_string(
     Ok(url.to_string())
 }
 
+async fn install_extensions(
+    database_url: &str,
+    profile_name: &str,
+    extensions: &[String],
+) -> anyhow::Result<()> {
+    if extensions.is_empty() {
+        return Ok(());
+    }
+
+    let (client, connection_task) = connect_url(database_url)
+        .await
+        .context("failed to connect to newly created sandbox while installing extensions")?;
+    let result = async {
+        for extension in extensions {
+            ensure_extension_available(&client, profile_name, extension).await?;
+            client
+                .batch_execute(&create_extension_statement(extension)?)
+                .await
+                .with_context(|| extension_install_failure_message(profile_name, extension))?;
+        }
+        anyhow::Ok(())
+    }
+    .await;
+
+    drop(client);
+    let _ = connection_task.await;
+    result
+}
+
+async fn ensure_extension_available(
+    client: &Client,
+    profile_name: &str,
+    extension: &str,
+) -> anyhow::Result<()> {
+    let row = client
+        .query_opt(
+            "SELECT 1 FROM pg_available_extensions WHERE name = $1",
+            &[&extension],
+        )
+        .await
+        .with_context(|| {
+            format!("failed to inspect available extensions for target Postgres profile `{profile_name}`")
+        })?;
+    if row.is_none() {
+        anyhow::bail!(
+            "invalid_extensions: extension `{extension}` is not available on target Postgres profile `{profile_name}`"
+        );
+    }
+    Ok(())
+}
+
+fn extension_install_failure_message(profile_name: &str, extension: &str) -> String {
+    format!(
+        "invalid_extensions: failed to install extension `{extension}` on target Postgres profile `{profile_name}`"
+    )
+}
+
 #[derive(Debug, PartialEq, Eq)]
 struct PgToolConnection {
     database: String,
@@ -6107,6 +6194,51 @@ fn clamp_ttl(ttl_minutes: Option<i64>, profile: &SandboxProfile) -> anyhow::Resu
         );
     }
     Ok(ttl_minutes as u32)
+}
+
+fn normalize_extension_names(extensions: Option<Vec<String>>) -> anyhow::Result<Vec<String>> {
+    let Some(extensions) = extensions else {
+        return Ok(Vec::new());
+    };
+    if extensions.len() > MAX_EXTENSION_COUNT {
+        anyhow::bail!(
+            "invalid_extensions: extensions may contain at most {MAX_EXTENSION_COUNT} items"
+        );
+    }
+
+    let mut normalized = Vec::new();
+    let mut seen = BTreeSet::new();
+    for (index, extension) in extensions.into_iter().enumerate() {
+        let extension = extension.trim().to_ascii_lowercase();
+        if extension.is_empty() {
+            anyhow::bail!("invalid_extensions: extensions[{index}] must not be blank");
+        }
+        if extension.len() > 63 {
+            anyhow::bail!(
+                "invalid_extensions: extensions[{index}] exceeds the Postgres identifier length limit"
+            );
+        }
+        if !extension
+            .chars()
+            .all(|character| character.is_ascii_alphanumeric() || matches!(character, '_' | '-'))
+        {
+            anyhow::bail!(
+                "invalid_extensions: extensions[{index}] must be a single extension identifier using letters, numbers, underscores, or hyphens"
+            );
+        }
+        if seen.insert(extension.clone()) {
+            normalized.push(extension);
+        }
+    }
+
+    Ok(normalized)
+}
+
+fn create_extension_statement(extension: &str) -> anyhow::Result<String> {
+    Ok(format!(
+        "CREATE EXTENSION IF NOT EXISTS {}",
+        quote_ident(extension)?
+    ))
 }
 
 fn normalize_row_limit(row_limit: Option<i64>) -> anyhow::Result<usize> {
@@ -7965,6 +8097,71 @@ mod tests {
     }
 
     #[test]
+    fn database_create_and_clone_inputs_accept_extension_lists() {
+        let create = serde_json::from_value::<CreateDatabaseInput>(json!({
+            "extensions": ["pg_trgm", "uuid-ossp"]
+        }))
+        .unwrap();
+        let clone = serde_json::from_value::<CloneDatabaseInput>(json!({
+            "sourceDatabaseUrl": "postgres://postgres:secret@localhost/source",
+            "extensions": ["citext"]
+        }))
+        .unwrap();
+
+        assert_eq!(
+            create.extensions,
+            Some(vec!["pg_trgm".to_string(), "uuid-ossp".to_string()])
+        );
+        assert_eq!(clone.extensions, Some(vec!["citext".to_string()]));
+    }
+
+    #[test]
+    fn extension_requests_normalize_lowercase_and_deduplicate() {
+        let extensions = normalize_extension_names(Some(vec![
+            " PG_TRGM ".to_string(),
+            "uuid-ossp".to_string(),
+            "pg_trgm".to_string(),
+        ]))
+        .unwrap();
+
+        assert_eq!(extensions, ["pg_trgm", "uuid-ossp"]);
+    }
+
+    #[test]
+    fn extension_requests_reject_unsafe_names() {
+        for value in [
+            "",
+            "   ",
+            "public.pg_trgm",
+            "pg_trgm; drop schema public",
+            "bad quote",
+        ] {
+            let error = normalize_extension_names(Some(vec![value.to_string()])).unwrap_err();
+
+            assert!(
+                error.to_string().contains("invalid_extensions"),
+                "{value:?} returned {error:#}"
+            );
+        }
+    }
+
+    #[test]
+    fn create_extension_statement_quotes_extension_identifier() {
+        let sql = create_extension_statement("uuid-ossp").unwrap();
+
+        assert_eq!(sql, "CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\"");
+    }
+
+    #[test]
+    fn extension_install_failure_message_preserves_validation_code() {
+        let message = extension_install_failure_message("local", "postgis");
+
+        assert!(message.contains("invalid_extensions"));
+        assert!(message.contains("postgis"));
+        assert!(message.contains("local"));
+    }
+
+    #[test]
     fn row_limit_validation_accepts_negative_values_after_deserialization() {
         let input = serde_json::from_value::<RunSqlInput>(json!({
             "databaseId": "db-id",
@@ -8340,6 +8537,7 @@ mod tests {
             expires_at,
             connection_string: connection_string.to_string(),
             connection_string_redacted: mask_connection_string(connection_string),
+            installed_extensions: Vec::new(),
         })
         .unwrap();
         assert!(created.get("connectionString").is_none());
@@ -8360,6 +8558,7 @@ mod tests {
             connection_string_redacted: mask_connection_string(connection_string),
             source: "external".to_string(),
             schema_only: false,
+            installed_extensions: Vec::new(),
         })
         .unwrap();
         assert!(cloned.get("connectionString").is_none());
@@ -8461,6 +8660,7 @@ mod tests {
             expires_at,
             connection_string: connection_string.to_string(),
             connection_string_redacted: mask_connection_string(connection_string),
+            installed_extensions: Vec::new(),
         };
         let cloned = CloneDatabaseOutput {
             database_id: "db-id".to_string(),
@@ -8472,6 +8672,7 @@ mod tests {
             connection_string_redacted: mask_connection_string(connection_string),
             source: "external".to_string(),
             schema_only: false,
+            installed_extensions: Vec::new(),
         };
         let restored = CreateSandboxFromTemplateOutput {
             database_id: "db-id".to_string(),

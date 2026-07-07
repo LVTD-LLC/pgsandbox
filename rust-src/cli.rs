@@ -302,6 +302,7 @@ async fn smoke_test(args: &[String]) -> anyhow::Result<u8> {
                 ttl_minutes: Some(15),
                 owner: Some("smoke".to_string()),
                 labels: None,
+                extensions: None,
             })
             .await?;
         println!("Created sandbox: {}", created.database_name);

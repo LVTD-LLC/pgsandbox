@@ -1,8 +1,8 @@
 ---
 import DocsLayout from '../../layouts/DocsLayout.astro';
 const tools = [
-  ['create_database', 'Creates an isolated database and login role. Returns the database id, database name, role name, expiry, and connection string.'],
-  ['clone_database', 'Creates a sandbox and restores an existing Postgres source into it with pg_dump and pg_restore. The restore runs as the sandbox role and cleans up the destination if cloning fails.'],
+  ['create_database', 'Creates an isolated database and login role, optionally installing requested extensions available on the target profile. Returns the database id, database name, role name, expiry, installed extensions, and redacted connection string.'],
+  ['clone_database', 'Creates a sandbox, optionally installs requested extensions, and restores an existing Postgres source into it with pg_dump and pg_restore. The restore runs as the sandbox role and cleans up the destination if cloning fails.'],
   ['delete_database', 'Deletes a database and role created by this MCP. Destructive operations are scoped to tracked sandbox resources.'],
   ['get_connection_string', 'Returns the connection string for a created sandbox database plus expiry metadata.'],
   ['run_sql', 'Runs SQL against an experiment database with optional readonly mode and capped row limits.'],

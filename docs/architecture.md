@@ -67,6 +67,9 @@ pgsandbox_<slug>_<short_id>
 ```
 
 The admin connection is used only for lifecycle operations. Tool calls that run user SQL connect using the generated sandbox role.
+Requested extension installation also connects with the generated sandbox role
+after the database is created, so `CREATE EXTENSION` succeeds or fails under
+the same privileges the sandbox owner has.
 Sandbox role passwords are encrypted before being persisted in the metadata table.
 Metadata setup encrypts older unencrypted local rows in place before strict
 password reads.

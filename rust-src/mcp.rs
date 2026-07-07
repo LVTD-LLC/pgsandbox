@@ -143,6 +143,13 @@ impl PgsandboxServer {
             ("hasOwner", json!(input.owner.is_some())),
             ("hasTtlMinutes", json!(input.ttl_minutes.is_some())),
             (
+                "extensionCount",
+                json!(input
+                    .extensions
+                    .as_ref()
+                    .map_or(0, |extensions| extensions.len())),
+            ),
+            (
                 "labelCount",
                 json!(input.labels.as_ref().map_or(0, |labels| labels.len())),
             ),
@@ -169,6 +176,13 @@ impl PgsandboxServer {
             ("hasNameHint", json!(input.name_hint.is_some())),
             ("hasOwner", json!(input.owner.is_some())),
             ("hasTtlMinutes", json!(input.ttl_minutes.is_some())),
+            (
+                "extensionCount",
+                json!(input
+                    .extensions
+                    .as_ref()
+                    .map_or(0, |extensions| extensions.len())),
+            ),
             (
                 "labelCount",
                 json!(input.labels.as_ref().map_or(0, |labels| labels.len())),
@@ -861,6 +875,22 @@ impl ToolErrorResponse {
                 detail_handle: Some(json!({
                     "type": "tool-contract",
                     "field": "rowLimit"
+                })),
+            }
+        } else if lower.contains("invalid_extensions") {
+            ToolErrorBody {
+                code: "invalid_extensions",
+                category: "validation",
+                message: chain,
+                hint: "Pass extensions as a list of extension names available on the target Postgres profile. Names must be single identifiers using letters, numbers, underscores, or hyphens, for example [\"pg_trgm\", \"uuid-ossp\"].".to_string(),
+                sqlstate: None,
+                requested_version: None,
+                source_version: None,
+                target_version: None,
+                detected_versions: Vec::new(),
+                detail_handle: Some(json!({
+                    "type": "tool-contract",
+                    "field": "extensions"
                 })),
             }
         } else if lower.contains("password authentication failed")
@@ -1603,6 +1633,11 @@ mod tests {
                 "invalid_row_limit",
                 "validation",
             ),
+            (
+                "invalid_extensions: extensions[0] must be a single extension identifier",
+                "invalid_extensions",
+                "validation",
+            ),
         ];
 
         for (message, code, category) in cases {
@@ -1629,6 +1664,23 @@ mod tests {
             .as_str()
             .unwrap()
             .contains("positive ttlMinutes"));
+    }
+
+    #[test]
+    fn invalid_extensions_tool_error_has_actionable_hint() {
+        let result = tool_json::<()>(Err(anyhow::anyhow!(
+            "invalid_extensions: extensions[0] must be a single extension identifier"
+        )))
+        .unwrap();
+        let text = result.content[0].as_text().unwrap().text.clone();
+        let value = serde_json::from_str::<Value>(&text).unwrap();
+
+        assert_eq!(first_error(&value)["code"], "invalid_extensions");
+        assert!(first_error(&value)["hint"]
+            .as_str()
+            .unwrap()
+            .contains("extensions"));
+        assert_eq!(value["detailHandles"][0]["field"], "extensions");
     }
 
     #[test]
@@ -1720,6 +1772,7 @@ mod tests {
                 ttl_minutes: Some(5),
                 owner: None,
                 labels: None,
+                extensions: None,
             }))
             .await
             .unwrap();
@@ -1760,6 +1813,7 @@ mod tests {
                 ttl_minutes: Some(5),
                 owner: None,
                 labels: None,
+                extensions: None,
             }))
             .await
             .unwrap();

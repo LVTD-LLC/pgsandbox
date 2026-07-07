@@ -29,6 +29,7 @@ async fn dogfood_reliability_suite_runs_when_enabled() {
             ttl_minutes: Some(45),
             owner: Some(owner.clone()),
             labels: Some([("suite".to_string(), json!("dogfood"))].into()),
+            extensions: None,
         })
         .await
         .expect("create dogfood sandbox");
@@ -74,6 +75,7 @@ async fn pg18_schema_snapshot_minimal_schema_returns_without_timeout_when_enable
             ttl_minutes: Some(30),
             owner: Some(owner),
             labels: Some([("suite".to_string(), json!("pg18-schema-snapshot"))].into()),
+            extensions: None,
         })
         .await
         .expect("create PG18 snapshot regression sandbox");
@@ -409,6 +411,7 @@ async fn exercise_clone(
             owner: Some(owner.to_string()),
             labels: Some([("suite".to_string(), json!("dogfood"))].into()),
             schema_only: Some(true),
+            extensions: None,
         })
         .await?;
 

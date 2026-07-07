@@ -22,6 +22,7 @@ async fn run_sql_preserves_to_regclass_nullability_with_cast_hint_when_enabled()
             ttl_minutes: Some(30),
             owner: Some(owner),
             labels: Some([("suite".to_string(), json!("run_sql_serialization"))].into()),
+            extensions: None,
         })
         .await
         .expect("create serialization sandbox");
@@ -104,6 +105,7 @@ async fn run_sql_returns_typed_ordered_result_sets_for_multi_statement_sql_when_
             ttl_minutes: Some(30),
             owner: Some(owner),
             labels: Some([("suite".to_string(), json!("run_sql_serialization"))].into()),
+            extensions: None,
         })
         .await
         .expect("create serialization sandbox");
@@ -200,6 +202,7 @@ async fn run_sql_readonly_contract_matches_postgres_transaction_when_enabled() {
             ttl_minutes: Some(30),
             owner: Some(owner),
             labels: Some([("suite".to_string(), json!("run_sql_readonly"))].into()),
+            extensions: None,
         })
         .await
         .expect("create readonly sandbox");

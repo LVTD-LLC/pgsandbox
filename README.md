@@ -371,6 +371,7 @@ No build-time environment variables are required for the site.
 |   `-- open-questions.md    Product and architecture questions
 |-- tests/
 |   |-- dogfood_reliability.rs
+|   |-- extensions.rs
 |   `-- run_sql_serialization.rs
 |-- scripts/
 |   |-- install.sh
@@ -507,7 +508,9 @@ Admin connections are used for:
 - audit events
 
 User SQL and repo commands use sandbox role credentials generated for the
-specific database.
+specific database. Requested sandbox extensions are installed through the same
+sandbox role connection after the database is created, not through the admin
+connection.
 
 ### Resource Model
 
@@ -520,6 +523,7 @@ Each sandbox gets:
 - one owner string, if supplied
 - one purpose/name hint, if supplied
 - JSON labels, if supplied
+- optional installed extensions requested at creation time
 - a `createdAt` timestamp
 - an `expiresAt` timestamp
 - a `deletedAt` timestamp after deletion
@@ -611,8 +615,8 @@ Postgres errors include SQLSTATE when available.
 |------|---------|
 | `list_profiles` | List configured profiles and discovered local Postgres versions. |
 | `doctor` | Return MCP-safe diagnostics and profile health. |
-| `create_database` | Create one isolated sandbox database and role. |
-| `clone_database` | Clone an existing source database into a new sandbox with `pg_dump`/`pg_restore`. |
+| `create_database` | Create one isolated sandbox database and role, optionally installing requested extensions. |
+| `clone_database` | Clone an existing source database into a new sandbox with `pg_dump`/`pg_restore`, optionally installing requested extensions before restore. |
 | `delete_database` | Delete a metadata-owned sandbox database and role. |
 | `get_connection_string` | Return a redacted connection string by default, or raw credentials when explicitly requested. |
 | `run_sql` | Run SQL against a sandbox with bounded result rows. |
@@ -636,6 +640,28 @@ Postgres errors include SQLSTATE when available.
 | `cleanup_expired` | Delete expired metadata-owned sandboxes, or dry-run the selection. |
 
 See [docs/mcp-tools.md](docs/mcp-tools.md) for full tool inputs and outputs.
+
+### Extension Installation
+
+`create_database` and `clone_database` accept an optional `extensions` list:
+
+```json
+{
+  "nameHint": "trigram search repro",
+  "extensions": ["pg_trgm", "uuid-ossp"]
+}
+```
+
+PGSandbox trims names, normalizes them to lowercase, deduplicates them, and
+allows only letters, numbers, underscores, and hyphens. The installed names are
+returned as `installedExtensions`.
+
+Extension availability depends on the selected target profile's Postgres
+installation. PGSandbox checks `pg_available_extensions` inside the target
+sandbox before running `CREATE EXTENSION IF NOT EXISTS`; unavailable or invalid
+names return `invalid_extensions` and the new sandbox is rolled back. For
+`clone_database`, requested extensions are installed in the empty target
+sandbox before `pg_restore` runs.
 
 ### SQL Execution
 
@@ -744,9 +770,10 @@ or a production-data import workflow.
 
 1. Preflight source and target Postgres major versions.
 2. Create an empty tracked target sandbox.
-3. Run `pg_dump` against the source database.
-4. Run `pg_restore` into the target sandbox using the sandbox role.
-5. Delete the target sandbox if restore fails.
+3. Install any requested target extensions using the sandbox role.
+4. Run `pg_dump` against the source database.
+5. Run `pg_restore` into the target sandbox using the sandbox role.
+6. Delete the target sandbox if restore fails.
 
 Newer-to-older clone paths fail before target creation with
 `restore_incompatible`. Cloning and template tools require `pg_dump` and
@@ -1093,6 +1120,7 @@ Integration-style tests live under `tests/`:
 
 ```text
 tests/dogfood_reliability.rs
+tests/extensions.rs
 tests/run_sql_serialization.rs
 ```
 
@@ -1131,6 +1159,17 @@ PGSANDBOX_RUN_SQL_READONLY_E2E=1 \
   cargo test --test run_sql_serialization \
   run_sql_readonly_contract_matches_postgres_transaction_when_enabled \
   -- --nocapture
+```
+
+Run the extension installation E2E test. It uses `pg_trgm` by default; override
+the extension name when a target profile exposes a different extension package:
+
+```bash
+PGSANDBOX_EXTENSION_E2E=1 \
+  cargo test --test extensions -- --nocapture
+
+PGSANDBOX_EXTENSION_E2E=1 PGSANDBOX_EXTENSION_E2E_NAME=citext \
+  cargo test --test extensions -- --nocapture
 ```
 
 Each live test creates a sandbox and attempts cleanup at the end. If cleanup

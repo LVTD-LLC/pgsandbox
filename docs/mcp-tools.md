@@ -48,7 +48,8 @@ Typical codes include `undefined_column`, `undefined_table`, `syntax_error`,
 `permission_denied`, `lock_timeout`, `statement_timeout`,
 `command_timeout`, `postgres_auth_failed`, `postgres_connection_failed`,
 `unknown_profile`, `postgres_version_unavailable`,
-`local_postgres_unavailable`, `invalid_ttl`, and `invalid_row_limit`.
+`local_postgres_unavailable`, `invalid_ttl`, `invalid_extensions`, and
+`invalid_row_limit`.
 `explain_query` multi-statement input returns `single_statement_required` with
 category `validation` and a hint to pass exactly one SQL statement.
 
@@ -71,6 +72,10 @@ Inputs:
   `maxTtlMinutes` return `code: "invalid_ttl"`.
 - `owner`: optional agent/session identifier
 - `labels`: optional key/value metadata
+- `extensions`: optional list of extension names to install in the new sandbox.
+  Names are trimmed, normalized to lowercase, deduplicated, and limited to
+  letters, numbers, underscores, and hyphens. Examples: `"pg_trgm"`,
+  `"uuid-ossp"`. Unavailable extensions return `code: "invalid_extensions"`.
 
 Returns:
 
@@ -78,8 +83,16 @@ Returns:
 - `databaseName`
 - `roleName`
 - `expiresAt`
+- `installedExtensions`: normalized extension names installed by the request
 - `connectionStringRedacted`: safe display value for logs, task trackers, and
   summaries
+
+Extension installation runs after database creation using the generated sandbox
+role connection, not the admin connection. PGSandbox checks
+`pg_available_extensions` in the target sandbox first, so availability depends
+on the selected profile's Postgres installation and extension packages. If any
+requested extension is invalid, unavailable, or fails to install, creation is
+rolled back by dropping the new database and role.
 
 ## `list_profiles`
 
@@ -152,6 +165,9 @@ Inputs:
 - `owner`: optional agent/session identifier
 - `labels`: optional key/value metadata
 - `schemaOnly`: optional boolean to clone schema without table data
+- `extensions`: optional list of extension names to install in the target
+  sandbox before restore. Validation and availability rules match
+  `create_database`.
 
 Returns:
 
@@ -163,10 +179,13 @@ Returns:
 - `connectionStringRedacted`
 - `source`: currently `external`
 - `schemaOnly`
+- `installedExtensions`: normalized extension names installed before restore
 
 Notes:
 
 - Requires `pg_dump` and `pg_restore` on `PATH` for this tool only.
+- Requested extensions are installed in the empty target sandbox before
+  `pg_restore` runs, so restored schemas can depend on those extension objects.
 - If restore fails, PGSandbox attempts to delete the newly created sandbox.
 - Do not paste production URLs into prompts when a secret input or local
   environment variable can provide them.
