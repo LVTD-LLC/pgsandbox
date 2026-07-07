@@ -68,8 +68,8 @@ For normal end-user installation:
 
 - macOS or Linux on `x86_64` or `aarch64`
 - Local PostgreSQL server binaries for the managed local runtime. `setup`
-  checks for them, installs PostgreSQL through Homebrew when available, and
-  starts the managed local cluster.
+  checks for them, installs PostgreSQL through a supported package manager when
+  available, and starts the managed local cluster.
 - Optional PostgreSQL dump tools for clone/template workflows:
   `pg_dump` and `pg_restore`
 - One MCP client: Codex, Cursor, VS Code, Claude Desktop, or another client
@@ -86,11 +86,11 @@ For repository development:
 - PostgreSQL server binaries available on `PATH`, in a common package-manager
   location, or through `PGSANDBOX_POSTGRES_BIN_DIR`
 
-PGSandbox checks `PATH`, common Homebrew locations such as
-`/opt/homebrew/opt/postgresql/bin` and versioned kegs from
-`postgresql@18` through `postgresql@13`, Postgres.app locations, and explicit
-bin dir environment variables. Homebrew kegs do not need to be linked globally
-if PGSandbox can discover the `opt` path.
+PGSandbox checks `PATH`, common package-manager locations such as
+`/opt/homebrew/opt/postgresql/bin`, `/usr/lib/postgresql/<major>/bin`,
+versioned Homebrew kegs from `postgresql@18` through `postgresql@13`,
+Postgres.app locations, and explicit bin dir environment variables. Homebrew
+kegs do not need to be linked globally if PGSandbox can discover the `opt` path.
 
 Docker is not required. `docker-compose.example.yml` is only a demo helper for
 users who intentionally want an external local Postgres profile.
@@ -139,8 +139,8 @@ pgsandbox-mcp setup --client claude-desktop
 `setup` does the normal local setup work for you:
 
 - checks for the PostgreSQL server binaries the managed runtime needs
-- installs PostgreSQL with Homebrew when those binaries are missing and
-  Homebrew is available
+- installs PostgreSQL with a supported package manager when those binaries are
+  missing and one is available
 - initializes and starts the managed local Postgres cluster under
   `~/.pgsandbox/`
 - writes the MCP client config
@@ -614,6 +614,7 @@ Postgres errors include SQLSTATE when available.
 | Tool | Purpose |
 |------|---------|
 | `list_profiles` | List configured profiles and discovered local Postgres versions. |
+| `ensure_postgres` | Install missing local Postgres server binaries with a supported package manager when available, then start a managed local profile. |
 | `doctor` | Return MCP-safe diagnostics and profile health. |
 | `create_database` | Create one isolated sandbox database and role, optionally installing requested extensions. |
 | `clone_database` | Clone an existing source database into a new sandbox with `pg_dump`/`pg_restore`, optionally installing requested extensions before restore. |
@@ -803,8 +804,9 @@ Telemetry never blocks CLI or MCP tool results. See
 
 PGSandbox is designed as local/private infrastructure:
 
-- It installs PostgreSQL packages only during explicit `setup` runs when
-  Homebrew is available.
+- It installs PostgreSQL packages only during explicit `setup`,
+  `ensure-postgres`, or `local start --install-missing` runs when a supported
+  package manager is available.
 - It does not require Docker.
 - It does not stop Docker containers.
 - It does not bind `localhost:5432` by default.
@@ -1057,13 +1059,14 @@ CLI commands after installation:
 | `pgsandbox-mcp setup --client codex --dry-run` | Print intended config without writing or preparing local Postgres. |
 | `pgsandbox-mcp doctor` | Check config and Postgres connectivity. |
 | `pgsandbox-mcp doctor --postgres-version 18` | Check a requested managed local major version. |
+| `pgsandbox-mcp ensure-postgres --postgres-version 13` | Install missing local Postgres 13 binaries with a supported package manager when available, then start `local-pg13`. |
 | `pgsandbox-mcp upgrade` | Upgrade Homebrew/install-script installs, rerun setup for all clients, and run doctor. |
 | `pgsandbox-mcp upgrade --setup codex` | Upgrade and only refresh the Codex config. |
 | `pgsandbox-mcp local init` | Initialize managed local Postgres without starting it. |
 | `pgsandbox-mcp local start` | Initialize if needed and start managed local Postgres. |
 | `pgsandbox-mcp local status` | Show managed local status. |
 | `pgsandbox-mcp local stop` | Stop managed local Postgres. |
-| `pgsandbox-mcp local start --postgres-version 18` | Start versioned local profile `local-pg18`. |
+| `pgsandbox-mcp local start --postgres-version 18 --install-missing` | Start versioned local profile `local-pg18`, installing binaries with a supported package manager when available. |
 | `pgsandbox-mcp smoke-test` | Create, query, and delete a sandbox. |
 | `pgsandbox-mcp smoke-test --postgres-version 18` | Smoke test a specific local major version. |
 
@@ -1477,8 +1480,9 @@ This is optional. Runtime code must not require Docker.
 
 ### `could not find local Postgres binaries`
 
-Rerun setup first. It checks the local runtime, installs PostgreSQL through
-Homebrew when available, starts the managed local cluster, and writes MCP config:
+Rerun setup first. It checks the local runtime, installs PostgreSQL through a
+supported package manager when available, starts the managed local cluster, and
+writes MCP config:
 
 ```bash
 pgsandbox-mcp setup --client codex
@@ -1493,16 +1497,34 @@ pgsandbox-mcp setup --client codex
 pgsandbox-mcp doctor
 ```
 
-For a requested major version on Homebrew, install the formula when your
-Homebrew setup still provides it:
+For a requested major version, let PGSandbox install the package when your
+system package manager still provides it:
 
 ```bash
-brew install postgresql@14
+pgsandbox-mcp ensure-postgres --postgres-version 14
 pgsandbox-mcp setup --client codex --postgres-version 14
 ```
 
-For an older already-installed major such as Postgres 13, point PGSandbox at
-the existing server binaries:
+For an older major such as Postgres 13:
+
+```bash
+pgsandbox-mcp ensure-postgres --postgres-version 13
+pgsandbox-mcp setup --client codex --postgres-version 13
+```
+
+From MCP, agents can call `ensure_postgres` before creating a sandbox:
+
+```json
+{ "postgresVersion": "13", "installMissing": true }
+```
+
+Automatic PostgreSQL package installs use Homebrew on macOS; `apt-get`, `dnf`,
+`yum`, `zypper`, or `pacman` on Linux; and WinGet or Chocolatey on Windows.
+Versioned packages still depend on what that package manager currently
+publishes.
+
+If your package manager does not provide that major version, point PGSandbox at
+existing server binaries:
 
 ```bash
 export PGSANDBOX_POSTGRES_13_BIN_DIR="/opt/homebrew/opt/postgresql@13/bin"

@@ -6,7 +6,7 @@ use std::{
     io::ErrorKind,
     net::TcpListener,
     path::{Path, PathBuf},
-    process::{Command, ExitStatus, Output},
+    process::{Command, ExitStatus, Output, Stdio},
 };
 
 use anyhow::Context;
@@ -65,6 +65,47 @@ pub struct LocalClusterStatus {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+pub struct LocalPostgresEnsureResult {
+    pub config: LocalClusterConfig,
+    pub install_method: Option<String>,
+    pub installed_package: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct LocalPostgresInstallPlan {
+    pub method: String,
+    pub package: String,
+    pub display_command: String,
+    commands: Vec<LocalPostgresInstallCommand>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct LocalPostgresInstallCommand {
+    program: String,
+    args: Vec<String>,
+    env: Vec<(String, String)>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[allow(dead_code)]
+pub(crate) enum LocalPostgresPackageManager {
+    Homebrew,
+    Apt,
+    Dnf,
+    Yum,
+    Zypper,
+    Pacman,
+    Winget,
+    Chocolatey,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct LocalPostgresInstallResult {
+    pub method: String,
+    pub package: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LocalPostgresInstallation {
     pub postgres_version: String,
     pub postgres_bin_dir: Option<PathBuf>,
@@ -120,6 +161,48 @@ impl LocalPostgresCluster {
     pub fn ensure_started(&self) -> anyhow::Result<LocalClusterConfig> {
         let _lock = self.acquire_lock()?;
         self.ensure_started_locked()
+    }
+
+    pub fn ensure_started_with_optional_install(
+        &self,
+        install_missing: bool,
+    ) -> anyhow::Result<LocalPostgresEnsureResult> {
+        match self.ensure_started() {
+            Ok(config) => Ok(LocalPostgresEnsureResult {
+                config,
+                install_method: None,
+                installed_package: None,
+            }),
+            Err(error) if install_missing && local_postgres_error_is_missing_binaries(&error) => {
+                let installed = install_local_postgres(self.postgres_version.as_deref())?;
+                let config = self.ensure_started().context(
+                    "failed to start managed local Postgres after installing PostgreSQL",
+                )?;
+                Ok(LocalPostgresEnsureResult {
+                    config,
+                    install_method: Some(installed.method),
+                    installed_package: Some(installed.package),
+                })
+            }
+            Err(error) => Err(error),
+        }
+    }
+
+    pub fn matching_binaries_available(&self) -> anyhow::Result<bool> {
+        match self.resolve_binaries_without_starting() {
+            Ok(_) => Ok(true),
+            Err(error) if local_postgres_error_is_missing_binaries(&error) => Ok(false),
+            Err(error) => Err(error),
+        }
+    }
+
+    fn resolve_binaries_without_starting(&self) -> anyhow::Result<LocalPostgresBinaries> {
+        if self.data_dir().join("PG_VERSION").exists() {
+            self.ensure_data_dir_matches_requested_version()?;
+            let config = self.read_config()?;
+            return resolve_postgres_binaries_for_config(&config, self.postgres_version.as_deref());
+        }
+        resolve_postgres_binaries(self.postgres_version.as_deref())
     }
 
     fn ensure_started_locked(&self) -> anyhow::Result<LocalClusterConfig> {
@@ -1092,6 +1175,333 @@ fn missing_local_postgres_binaries<T>() -> anyhow::Result<T> {
     )
 }
 
+pub(crate) fn local_postgres_error_is_missing_binaries(error: &anyhow::Error) -> bool {
+    error.chain().any(|cause| {
+        let message = cause.to_string();
+        message.starts_with("could not find local Postgres")
+            || message.starts_with(
+                "Postgres server binaries `initdb`, `pg_ctl`, and `postgres` were not found",
+            )
+    })
+}
+
+pub(crate) fn install_local_postgres(
+    postgres_version: Option<&str>,
+) -> anyhow::Result<LocalPostgresInstallResult> {
+    let plan = local_postgres_install_plan(postgres_version)?;
+
+    println!("Postgres server binaries were not found.");
+    println!(
+        "Installing PostgreSQL with {}: {}",
+        plan.method, plan.display_command
+    );
+
+    for command in &plan.commands {
+        command.run().with_context(|| {
+            format!(
+                "failed to install PostgreSQL with {}. Install PostgreSQL manually and set PGSANDBOX_POSTGRES_BIN_DIR, or set PGSANDBOX_POSTGRES_<MAJOR>_BIN_DIR for a requested major version.",
+                plan.method
+            )
+        })?;
+    }
+    Ok(LocalPostgresInstallResult {
+        method: plan.method,
+        package: plan.package,
+    })
+}
+
+pub(crate) fn local_postgres_install_plan(
+    postgres_version: Option<&str>,
+) -> anyhow::Result<LocalPostgresInstallPlan> {
+    for manager in supported_local_postgres_package_managers() {
+        if command_available(manager.command()) {
+            return postgres_install_plan_for_manager(manager, postgres_version);
+        }
+    }
+
+    anyhow::bail!(
+        "Postgres server binaries are missing and no supported package manager was found for this OS. Supported automatic installers are Homebrew on macOS; apt-get, dnf, yum, zypper, or pacman on Linux; and winget or Chocolatey on Windows. Install PostgreSQL manually and set PGSANDBOX_POSTGRES_BIN_DIR, or set PGSANDBOX_POSTGRES_<MAJOR>_BIN_DIR for a requested major version."
+    )
+}
+
+pub(crate) fn postgres_install_plan_for_manager(
+    manager: LocalPostgresPackageManager,
+    postgres_version: Option<&str>,
+) -> anyhow::Result<LocalPostgresInstallPlan> {
+    let package = postgres_package_for_manager(manager, postgres_version)?;
+    let commands = match manager {
+        LocalPostgresPackageManager::Homebrew => vec![LocalPostgresInstallCommand::new(
+            "brew",
+            ["install".to_string(), package.clone()],
+        )],
+        LocalPostgresPackageManager::Apt => vec![
+            privileged_install_command(
+                "apt-get",
+                ["update".to_string()],
+                vec![("DEBIAN_FRONTEND".to_string(), "noninteractive".to_string())],
+            ),
+            privileged_install_command(
+                "apt-get",
+                ["install".to_string(), "-y".to_string(), package.clone()],
+                vec![("DEBIAN_FRONTEND".to_string(), "noninteractive".to_string())],
+            ),
+        ],
+        LocalPostgresPackageManager::Dnf => vec![privileged_install_command(
+            "dnf",
+            ["install".to_string(), "-y".to_string(), package.clone()],
+            Vec::new(),
+        )],
+        LocalPostgresPackageManager::Yum => vec![privileged_install_command(
+            "yum",
+            ["install".to_string(), "-y".to_string(), package.clone()],
+            Vec::new(),
+        )],
+        LocalPostgresPackageManager::Zypper => vec![privileged_install_command(
+            "zypper",
+            [
+                "--non-interactive".to_string(),
+                "install".to_string(),
+                package.clone(),
+            ],
+            Vec::new(),
+        )],
+        LocalPostgresPackageManager::Pacman => vec![privileged_install_command(
+            "pacman",
+            [
+                "--sync".to_string(),
+                "--refresh".to_string(),
+                "--noconfirm".to_string(),
+                package.clone(),
+            ],
+            Vec::new(),
+        )],
+        LocalPostgresPackageManager::Winget => vec![LocalPostgresInstallCommand::new(
+            "winget",
+            [
+                "install".to_string(),
+                "--exact".to_string(),
+                "--id".to_string(),
+                package.clone(),
+                "--accept-package-agreements".to_string(),
+                "--accept-source-agreements".to_string(),
+                "--silent".to_string(),
+            ],
+        )],
+        LocalPostgresPackageManager::Chocolatey => vec![LocalPostgresInstallCommand::new(
+            "choco",
+            ["install".to_string(), package.clone(), "-y".to_string()],
+        )],
+    };
+
+    let display_command = commands
+        .iter()
+        .map(LocalPostgresInstallCommand::display)
+        .collect::<Vec<_>>()
+        .join(" && ");
+
+    Ok(LocalPostgresInstallPlan {
+        method: manager.display_name().to_string(),
+        package,
+        display_command,
+        commands,
+    })
+}
+
+fn postgres_package_for_manager(
+    manager: LocalPostgresPackageManager,
+    postgres_version: Option<&str>,
+) -> anyhow::Result<String> {
+    let version = postgres_version
+        .map(normalize_postgres_version)
+        .transpose()?;
+    match manager {
+        LocalPostgresPackageManager::Homebrew => match version {
+            Some(version) => Ok(format!("postgresql@{version}")),
+            None => Ok("postgresql".to_string()),
+        },
+        LocalPostgresPackageManager::Apt => match version {
+            Some(version) => Ok(format!("postgresql-{version}")),
+            None => Ok("postgresql".to_string()),
+        },
+        LocalPostgresPackageManager::Dnf
+        | LocalPostgresPackageManager::Yum
+        | LocalPostgresPackageManager::Zypper => match version {
+            Some(version) => Ok(format!("postgresql{version}-server")),
+            None => Ok("postgresql-server".to_string()),
+        },
+        LocalPostgresPackageManager::Pacman => match version {
+            Some(version) => anyhow::bail!(
+                "pacman does not provide versioned PostgreSQL package names for Postgres {version}; install that major manually and set PGSANDBOX_POSTGRES_{version}_BIN_DIR"
+            ),
+            None => Ok("postgresql".to_string()),
+        },
+        LocalPostgresPackageManager::Winget => match version {
+            Some(version) => Ok(format!("PostgreSQL.PostgreSQL.{version}")),
+            None => Ok("PostgreSQL.PostgreSQL".to_string()),
+        },
+        LocalPostgresPackageManager::Chocolatey => match version {
+            Some(version) => Ok(format!("postgresql{version}")),
+            None => Ok("postgresql".to_string()),
+        },
+    }
+}
+
+fn supported_local_postgres_package_managers() -> Vec<LocalPostgresPackageManager> {
+    #[cfg(target_os = "macos")]
+    {
+        vec![LocalPostgresPackageManager::Homebrew]
+    }
+    #[cfg(target_os = "linux")]
+    {
+        vec![
+            LocalPostgresPackageManager::Apt,
+            LocalPostgresPackageManager::Dnf,
+            LocalPostgresPackageManager::Yum,
+            LocalPostgresPackageManager::Zypper,
+            LocalPostgresPackageManager::Pacman,
+        ]
+    }
+    #[cfg(windows)]
+    {
+        vec![
+            LocalPostgresPackageManager::Winget,
+            LocalPostgresPackageManager::Chocolatey,
+        ]
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "linux", windows)))]
+    {
+        Vec::new()
+    }
+}
+
+fn command_available(command: &str) -> bool {
+    Command::new(command)
+        .arg("--version")
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .is_ok_and(|status| status.success())
+}
+
+impl LocalPostgresPackageManager {
+    fn command(self) -> &'static str {
+        match self {
+            Self::Homebrew => "brew",
+            Self::Apt => "apt-get",
+            Self::Dnf => "dnf",
+            Self::Yum => "yum",
+            Self::Zypper => "zypper",
+            Self::Pacman => "pacman",
+            Self::Winget => "winget",
+            Self::Chocolatey => "choco",
+        }
+    }
+
+    fn display_name(self) -> &'static str {
+        match self {
+            Self::Homebrew => "Homebrew",
+            Self::Apt => "apt-get",
+            Self::Dnf => "dnf",
+            Self::Yum => "yum",
+            Self::Zypper => "zypper",
+            Self::Pacman => "pacman",
+            Self::Winget => "WinGet",
+            Self::Chocolatey => "Chocolatey",
+        }
+    }
+}
+
+fn privileged_install_command<I>(
+    program: &str,
+    args: I,
+    env: Vec<(String, String)>,
+) -> LocalPostgresInstallCommand
+where
+    I: IntoIterator<Item = String>,
+{
+    if should_use_sudo_for_install() {
+        let mut sudo_args = vec!["-n".to_string()];
+        if !env.is_empty() {
+            sudo_args.push("env".to_string());
+            sudo_args.extend(env.iter().map(|(key, value)| format!("{key}={value}")));
+        }
+        sudo_args.push(program.to_string());
+        sudo_args.extend(args);
+        LocalPostgresInstallCommand::with_env("sudo", sudo_args, Vec::new())
+    } else {
+        LocalPostgresInstallCommand::with_env(program, args, env)
+    }
+}
+
+fn should_use_sudo_for_install() -> bool {
+    #[cfg(unix)]
+    {
+        !current_user_is_root()
+    }
+    #[cfg(not(unix))]
+    {
+        false
+    }
+}
+
+#[cfg(unix)]
+fn current_user_is_root() -> bool {
+    Command::new("id")
+        .arg("-u")
+        .stdin(Stdio::null())
+        .output()
+        .ok()
+        .and_then(|output| String::from_utf8(output.stdout).ok())
+        .is_some_and(|uid| uid.trim() == "0")
+}
+
+impl LocalPostgresInstallCommand {
+    fn new<I>(program: &str, args: I) -> Self
+    where
+        I: IntoIterator<Item = String>,
+    {
+        Self::with_env(program, args, Vec::new())
+    }
+
+    fn with_env<I>(program: &str, args: I, env: Vec<(String, String)>) -> Self
+    where
+        I: IntoIterator<Item = String>,
+    {
+        Self {
+            program: program.to_string(),
+            args: args.into_iter().collect(),
+            env,
+        }
+    }
+
+    fn run(&self) -> anyhow::Result<()> {
+        let status = Command::new(&self.program)
+            .args(&self.args)
+            .envs(self.env.iter().map(|(key, value)| (key, value)))
+            .stdin(Stdio::null())
+            .status()
+            .with_context(|| format!("failed to run `{}`", self.display()))?;
+        if !status.success() {
+            anyhow::bail!("`{}` failed with {status}", self.display());
+        }
+        Ok(())
+    }
+
+    fn display(&self) -> String {
+        let env = self
+            .env
+            .iter()
+            .map(|(key, value)| format!("{key}={value}"))
+            .collect::<Vec<_>>();
+        env.into_iter()
+            .chain(std::iter::once(self.program.clone()))
+            .chain(self.args.clone())
+            .collect::<Vec<_>>()
+            .join(" ")
+    }
+}
+
 fn command_output(
     binary: &'static str,
     result: std::io::Result<std::process::Output>,
@@ -1281,6 +1691,85 @@ mod tests {
         assert!(binaries.contains(&"initdb"));
         assert!(binaries.contains(&"pg_ctl"));
         assert!(binaries.contains(&"postgres"));
+    }
+
+    #[test]
+    fn homebrew_postgres_package_defaults_to_unversioned_package() {
+        assert_eq!(
+            postgres_package_for_manager(LocalPostgresPackageManager::Homebrew, None).unwrap(),
+            "postgresql"
+        );
+    }
+
+    #[test]
+    fn homebrew_postgres_package_uses_requested_major_version() {
+        assert_eq!(
+            postgres_package_for_manager(LocalPostgresPackageManager::Homebrew, Some("13.16"))
+                .unwrap(),
+            "postgresql@13"
+        );
+    }
+
+    #[test]
+    fn apt_postgres_package_uses_requested_major_version() {
+        assert_eq!(
+            postgres_package_for_manager(LocalPostgresPackageManager::Apt, Some("13.16")).unwrap(),
+            "postgresql-13"
+        );
+    }
+
+    #[test]
+    fn winget_postgres_package_uses_requested_major_version() {
+        assert_eq!(
+            postgres_package_for_manager(LocalPostgresPackageManager::Winget, Some("13.16"))
+                .unwrap(),
+            "PostgreSQL.PostgreSQL.13"
+        );
+    }
+
+    #[test]
+    fn pacman_rejects_requested_major_version() {
+        let error = postgres_package_for_manager(LocalPostgresPackageManager::Pacman, Some("13"))
+            .unwrap_err();
+
+        assert!(error
+            .to_string()
+            .contains("pacman does not provide versioned PostgreSQL"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn matching_binaries_available_detects_existing_versioned_binaries() {
+        let directory = tempfile::tempdir().unwrap();
+        let bin_dir = directory.path().join("bin");
+        fs::create_dir_all(&bin_dir).unwrap();
+        for binary in required_local_binaries() {
+            write_executable(
+                &bin_dir.join(binary),
+                "#!/bin/sh\necho 'postgres (PostgreSQL) 98.1'\nexit 0\n",
+            );
+        }
+
+        let key = "PGSANDBOX_POSTGRES_98_BIN_DIR";
+        let previous = env::var_os(key);
+        env::set_var(key, &bin_dir);
+        let cluster = LocalPostgresCluster::new_for_version(directory.path(), Some("98")).unwrap();
+        let available = cluster.matching_binaries_available().unwrap();
+        match previous {
+            Some(value) => env::set_var(key, value),
+            None => env::remove_var(key),
+        }
+
+        assert!(available);
+    }
+
+    #[test]
+    fn local_postgres_error_classifier_detects_missing_binaries() {
+        let error = anyhow::anyhow!(
+            "Postgres server binaries `initdb`, `pg_ctl`, and `postgres` were not found together on PATH or in common local install locations."
+        );
+
+        assert!(local_postgres_error_is_missing_binaries(&error));
     }
 
     #[test]

@@ -10,7 +10,9 @@ Tools that accept `profile` also accept `postgresVersion`. If both are supplied,
 the selected profile must carry matching `postgresVersion` metadata. On the
 managed local default, requesting a version such as `"18"` starts or reuses the
 isolated `local-pg18` cluster when matching local Postgres binaries are
-installed.
+installed. Agents can call `ensure_postgres` first to install missing local
+server binaries through a supported package manager when that package is
+available.
 
 Every MCP tool response returns JSON text in the same compact envelope. The
 `Returns` sections below describe the tool-specific `result` payload inside
@@ -123,9 +125,47 @@ Returns:
   started yet report `adminUrl: "(managed local; starts on demand)"`.
 
 Use `includeDiscoveredLocal: true` before requesting a `postgresVersion`. The
-server does not download Postgres; the requested major must be installed locally
-or supplied through `PGSANDBOX_POSTGRES_BIN_DIR` or
+requested major must be installed locally, prepared with `ensure_postgres`, or
+supplied through `PGSANDBOX_POSTGRES_BIN_DIR` or
 `PGSANDBOX_POSTGRES_<MAJOR>_BIN_DIR`.
+
+## `ensure_postgres`
+
+Installs missing local Postgres server binaries with a supported package manager
+when available, then starts the managed local runtime for the requested major
+version. Use this before requesting a versioned sandbox when `list_profiles` or
+a prior tool call shows `local_postgres_unavailable`.
+
+Inputs:
+
+- `postgresVersion`: optional Postgres major version, for example `"13"`.
+  Omit it to ensure the default managed local Postgres runtime.
+- `installMissing`: optional boolean, defaults to true. When false, the tool
+  starts the managed local runtime only if matching binaries already exist.
+
+Returns:
+
+- `serverVersion`
+- `profileName`: `local` for the default runtime or `local-pg<major>` for a
+  versioned runtime
+- `postgresVersion`
+- `installMissing`
+- `installMethod`: package manager used, such as `Homebrew`, `apt-get`, or
+  `WinGet`, or null when no install was needed
+- `installedPackage`: package installed, such as `postgresql@13`,
+  `postgresql-13`, or `PostgreSQL.PostgreSQL.13`, or null when no install was
+  needed
+- `port`
+- `dataDir`
+- `socketDir`
+- `configPath`
+- `adminUrlRedacted`: password-masked local admin URL
+
+This tool may mutate local developer infrastructure by installing PostgreSQL
+server packages. Automatic installs use Homebrew on macOS; `apt-get`, `dnf`,
+`yum`, `zypper`, or `pacman` on Linux; and WinGet or Chocolatey on Windows. It
+does not install Docker, does not bind `localhost:5432`, and does not write MCP
+client config.
 
 ## `doctor`
 

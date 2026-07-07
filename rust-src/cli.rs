@@ -1,7 +1,6 @@
 use std::{
     collections::BTreeMap,
     env, fs,
-    io::ErrorKind,
     path::{Path, PathBuf},
     process::{Command, Stdio},
     time::{SystemTime, UNIX_EPOCH},
@@ -12,7 +11,10 @@ use anyhow::Context;
 use crate::{
     config::{load_config, load_config_deferred_local, load_config_from_env},
     doctor::{mask_connection_string, run_doctor},
-    local::{LocalClusterConfig, LocalClusterStatus, LocalPostgresCluster},
+    local::{
+        local_postgres_install_plan, LocalClusterConfig, LocalClusterStatus, LocalPostgresCluster,
+        LocalPostgresEnsureResult,
+    },
     mcp::serve_stdio,
     postgres::{CreateDatabaseInput, DatabaseSelector, PostgresSandboxManager, RunSqlInput},
     setup::{
@@ -47,6 +49,10 @@ pub async fn run(args: Vec<String>) -> anyhow::Result<u8> {
             print_help();
             Ok(0)
         }
+        "ensure-postgres" if has_help_flag(&rest) => {
+            print_help();
+            Ok(0)
+        }
         "upgrade" if has_help_flag(&rest) => {
             print_help();
             Ok(0)
@@ -61,6 +67,7 @@ pub async fn run(args: Vec<String>) -> anyhow::Result<u8> {
         }
         "setup" => setup(&rest).await,
         "doctor" => doctor(&rest).await,
+        "ensure-postgres" => ensure_postgres(&rest).await,
         "upgrade" => upgrade(&rest).await,
         "local" => local(&rest).await,
         "smoke-test" => smoke_test(&rest).await,
@@ -170,6 +177,46 @@ async fn doctor(args: &[String]) -> anyhow::Result<u8> {
     Ok(code)
 }
 
+async fn ensure_postgres(args: &[String]) -> anyhow::Result<u8> {
+    let started = std::time::Instant::now();
+    let telemetry = Telemetry::new(crate::config::load_telemetry_config());
+    let options = parse_options(args)?;
+    let postgres_version = options.get("postgres-version").map(String::as_str);
+    let install_missing = !options.contains_key("no-install");
+    let dry_run = options.contains_key("dry-run");
+
+    if dry_run {
+        print_ensure_postgres_dry_run(postgres_version, install_missing)?;
+    } else {
+        let cluster = LocalPostgresCluster::from_env_for_version(postgres_version)?;
+        let result = cluster
+            .ensure_started_with_optional_install(install_missing)
+            .context("failed to ensure managed local Postgres")?;
+        print_local_ensure_result(&result, &cluster);
+    }
+
+    telemetry
+        .capture(
+            crate::telemetry::EVENT_CLI_COMMAND_COMPLETED,
+            properties([
+                ("command", serde_json::json!("ensure-postgres")),
+                (
+                    "hasPostgresVersion",
+                    serde_json::json!(postgres_version.is_some()),
+                ),
+                ("installMissing", serde_json::json!(install_missing)),
+                ("dryRun", serde_json::json!(dry_run)),
+                ("success", serde_json::json!(true)),
+                (
+                    "elapsedMs",
+                    serde_json::json!(started.elapsed().as_millis()),
+                ),
+            ]),
+        )
+        .await;
+    Ok(0)
+}
+
 async fn upgrade(args: &[String]) -> anyhow::Result<u8> {
     let started = std::time::Instant::now();
     let telemetry = Telemetry::new(crate::config::load_telemetry_config());
@@ -248,9 +295,14 @@ async fn local(args: &[String]) -> anyhow::Result<u8> {
             print_local_config(&config, &cluster);
         }
         LocalAction::Start => {
-            let config = cluster.start()?;
-            println!("Local Postgres: running");
-            print_local_config(&config, &cluster);
+            if command.install_missing {
+                let result = cluster.ensure_started_with_optional_install(true)?;
+                print_local_ensure_result(&result, &cluster);
+            } else {
+                let config = cluster.start()?;
+                println!("Local Postgres: running");
+                print_local_config(&config, &cluster);
+            }
         }
         LocalAction::Stop => {
             cluster.stop()?;
@@ -575,6 +627,7 @@ enum LocalAction {
 struct LocalCommand {
     action: LocalAction,
     postgres_version: Option<String>,
+    install_missing: bool,
 }
 
 fn parse_local_command(args: &[String]) -> anyhow::Result<LocalCommand> {
@@ -595,6 +648,7 @@ fn parse_local_command(args: &[String]) -> anyhow::Result<LocalCommand> {
     Ok(LocalCommand {
         action,
         postgres_version: options.get("postgres-version").cloned(),
+        install_missing: options.contains_key("install-missing"),
     })
 }
 
@@ -616,6 +670,14 @@ fn parse_options(args: &[String]) -> anyhow::Result<BTreeMap<String, String>> {
             }
             "--no-doctor" => {
                 options.insert("no-doctor".to_string(), "true".to_string());
+                index += 1;
+            }
+            "--install-missing" => {
+                options.insert("install-missing".to_string(), "true".to_string());
+                index += 1;
+            }
+            "--no-install" => {
+                options.insert("no-install".to_string(), "true".to_string());
                 index += 1;
             }
             "-c" => {
@@ -1014,92 +1076,11 @@ fn setup_should_prepare_managed_local(admin_url: Option<&str>, dry_run: bool) ->
 fn ensure_setup_managed_local(postgres_version: Option<&str>) -> anyhow::Result<()> {
     println!("Checking managed local Postgres runtime...");
     let cluster = LocalPostgresCluster::from_env_for_version(postgres_version)?;
-
-    match cluster.ensure_started() {
-        Ok(config) => {
-            println!("Local Postgres: running");
-            print_local_config(&config, &cluster);
-            Ok(())
-        }
-        Err(error) if setup_error_is_missing_local_postgres(&error) => {
-            install_local_postgres_with_homebrew(postgres_version)?;
-            let config = cluster
-                .ensure_started()
-                .context("failed to start managed local Postgres after installing PostgreSQL")?;
-            println!("Local Postgres: running");
-            print_local_config(&config, &cluster);
-            Ok(())
-        }
-        Err(error) => Err(error).context("failed to start managed local Postgres"),
-    }
-}
-
-fn setup_error_is_missing_local_postgres(error: &anyhow::Error) -> bool {
-    error.chain().any(|cause| {
-        let message = cause.to_string();
-        message.starts_with("could not find local Postgres")
-            || message.starts_with(
-                "Postgres server binaries `initdb`, `pg_ctl`, and `postgres` were not found",
-            )
-    })
-}
-
-fn install_local_postgres_with_homebrew(postgres_version: Option<&str>) -> anyhow::Result<()> {
-    let package = homebrew_postgres_package(postgres_version)?;
-    ensure_homebrew_available()?;
-
-    println!("Postgres server binaries were not found.");
-    println!("Installing PostgreSQL with Homebrew: brew install {package}");
-
-    let status = Command::new("brew")
-        .arg("install")
-        .arg(&package)
-        .status()
-        .with_context(|| format!("failed to run `brew install {package}`"))?;
-    if !status.success() {
-        anyhow::bail!("`brew install {package}` failed with {status}");
-    }
+    let result = cluster
+        .ensure_started_with_optional_install(true)
+        .context("failed to start managed local Postgres")?;
+    print_local_ensure_result(&result, &cluster);
     Ok(())
-}
-
-fn ensure_homebrew_available() -> anyhow::Result<()> {
-    match Command::new("brew")
-        .arg("--version")
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-    {
-        Ok(status) if status.success() => Ok(()),
-        Ok(status) => anyhow::bail!(
-            "Homebrew is installed, but `brew --version` failed with {status}"
-        ),
-        Err(error) if error.kind() == ErrorKind::NotFound => anyhow::bail!(
-            "Postgres server binaries are missing and Homebrew is not available. Install Homebrew and rerun `pgsandbox-mcp setup`, or install PostgreSQL manually and set PGSANDBOX_POSTGRES_BIN_DIR."
-        ),
-        Err(error) => Err(error).context("failed to run `brew --version`"),
-    }
-}
-
-fn homebrew_postgres_package(postgres_version: Option<&str>) -> anyhow::Result<String> {
-    match postgres_version
-        .map(normalize_setup_postgres_version)
-        .transpose()?
-    {
-        Some(version) => Ok(format!("postgresql@{version}")),
-        None => Ok("postgresql".to_string()),
-    }
-}
-
-fn normalize_setup_postgres_version(value: &str) -> anyhow::Result<String> {
-    let value = value.trim();
-    let major = value
-        .chars()
-        .take_while(|character| character.is_ascii_digit())
-        .collect::<String>();
-    if major.is_empty() {
-        anyhow::bail!("postgres-version must start with a numeric major version");
-    }
-    Ok(major)
 }
 
 fn next_value<'a>(args: &'a [String], index: usize, flag: &str) -> anyhow::Result<&'a str> {
@@ -1149,6 +1130,39 @@ fn print_local_config(config: &LocalClusterConfig, cluster: &LocalPostgresCluste
     println!("Admin URL: {}", mask_connection_string(&config.admin_url));
 }
 
+fn print_local_ensure_result(result: &LocalPostgresEnsureResult, cluster: &LocalPostgresCluster) {
+    if let (Some(method), Some(package)) = (&result.install_method, &result.installed_package) {
+        println!("Installed PostgreSQL with {method}: {package}");
+    }
+    println!("Local Postgres: running");
+    print_local_config(&result.config, cluster);
+}
+
+fn print_ensure_postgres_dry_run(
+    postgres_version: Option<&str>,
+    install_missing: bool,
+) -> anyhow::Result<()> {
+    let cluster = LocalPostgresCluster::from_env_for_version(postgres_version)?;
+    println!("Dry run: managed local Postgres would be checked and started.");
+    println!("Root: {}", cluster.root().display());
+    if install_missing {
+        if cluster.matching_binaries_available()? {
+            println!("Matching Postgres binaries are already available; no package install would be needed.");
+        } else {
+            let plan = local_postgres_install_plan(postgres_version)?;
+            println!(
+                "If binaries are missing, PGSandbox would run: {}",
+                plan.display_command
+            );
+        }
+    } else {
+        println!(
+            "Missing Postgres binaries would not be installed because --no-install was provided."
+        );
+    }
+    Ok(())
+}
+
 fn print_help() {
     println!("{}", help_text());
 }
@@ -1162,6 +1176,7 @@ Usage:
   pgsandbox-mcp stdio                Start the MCP server over stdio
   pgsandbox-mcp setup [options]      Check and start managed local Postgres, then write MCP client config
   pgsandbox-mcp doctor [options]     Check config and Postgres connectivity
+  pgsandbox-mcp ensure-postgres      Install missing Postgres binaries when possible, then start managed local Postgres
   pgsandbox-mcp upgrade [options]    Upgrade the binary, then run setup all and doctor
   pgsandbox-mcp local init [options] Initialize the managed local Postgres cluster
   pgsandbox-mcp local start [options] Start the managed local Postgres cluster
@@ -1177,6 +1192,15 @@ Setup options:
   --command <command>                Command MCP clients should run
   --name <name>                      Server name in MCP config
   --dry-run                          Print config without writing or preparing local Postgres
+
+Postgres ensure options:
+  --postgres-version <major>          Managed local Postgres version, for example 13
+  --no-install                        Do not install missing Postgres binaries
+  --dry-run                           Print what would be checked or installed
+
+Local options:
+  --postgres-version <major>          Managed local Postgres version, for example 13
+  --install-missing                   For local start, install missing Postgres binaries with a supported package manager
 
 Upgrade options:
   --setup <client>                   Setup client after upgrade; defaults to all
@@ -1246,6 +1270,15 @@ mod tests {
     }
 
     #[test]
+    fn help_text_lists_ensure_postgres_command() {
+        let help = help_text();
+
+        assert!(help.contains("pgsandbox-mcp ensure-postgres"));
+        assert!(help.contains("--no-install"));
+        assert!(help.contains("--install-missing"));
+    }
+
+    #[test]
     fn parse_options_accepts_upgrade_boolean_flags() {
         let options =
             parse_options(&args(&["--no-setup", "--no-doctor", "--setup", "codex"])).unwrap();
@@ -1253,6 +1286,17 @@ mod tests {
         assert_eq!(options.get("no-setup").map(String::as_str), Some("true"));
         assert_eq!(options.get("no-doctor").map(String::as_str), Some("true"));
         assert_eq!(options.get("setup").map(String::as_str), Some("codex"));
+    }
+
+    #[test]
+    fn parse_options_accepts_postgres_install_boolean_flags() {
+        let options = parse_options(&args(&["--install-missing", "--no-install"])).unwrap();
+
+        assert_eq!(
+            options.get("install-missing").map(String::as_str),
+            Some("true")
+        );
+        assert_eq!(options.get("no-install").map(String::as_str), Some("true"));
     }
 
     #[test]
@@ -1397,16 +1441,27 @@ mod tests {
     }
 
     #[test]
-    fn setup_installs_unversioned_homebrew_postgres_by_default() {
-        assert_eq!(homebrew_postgres_package(None).unwrap(), "postgresql");
+    fn setup_installs_unversioned_postgres_by_default() {
+        let plan = crate::local::postgres_install_plan_for_manager(
+            crate::local::LocalPostgresPackageManager::Homebrew,
+            None,
+        )
+        .unwrap();
+
+        assert_eq!(plan.package, "postgresql");
+        assert_eq!(plan.display_command, "brew install postgresql");
     }
 
     #[test]
-    fn setup_installs_requested_homebrew_postgres_major_version() {
-        assert_eq!(
-            homebrew_postgres_package(Some("18.4")).unwrap(),
-            "postgresql@18"
-        );
+    fn setup_installs_requested_postgres_major_version() {
+        let plan = crate::local::postgres_install_plan_for_manager(
+            crate::local::LocalPostgresPackageManager::Homebrew,
+            Some("18.4"),
+        )
+        .unwrap();
+
+        assert_eq!(plan.package, "postgresql@18");
+        assert_eq!(plan.display_command, "brew install postgresql@18");
     }
 
     #[test]
@@ -1415,7 +1470,9 @@ mod tests {
             "Postgres server binaries `initdb`, `pg_ctl`, and `postgres` were not found together on PATH or in common local install locations."
         );
 
-        assert!(setup_error_is_missing_local_postgres(&error));
+        assert!(crate::local::local_postgres_error_is_missing_binaries(
+            &error
+        ));
     }
 
     #[test]

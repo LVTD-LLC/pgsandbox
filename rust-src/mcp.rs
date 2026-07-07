@@ -1,3 +1,4 @@
+use anyhow::Context;
 use rmcp::{
     handler::server::wrapper::Parameters,
     model::{CallToolResult, Content},
@@ -9,7 +10,8 @@ use serde_json::{json, Map, Value};
 
 use crate::{
     config::SandboxConfig,
-    doctor::run_doctor,
+    doctor::{mask_connection_string, run_doctor},
+    local::LocalPostgresCluster,
     postgres::{
         CleanupExpiredInput, CloneDatabaseInput, ConnectionStringInput, CreateDatabaseInput,
         CreateSandboxFromTemplateInput, CreateSchemaSnapshotInput, CreateTemplateFromSandboxInput,
@@ -28,6 +30,7 @@ const SOURCE_DATABASE_URL_HINT: &str = "Check `sourceDatabaseUrl` credentials, s
 
 pub const PUBLIC_MCP_TOOLS: &[&str] = &[
     "list_profiles",
+    "ensure_postgres",
     "create_database",
     "clone_database",
     "delete_database",
@@ -66,6 +69,29 @@ pub struct PgsandboxServer {
 #[serde(rename_all = "camelCase")]
 struct DoctorInput {
     postgres_version: Option<String>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+struct EnsurePostgresInput {
+    postgres_version: Option<String>,
+    install_missing: Option<bool>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct EnsurePostgresOutput {
+    server_version: String,
+    profile_name: String,
+    postgres_version: Option<String>,
+    install_missing: bool,
+    install_method: Option<String>,
+    installed_package: Option<String>,
+    port: u16,
+    data_dir: std::path::PathBuf,
+    socket_dir: std::path::PathBuf,
+    config_path: std::path::PathBuf,
+    admin_url_redacted: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -124,6 +150,49 @@ impl PgsandboxServer {
         )]);
         self.tracked_tool("list_profiles", event_properties, async {
             self.manager.list_profiles(input)
+        })
+        .await
+    }
+
+    #[tool(
+        description = "Install missing local Postgres server binaries with a supported package manager when available, then start the managed local Postgres runtime."
+    )]
+    async fn ensure_postgres(
+        &self,
+        Parameters(input): Parameters<EnsurePostgresInput>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let install_missing = input.install_missing.unwrap_or(true);
+        let event_properties = properties([
+            (
+                "hasPostgresVersion",
+                json!(input.postgres_version.is_some()),
+            ),
+            ("installMissing", json!(install_missing)),
+        ]);
+        self.tracked_tool("ensure_postgres", event_properties, async move {
+            let cluster =
+                LocalPostgresCluster::from_env_for_version(input.postgres_version.as_deref())?;
+            let result = cluster
+                .ensure_started_with_optional_install(install_missing)
+                .with_context(|| match input.postgres_version.as_deref() {
+                    Some(version) => {
+                        format!("failed to ensure local Postgres {version}")
+                    }
+                    None => "failed to ensure default local Postgres".to_string(),
+                })?;
+            anyhow::Ok(EnsurePostgresOutput {
+                server_version: crate::VERSION.to_string(),
+                profile_name: result.config.profile_name,
+                postgres_version: result.config.postgres_version,
+                install_missing,
+                install_method: result.install_method,
+                installed_package: result.installed_package,
+                port: result.config.port,
+                data_dir: result.config.data_dir,
+                socket_dir: result.config.socket_dir,
+                config_path: cluster.config_path(),
+                admin_url_redacted: mask_connection_string(&result.config.admin_url),
+            })
         })
         .await
     }
@@ -1023,7 +1092,7 @@ impl ToolErrorResponse {
                     .as_ref()
                     .map(|version| format!("Local Postgres {version} binaries are unavailable."))
                     .unwrap_or_else(|| "Local Postgres binaries are unavailable.".to_string()),
-                hint: "Install local PostgreSQL server binaries for the requested major version, set PGSANDBOX_POSTGRES_BIN_DIR or PGSANDBOX_POSTGRES_<MAJOR>_BIN_DIR, or choose a version shown by list_profiles.".to_string(),
+                hint: "Call ensure_postgres with installMissing=true for the requested major version, set PGSANDBOX_POSTGRES_BIN_DIR or PGSANDBOX_POSTGRES_<MAJOR>_BIN_DIR, or choose a version shown by list_profiles.".to_string(),
                 sqlstate: None,
                 requested_version,
                 source_version: None,
