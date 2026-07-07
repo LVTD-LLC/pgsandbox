@@ -44,6 +44,9 @@ names the invalid profile, and includes a bounded `knownProfiles` list. Version
 diagnostics may also include `requestedVersion`, `sourceVersion`,
 `targetVersion`, `detectedVersions`, and a `detailHandles` entry pointing to
 `list_profiles` or `doctor` instead of embedding long local path traces.
+After `create_database` or `clone_database` resolves a target profile, failure
+errors also include `resolvedProfile` and `resolvedPostgresVersion` when known,
+with a matching diagnostic detail handle naming the attempted tool.
 Typical codes include `undefined_column`, `undefined_table`, `syntax_error`,
 `permission_denied`, `lock_timeout`, `statement_timeout`,
 `command_timeout`, `postgres_auth_failed`, `postgres_connection_failed`,
@@ -80,6 +83,9 @@ Inputs:
 Returns:
 
 - `databaseId`
+- `profile`: selected profile name
+- `resolvedProfile`: selected target profile name
+- `resolvedPostgresVersion`: selected target Postgres major version
 - `databaseName`
 - `roleName`
 - `expiresAt`
@@ -173,6 +179,8 @@ Returns:
 
 - `databaseId`
 - `profile`
+- `resolvedProfile`: selected target profile name
+- `resolvedPostgresVersion`: selected target Postgres major version
 - `databaseName`
 - `roleName`
 - `expiresAt`

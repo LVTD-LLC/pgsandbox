@@ -16,8 +16,8 @@ use crate::{
         DatabaseSelector, DeleteSchemaSnapshotInput, DeleteTemplateInput, DescribeSchemaInput,
         DiffSchemaSnapshotInput, ExplainQueryInput, ListDatabasesInput, ListProfilesInput,
         ListSchemaSnapshotsInput, ListTemplatesInput, PostgresSandboxManager, PrepareForRepoInput,
-        RunRepoCommandInput, RunSqlInput, SchemaDiffInput, SeedDatabaseInput, UnknownProfileError,
-        ValidateSchemaChangeInput,
+        ResolvedTargetContext, RunRepoCommandInput, RunSqlInput, SchemaDiffInput,
+        SeedDatabaseInput, UnknownProfileError, ValidateSchemaChangeInput,
     },
     telemetry::{properties, Telemetry, EVENT_MCP_SERVER_STARTED, EVENT_MCP_TOOL_COMPLETED},
 };
@@ -787,6 +787,10 @@ struct ToolErrorBody {
     source_version: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     target_version: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    resolved_profile: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    resolved_postgres_version: Option<String>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     detected_versions: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -816,6 +820,8 @@ impl ToolErrorResponse {
                 requested_version: None,
                 source_version: None,
                 target_version: None,
+                resolved_profile: None,
+                resolved_postgres_version: None,
                 detected_versions: Vec::new(),
                 detail_handle: Some(json!({
                     "type": "tool-contract",
@@ -838,6 +844,8 @@ impl ToolErrorResponse {
                 requested_version: None,
                 source_version: None,
                 target_version: None,
+                resolved_profile: None,
+                resolved_postgres_version: None,
                 detected_versions: Vec::new(),
                 detail_handle: Some(json!({
                     "type": "tool-contract",
@@ -855,6 +863,8 @@ impl ToolErrorResponse {
                 requested_version: None,
                 source_version: None,
                 target_version: None,
+                resolved_profile: None,
+                resolved_postgres_version: None,
                 detected_versions: Vec::new(),
                 detail_handle: Some(json!({
                     "type": "tool-contract",
@@ -871,6 +881,8 @@ impl ToolErrorResponse {
                 requested_version: None,
                 source_version: None,
                 target_version: None,
+                resolved_profile: None,
+                resolved_postgres_version: None,
                 detected_versions: Vec::new(),
                 detail_handle: Some(json!({
                     "type": "tool-contract",
@@ -887,6 +899,8 @@ impl ToolErrorResponse {
                 requested_version: None,
                 source_version: None,
                 target_version: None,
+                resolved_profile: None,
+                resolved_postgres_version: None,
                 detected_versions: Vec::new(),
                 detail_handle: Some(json!({
                     "type": "tool-contract",
@@ -905,6 +919,8 @@ impl ToolErrorResponse {
                 requested_version: None,
                 source_version: None,
                 target_version: None,
+                resolved_profile: None,
+                resolved_postgres_version: None,
                 detected_versions: Vec::new(),
                 detail_handle: None,
             }
@@ -918,6 +934,8 @@ impl ToolErrorResponse {
                 requested_version: None,
                 source_version: None,
                 target_version: None,
+                resolved_profile: None,
+                resolved_postgres_version: None,
                 detected_versions: Vec::new(),
                 detail_handle: None,
             }
@@ -933,6 +951,8 @@ impl ToolErrorResponse {
                 requested_version: None,
                 source_version: None,
                 target_version: None,
+                resolved_profile: None,
+                resolved_postgres_version: None,
                 detected_versions: Vec::new(),
                 detail_handle: None,
             }
@@ -946,6 +966,8 @@ impl ToolErrorResponse {
                 requested_version: None,
                 source_version: None,
                 target_version: None,
+                resolved_profile: None,
+                resolved_postgres_version: None,
                 detected_versions: Vec::new(),
                 detail_handle: None,
             }
@@ -959,6 +981,8 @@ impl ToolErrorResponse {
                 requested_version: requested_version_from_message(&chain),
                 source_version: None,
                 target_version: None,
+                resolved_profile: None,
+                resolved_postgres_version: None,
                 detected_versions: detected_postgres_versions(),
                 detail_handle: Some(json!({
                     "type": "diagnostic",
@@ -979,6 +1003,8 @@ impl ToolErrorResponse {
                     .or_else(|| requested_version_from_message(&chain)),
                 source_version,
                 target_version,
+                resolved_profile: None,
+                resolved_postgres_version: None,
                 detected_versions: detected_postgres_versions(),
                 detail_handle: Some(json!({
                     "type": "diagnostic",
@@ -1002,6 +1028,8 @@ impl ToolErrorResponse {
                 requested_version,
                 source_version: None,
                 target_version: None,
+                resolved_profile: None,
+                resolved_postgres_version: None,
                 detected_versions: detected_postgres_versions(),
                 detail_handle: Some(json!({
                     "type": "diagnostic",
@@ -1026,6 +1054,8 @@ impl ToolErrorResponse {
                 requested_version,
                 source_version: None,
                 target_version: None,
+                resolved_profile: None,
+                resolved_postgres_version: None,
                 detected_versions: detected_postgres_versions(),
                 detail_handle: Some(json!({
                     "type": "diagnostic",
@@ -1045,6 +1075,8 @@ impl ToolErrorResponse {
                 requested_version: None,
                 source_version: None,
                 target_version: None,
+                resolved_profile: None,
+                resolved_postgres_version: None,
                 detected_versions: Vec::new(),
                 detail_handle: None,
             }
@@ -1058,13 +1090,24 @@ impl ToolErrorResponse {
                 requested_version: None,
                 source_version: None,
                 target_version: None,
+                resolved_profile: None,
+                resolved_postgres_version: None,
                 detected_versions: Vec::new(),
                 detail_handle: None,
             }
         };
 
         let mut body = body;
-        let detail_handles = body.detail_handle.take().into_iter().collect();
+        let target_context = resolved_target_context(error);
+        if let Some(target_context) = target_context {
+            body.resolved_profile = Some(target_context.resolved_profile.clone());
+            body.resolved_postgres_version = target_context.resolved_postgres_version.clone();
+        }
+        let mut detail_handles = target_context
+            .map(resolved_target_detail_handle)
+            .into_iter()
+            .collect::<Vec<_>>();
+        detail_handles.extend(body.detail_handle.take());
 
         Self {
             ok: false,
@@ -1074,6 +1117,23 @@ impl ToolErrorResponse {
             detail_handles,
         }
     }
+}
+
+fn resolved_target_context(error: &anyhow::Error) -> Option<&ResolvedTargetContext> {
+    error.downcast_ref::<ResolvedTargetContext>().or_else(|| {
+        error
+            .chain()
+            .find_map(|cause| cause.downcast_ref::<ResolvedTargetContext>())
+    })
+}
+
+fn resolved_target_detail_handle(target: &ResolvedTargetContext) -> Value {
+    json!({
+        "type": "diagnostic",
+        "tool": target.operation,
+        "resolvedProfile": target.resolved_profile.clone(),
+        "resolvedPostgresVersion": target.resolved_postgres_version.clone(),
+    })
 }
 
 fn unknown_profile_error_body(error: &anyhow::Error) -> Option<ToolErrorBody> {
@@ -1089,6 +1149,8 @@ fn unknown_profile_error_body(error: &anyhow::Error) -> Option<ToolErrorBody> {
         requested_version: None,
         source_version: None,
         target_version: None,
+        resolved_profile: None,
+        resolved_postgres_version: None,
         detected_versions: Vec::new(),
         detail_handle: Some(json!({
             "type": "diagnostic",
@@ -1263,6 +1325,8 @@ fn postgres_error_body(
         requested_version: None,
         source_version: None,
         target_version: None,
+        resolved_profile: None,
+        resolved_postgres_version: None,
         detected_versions: Vec::new(),
         detail_handle: None,
     }
@@ -1879,6 +1943,27 @@ mod tests {
         assert_eq!(first_error(&value)["requestedVersion"], "16");
         assert_eq!(first_error(&value)["sourceVersion"], "18");
         assert_eq!(first_error(&value)["targetVersion"], "16");
+    }
+
+    #[test]
+    fn failure_errors_include_resolved_target_context_when_available() {
+        let error = anyhow::anyhow!("invalid_ttl: ttlMinutes exceeds maxTtlMinutes (60)").context(
+            crate::postgres::ResolvedTargetContext {
+                operation: "create_database",
+                resolved_profile: "local-pg16".to_string(),
+                resolved_postgres_version: Some("16".to_string()),
+            },
+        );
+        let result = tool_json::<()>(Err(error)).unwrap();
+        let text = result.content[0].as_text().unwrap().text.clone();
+        let value = serde_json::from_str::<Value>(&text).unwrap();
+
+        assert_eq!(first_error(&value)["code"], "invalid_ttl");
+        assert_eq!(first_error(&value)["resolvedProfile"], "local-pg16");
+        assert_eq!(first_error(&value)["resolvedPostgresVersion"], "16");
+        assert_eq!(value["detailHandles"][0]["tool"], "create_database");
+        assert_eq!(value["detailHandles"][0]["resolvedProfile"], "local-pg16");
+        assert_eq!(value["detailHandles"][0]["resolvedPostgresVersion"], "16");
     }
 
     #[test]
