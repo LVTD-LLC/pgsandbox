@@ -96,6 +96,50 @@ impl fmt::Display for UnknownProfileError {
 
 impl std::error::Error for UnknownProfileError {}
 
+#[derive(Clone, Debug)]
+pub(crate) struct ResolvedTargetContext {
+    pub(crate) operation: &'static str,
+    pub(crate) resolved_profile: String,
+    pub(crate) resolved_postgres_version: Option<String>,
+}
+
+impl ResolvedTargetContext {
+    fn from_profile(operation: &'static str, profile: &SandboxProfile) -> Self {
+        Self {
+            operation,
+            resolved_profile: profile.name.clone(),
+            resolved_postgres_version: profile
+                .postgres_version
+                .as_deref()
+                .and_then(|version| postgres_major_from_server_version(version).ok()),
+        }
+    }
+
+    fn with_resolved_postgres_version(mut self, version: String) -> Self {
+        self.resolved_postgres_version = Some(version);
+        self
+    }
+}
+
+impl fmt::Display for ResolvedTargetContext {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.resolved_postgres_version {
+            Some(version) => write!(
+                formatter,
+                "{} resolved target profile {} postgresVersion {}",
+                self.operation, self.resolved_profile, version
+            ),
+            None => write!(
+                formatter,
+                "{} resolved target profile {}",
+                self.operation, self.resolved_profile
+            ),
+        }
+    }
+}
+
+impl std::error::Error for ResolvedTargetContext {}
+
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateDatabaseInput {
@@ -437,6 +481,8 @@ pub struct ProfileSummary {
 pub struct CreateDatabaseOutput {
     pub database_id: String,
     pub profile: String,
+    pub resolved_profile: String,
+    pub resolved_postgres_version: String,
     pub database_name: String,
     pub role_name: String,
     pub expires_at: DateTime<Utc>,
@@ -452,6 +498,8 @@ impl fmt::Debug for CreateDatabaseOutput {
             .debug_struct("CreateDatabaseOutput")
             .field("database_id", &self.database_id)
             .field("profile", &self.profile)
+            .field("resolved_profile", &self.resolved_profile)
+            .field("resolved_postgres_version", &self.resolved_postgres_version)
             .field("database_name", &self.database_name)
             .field("role_name", &self.role_name)
             .field("expires_at", &self.expires_at)
@@ -470,6 +518,8 @@ impl fmt::Debug for CreateDatabaseOutput {
 pub struct CloneDatabaseOutput {
     pub database_id: String,
     pub profile: String,
+    pub resolved_profile: String,
+    pub resolved_postgres_version: String,
     pub database_name: String,
     pub role_name: String,
     pub expires_at: DateTime<Utc>,
@@ -487,6 +537,8 @@ impl fmt::Debug for CloneDatabaseOutput {
             .debug_struct("CloneDatabaseOutput")
             .field("database_id", &self.database_id)
             .field("profile", &self.profile)
+            .field("resolved_profile", &self.resolved_profile)
+            .field("resolved_postgres_version", &self.resolved_postgres_version)
             .field("database_name", &self.database_name)
             .field("role_name", &self.role_name)
             .field("expires_at", &self.expires_at)
@@ -1548,8 +1600,11 @@ impl PostgresSandboxManager {
             extensions,
         } = input;
         let profile = self.resolve_profile(profile.as_deref(), postgres_version.as_deref())?;
-        let ttl_minutes = clamp_ttl(ttl_minutes, &profile)?;
-        let extensions = normalize_extension_names(extensions)?;
+        let mut target_context = ResolvedTargetContext::from_profile("create_database", &profile);
+        let ttl_minutes =
+            clamp_ttl(ttl_minutes, &profile).with_context(|| target_context.clone())?;
+        let extensions =
+            normalize_extension_names(extensions).with_context(|| target_context.clone())?;
         let names = make_sandbox_names(&profile.database_prefix, name_hint.as_deref());
         let role_password = format!("{}{}", Uuid::new_v4().simple(), Uuid::new_v4().simple());
         let expires_at = Utc::now() + Duration::minutes(ttl_minutes.into());
@@ -1558,11 +1613,23 @@ impl PostgresSandboxManager {
             &names.database_name,
             &names.role_name,
             &role_password,
-        )?;
+        )
+        .with_context(|| target_context.clone())?;
 
-        let (client, connection_task) = connect_admin(&profile).await?;
-        ensure_metadata_table(&client, &profile).await?;
-        enforce_owner_quota(&client, &profile, owner.as_deref()).await?;
+        let (client, connection_task) = connect_admin(&profile)
+            .await
+            .with_context(|| target_context.clone())?;
+        let resolved_postgres_version = postgres_major_for_connected_profile(&profile, &client)
+            .await
+            .with_context(|| target_context.clone())?;
+        target_context =
+            target_context.with_resolved_postgres_version(resolved_postgres_version.clone());
+        ensure_metadata_table(&client, &profile)
+            .await
+            .with_context(|| target_context.clone())?;
+        enforce_owner_quota(&client, &profile, owner.as_deref())
+            .await
+            .with_context(|| target_context.clone())?;
 
         let mut created_role = false;
         let mut created_database = false;
@@ -1670,7 +1737,7 @@ impl PostgresSandboxManager {
             .await;
             drop(client);
             let _ = connection_task.await;
-            return Err(error);
+            return Err(error).with_context(|| target_context.clone());
         }
 
         drop(client);
@@ -1679,6 +1746,8 @@ impl PostgresSandboxManager {
         Ok(CreateDatabaseOutput {
             database_id: names.database_id,
             profile: profile.name.clone(),
+            resolved_profile: profile.name.clone(),
+            resolved_postgres_version,
             database_name: names.database_name.clone(),
             role_name: names.role_name.clone(),
             expires_at,
@@ -1706,7 +1775,15 @@ impl PostgresSandboxManager {
         let schema_only = schema_only.unwrap_or(false);
         let target_profile =
             self.resolve_profile(profile.as_deref(), postgres_version.as_deref())?;
-        preflight_clone_compatibility(&source_database_url, &target_profile).await?;
+        let target_context = ResolvedTargetContext::from_profile("clone_database", &target_profile);
+        let target_postgres_version = postgres_major_for_profile(&target_profile)
+            .await
+            .with_context(|| target_context.clone())?;
+        let target_context =
+            target_context.with_resolved_postgres_version(target_postgres_version.clone());
+        preflight_clone_compatibility(&source_database_url, &target_postgres_version)
+            .await
+            .with_context(|| target_context.clone())?;
         let created = self
             .create_database(CreateDatabaseInput {
                 profile: Some(target_profile.name.clone()),
@@ -1717,7 +1794,8 @@ impl PostgresSandboxManager {
                 labels,
                 extensions,
             })
-            .await?;
+            .await
+            .with_context(|| target_context.clone())?;
 
         let clone_result = clone_with_pg_tools(
             &source_database_url,
@@ -1735,20 +1813,23 @@ impl PostgresSandboxManager {
                     database_name: None,
                 })
                 .await;
-            match cleanup_result {
-                Ok(_) => {
-                    anyhow::bail!("database clone failed; created sandbox was deleted: {error}")
-                }
-                Err(cleanup_error) => anyhow::bail!(
+            let clone_error = match cleanup_result {
+                Ok(_) => anyhow::anyhow!(
+                    "database clone failed; created sandbox was deleted: {error}"
+                ),
+                Err(cleanup_error) => anyhow::anyhow!(
                     "database clone failed and cleanup also failed for {}: {error}; cleanup error: {cleanup_error}",
                     created.database_name
                 ),
-            }
+            };
+            return Err(clone_error).with_context(|| target_context.clone());
         }
 
         Ok(CloneDatabaseOutput {
             database_id: created.database_id,
             profile: created.profile,
+            resolved_profile: created.resolved_profile,
+            resolved_postgres_version: created.resolved_postgres_version,
             database_name: created.database_name,
             role_name: created.role_name,
             expires_at: created.expires_at,
@@ -4047,15 +4128,14 @@ async fn postgres_version(client: &Client) -> anyhow::Result<String> {
 
 async fn preflight_clone_compatibility(
     source_database_url: &str,
-    target_profile: &SandboxProfile,
+    target_major: &str,
 ) -> anyhow::Result<()> {
     let source_version = postgres_server_version_for_url(source_database_url)
         .await
         .context("failed to inspect source Postgres version before clone")?;
     let source_major = postgres_major_from_server_version(&source_version)?;
-    let target_major = postgres_major_for_profile(target_profile).await?;
 
-    if clone_downgrade_error(&source_major, &target_major).is_some() {
+    if clone_downgrade_error(&source_major, target_major).is_some() {
         anyhow::bail!(
             "restore_incompatible: cannot clone from Postgres {source_major} into older target Postgres {target_major}. Choose postgresVersion {source_major} or newer, or dump from an older-compatible source."
         );
@@ -4077,10 +4157,21 @@ async fn postgres_major_for_profile(profile: &SandboxProfile) -> anyhow::Result<
         return postgres_major_from_server_version(version);
     }
     let (client, connection_task) = connect_admin(profile).await?;
-    let version = postgres_version(&client).await;
+    let version = postgres_major_for_connected_profile(profile, &client).await;
     drop(client);
     let _ = connection_task.await;
-    postgres_major_from_server_version(&version?)
+    version
+}
+
+async fn postgres_major_for_connected_profile(
+    profile: &SandboxProfile,
+    client: &Client,
+) -> anyhow::Result<String> {
+    if let Some(version) = &profile.postgres_version {
+        return postgres_major_from_server_version(version);
+    }
+    let version = postgres_version(client).await?;
+    postgres_major_from_server_version(&version)
 }
 
 fn postgres_major_from_server_version(version: &str) -> anyhow::Result<String> {
@@ -8532,6 +8623,8 @@ mod tests {
         let created = serde_json::to_value(CreateDatabaseOutput {
             database_id: "db-id".to_string(),
             profile: "default".to_string(),
+            resolved_profile: "default".to_string(),
+            resolved_postgres_version: "16".to_string(),
             database_name: "sandbox".to_string(),
             role_name: "sandbox_role".to_string(),
             expires_at,
@@ -8547,10 +8640,22 @@ mod tests {
                 .and_then(Value::as_str),
             Some("postgres://role:****@localhost:5432/sandbox")
         );
+        assert_eq!(
+            created.get("resolvedProfile").and_then(Value::as_str),
+            Some("default")
+        );
+        assert_eq!(
+            created
+                .get("resolvedPostgresVersion")
+                .and_then(Value::as_str),
+            Some("16")
+        );
 
         let cloned = serde_json::to_value(CloneDatabaseOutput {
             database_id: "db-id".to_string(),
             profile: "default".to_string(),
+            resolved_profile: "default".to_string(),
+            resolved_postgres_version: "16".to_string(),
             database_name: "sandbox".to_string(),
             role_name: "sandbox_role".to_string(),
             expires_at,
@@ -8567,6 +8672,16 @@ mod tests {
                 .get("connectionStringRedacted")
                 .and_then(Value::as_str),
             Some("postgres://role:****@localhost:5432/sandbox")
+        );
+        assert_eq!(
+            cloned.get("resolvedProfile").and_then(Value::as_str),
+            Some("default")
+        );
+        assert_eq!(
+            cloned
+                .get("resolvedPostgresVersion")
+                .and_then(Value::as_str),
+            Some("16")
         );
     }
 
@@ -8655,6 +8770,8 @@ mod tests {
         let created = CreateDatabaseOutput {
             database_id: "db-id".to_string(),
             profile: "default".to_string(),
+            resolved_profile: "default".to_string(),
+            resolved_postgres_version: "16".to_string(),
             database_name: "sandbox".to_string(),
             role_name: "sandbox_role".to_string(),
             expires_at,
@@ -8665,6 +8782,8 @@ mod tests {
         let cloned = CloneDatabaseOutput {
             database_id: "db-id".to_string(),
             profile: "default".to_string(),
+            resolved_profile: "default".to_string(),
+            resolved_postgres_version: "16".to_string(),
             database_name: "sandbox".to_string(),
             role_name: "sandbox_role".to_string(),
             expires_at,
