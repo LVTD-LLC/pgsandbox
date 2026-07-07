@@ -898,7 +898,7 @@ Pin the current manifest version explicitly:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/LVTD-LLC/pgsandbox-mcp/main/scripts/install.sh \
-  | PGSANDBOX_VERSION=0.4.4 sh
+  | PGSANDBOX_VERSION=0.4.5 sh
 ```
 
 ### Site Variables
@@ -1214,7 +1214,7 @@ Install the current manifest version explicitly:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/LVTD-LLC/pgsandbox-mcp/main/scripts/install.sh \
-  | PGSANDBOX_VERSION=0.4.4 sh
+  | PGSANDBOX_VERSION=0.4.5 sh
 ```
 
 Install to a custom directory:
@@ -1242,7 +1242,7 @@ pgsandbox-mcp doctor
 From GitHub:
 
 ```bash
-cargo install --git https://github.com/LVTD-LLC/pgsandbox-mcp --tag v0.4.4 --force
+cargo install --git https://github.com/LVTD-LLC/pgsandbox-mcp --tag v0.4.5 --force
 pgsandbox-mcp setup --client codex
 pgsandbox-mcp doctor
 ```
