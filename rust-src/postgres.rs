@@ -48,6 +48,7 @@ const AUDIT_TABLE: &str = "pgsandbox_events";
 const DEFAULT_ROW_LIMIT: usize = 100;
 const MAX_ROW_LIMIT: usize = 1000;
 const MAX_EXTENSION_COUNT: usize = 25;
+const DEFAULT_CLONE_EXCLUDED_SOURCE_EXTENSIONS: &[&str] = &["pg_stat_statements"];
 const LIST_DATABASES_LIMIT: usize = 100;
 const ENCRYPTED_PASSWORD_PREFIX: &str = "v1";
 const SCHEMA_DIGEST_VERSION: u32 = 3;
@@ -126,6 +127,10 @@ pub struct CloneDatabaseInput {
         description = "Optional extension names to install in the target sandbox before pg_restore. Names are normalized to lowercase and must be available on the selected Postgres profile."
     )]
     pub extensions: Option<Vec<String>>,
+    #[schemars(
+        description = "Optional source extension names to skip while restoring a clone. These are normalized like extensions and added to the default skip list for source-only observability extensions such as pg_stat_statements."
+    )]
+    pub exclude_source_extensions: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -479,6 +484,7 @@ pub struct CloneDatabaseOutput {
     pub source: String,
     pub schema_only: bool,
     pub installed_extensions: Vec<String>,
+    pub excluded_source_extensions: Vec<String>,
 }
 
 impl fmt::Debug for CloneDatabaseOutput {
@@ -498,6 +504,10 @@ impl fmt::Debug for CloneDatabaseOutput {
             .field("source", &self.source)
             .field("schema_only", &self.schema_only)
             .field("installed_extensions", &self.installed_extensions)
+            .field(
+                "excluded_source_extensions",
+                &self.excluded_source_extensions,
+            )
             .finish()
     }
 }
@@ -1702,8 +1712,11 @@ impl PostgresSandboxManager {
             labels,
             schema_only,
             extensions,
+            exclude_source_extensions,
         } = input;
         let schema_only = schema_only.unwrap_or(false);
+        let excluded_source_extensions =
+            clone_excluded_source_extensions(exclude_source_extensions)?;
         let target_profile =
             self.resolve_profile(profile.as_deref(), postgres_version.as_deref())?;
         preflight_clone_compatibility(&source_database_url, &target_profile).await?;
@@ -1723,6 +1736,7 @@ impl PostgresSandboxManager {
             &source_database_url,
             &created.connection_string,
             schema_only,
+            &excluded_source_extensions,
         )
         .await;
 
@@ -1757,6 +1771,7 @@ impl PostgresSandboxManager {
             source: "external".to_string(),
             schema_only,
             installed_extensions: created.installed_extensions,
+            excluded_source_extensions,
         })
     }
 
@@ -4981,6 +4996,17 @@ fn pg_restore_file_args(database: &str, dump_file: &Path) -> Vec<String> {
     args
 }
 
+fn pg_restore_filtered_file_args(database: &str, dump_file: &Path, toc_file: &Path) -> Vec<String> {
+    let mut args = pg_restore_args(database);
+    args.push(format!("--use-list={}", toc_file.display()));
+    args.push(dump_file.display().to_string());
+    args
+}
+
+fn pg_restore_list_args(dump_file: &Path) -> Vec<String> {
+    vec!["--list".to_string(), dump_file.display().to_string()]
+}
+
 fn mask_connection_string(value: &str) -> String {
     if let Ok(mut url) = Url::parse(value) {
         if url.password().is_some() {
@@ -5963,12 +5989,31 @@ async fn clone_with_pg_tools(
     source_database_url: &str,
     target_database_url: &str,
     schema_only: bool,
+    excluded_source_extensions: &[String],
 ) -> anyhow::Result<()> {
     let source = pg_tool_connection_from_url(source_database_url)
         .context("sourceDatabaseUrl is not a supported Postgres URL")?;
     let target = pg_tool_connection_from_url(target_database_url)
         .context("target sandbox connection string is not a supported Postgres URL")?;
 
+    if !excluded_source_extensions.is_empty() {
+        return clone_with_pg_tools_filtered_archive(
+            &source,
+            &target,
+            schema_only,
+            excluded_source_extensions,
+        )
+        .await;
+    }
+
+    clone_with_pg_tools_stream(&source, &target, schema_only).await
+}
+
+async fn clone_with_pg_tools_stream(
+    source: &PgToolConnection,
+    target: &PgToolConnection,
+    schema_only: bool,
+) -> anyhow::Result<()> {
     let mut dump_command = Command::new("pg_dump");
     apply_command_env(&mut dump_command, &source.env);
     dump_command
@@ -6027,6 +6072,90 @@ async fn clone_with_pg_tools(
         .context("dump/restore pipe failed")?;
 
     Ok(())
+}
+
+async fn clone_with_pg_tools_filtered_archive(
+    source: &PgToolConnection,
+    target: &PgToolConnection,
+    schema_only: bool,
+    excluded_source_extensions: &[String],
+) -> anyhow::Result<()> {
+    let temp_stem = format!("pgsandbox-clone-{}", Uuid::new_v4().simple());
+    let temp_dir = std::env::temp_dir();
+    let dump_path = temp_dir.join(format!("{temp_stem}.dump"));
+    let toc_path = temp_dir.join(format!("{temp_stem}.toc"));
+
+    let result = async {
+        let mut dump_command = Command::new("pg_dump");
+        apply_command_env(&mut dump_command, &source.env);
+        let dump_output = dump_command
+            .args(pg_dump_file_args(&source.database, &dump_path, schema_only))
+            .stderr(Stdio::piped())
+            .kill_on_drop(true)
+            .output()
+            .await
+            .context(
+                "failed to start pg_dump; install PostgreSQL client tools and ensure pg_dump is on PATH",
+            )?;
+        if !dump_output.status.success() {
+            anyhow::bail!("pg_dump failed: {}", summarize_tool_stderr(&dump_output.stderr));
+        }
+
+        let list_output = Command::new("pg_restore")
+            .args(pg_restore_list_args(&dump_path))
+            .stderr(Stdio::piped())
+            .kill_on_drop(true)
+            .output()
+            .await
+            .context(
+                "failed to start pg_restore; install PostgreSQL client tools and ensure pg_restore is on PATH",
+            )?;
+        if !list_output.status.success() {
+            anyhow::bail!(
+                "pg_restore --list failed: {}",
+                summarize_tool_stderr(&list_output.stderr)
+            );
+        }
+        let toc = String::from_utf8(list_output.stdout)
+            .context("pg_restore --list output was not valid UTF-8")?;
+        let filtered_toc = filter_pg_restore_toc_list(&toc, excluded_source_extensions)?;
+        fs::write(&toc_path, filtered_toc).with_context(|| {
+            format!(
+                "failed to write filtered pg_restore table of contents to {}",
+                toc_path.display()
+            )
+        })?;
+
+        let mut restore_command = Command::new("pg_restore");
+        apply_command_env(&mut restore_command, &target.env);
+        let restore_output = restore_command
+            .args(pg_restore_filtered_file_args(
+                &target.database,
+                &dump_path,
+                &toc_path,
+            ))
+            .stderr(Stdio::piped())
+            .kill_on_drop(true)
+            .output()
+            .await
+            .context(
+                "failed to start pg_restore; install PostgreSQL client tools and ensure pg_restore is on PATH",
+            )?;
+        if !restore_output.status.success() {
+            anyhow::bail!(
+                "pg_restore failed: {}",
+                summarize_tool_stderr(&restore_output.stderr)
+            );
+        }
+
+        anyhow::Ok(())
+    }
+    .await;
+
+    let _ = fs::remove_file(&dump_path);
+    let _ = fs::remove_file(&toc_path);
+
+    result
 }
 
 fn pg_tool_connection_from_url(raw_url: &str) -> anyhow::Result<PgToolConnection> {
@@ -6232,6 +6361,90 @@ fn normalize_extension_names(extensions: Option<Vec<String>>) -> anyhow::Result<
     }
 
     Ok(normalized)
+}
+
+fn clone_excluded_source_extensions(
+    exclude_source_extensions: Option<Vec<String>>,
+) -> anyhow::Result<Vec<String>> {
+    let mut excluded = DEFAULT_CLONE_EXCLUDED_SOURCE_EXTENSIONS
+        .iter()
+        .map(|extension| (*extension).to_string())
+        .collect::<Vec<_>>();
+    let mut seen = excluded.iter().cloned().collect::<BTreeSet<_>>();
+
+    for extension in normalize_extension_names(exclude_source_extensions)? {
+        if seen.insert(extension.clone()) {
+            excluded.push(extension);
+        }
+    }
+
+    if excluded.len() > MAX_EXTENSION_COUNT {
+        anyhow::bail!(
+            "invalid_extensions: excludeSourceExtensions may contain at most {MAX_EXTENSION_COUNT} total items including defaults"
+        );
+    }
+
+    Ok(excluded)
+}
+
+fn filter_pg_restore_toc_list(
+    toc: &str,
+    excluded_source_extensions: &[String],
+) -> anyhow::Result<String> {
+    if excluded_source_extensions.is_empty() {
+        return Ok(ensure_trailing_newline(toc));
+    }
+
+    let excluded = excluded_source_extensions
+        .iter()
+        .map(String::as_str)
+        .collect::<BTreeSet<_>>();
+    let mut filtered = String::new();
+    for line in toc.lines() {
+        if pg_restore_toc_line_extension_name(line)
+            .is_some_and(|extension| excluded.contains(extension))
+        {
+            continue;
+        }
+        filtered.push_str(line);
+        filtered.push('\n');
+    }
+
+    Ok(filtered)
+}
+
+fn ensure_trailing_newline(value: &str) -> String {
+    if value.ends_with('\n') {
+        value.to_string()
+    } else {
+        format!("{value}\n")
+    }
+}
+
+fn pg_restore_toc_line_extension_name(line: &str) -> Option<&str> {
+    let (_, payload) = line.split_once(';')?;
+    let tokens = payload.split_whitespace().collect::<Vec<_>>();
+
+    if tokens.len() >= 5 && tokens[2] == "EXTENSION" && tokens[3] == "-" {
+        return Some(tokens[4]);
+    }
+    if tokens.len() >= 6
+        && matches!(tokens[2], "COMMENT" | "ACL")
+        && tokens[3] == "-"
+        && tokens[4] == "EXTENSION"
+    {
+        return Some(tokens[5]);
+    }
+    if tokens.len() >= 7
+        && tokens[2] == "SECURITY"
+        && tokens[3] == "LABEL"
+        && tokens[4] == "-"
+        && tokens[5] == "EXTENSION"
+    {
+        return Some(tokens[6]);
+    }
+
+    None
 }
 
 fn create_extension_statement(extension: &str) -> anyhow::Result<String> {
@@ -8104,7 +8317,8 @@ mod tests {
         .unwrap();
         let clone = serde_json::from_value::<CloneDatabaseInput>(json!({
             "sourceDatabaseUrl": "postgres://postgres:secret@localhost/source",
-            "extensions": ["citext"]
+            "extensions": ["citext"],
+            "excludeSourceExtensions": ["pg_stat_statements", "auto_explain"]
         }))
         .unwrap();
 
@@ -8113,6 +8327,44 @@ mod tests {
             Some(vec!["pg_trgm".to_string(), "uuid-ossp".to_string()])
         );
         assert_eq!(clone.extensions, Some(vec!["citext".to_string()]));
+        assert_eq!(
+            clone.exclude_source_extensions,
+            Some(vec![
+                "pg_stat_statements".to_string(),
+                "auto_explain".to_string()
+            ])
+        );
+    }
+
+    #[test]
+    fn clone_excludes_pg_stat_statements_source_extension_by_default() {
+        let extensions = clone_excluded_source_extensions(None).unwrap();
+
+        assert_eq!(extensions, ["pg_stat_statements"]);
+    }
+
+    #[test]
+    fn clone_source_extension_filter_removes_extension_toc_entries() {
+        let toc = "\
+;
+; Archive created at 2026-07-07 12:00:00 UTC
+;
+6; 0 0 EXTENSION - pg_stat_statements postgres
+7; 0 0 COMMENT - EXTENSION pg_stat_statements postgres
+8; 0 0 ACL - EXTENSION pg_stat_statements postgres
+9; 0 0 SECURITY LABEL - EXTENSION pg_stat_statements postgres
+10; 0 0 EXTENSION - citext postgres
+11; 0 0 TABLE public app_document postgres
+";
+        let filtered =
+            filter_pg_restore_toc_list(toc, &["pg_stat_statements".to_string()]).unwrap();
+
+        assert!(!filtered.contains("EXTENSION - pg_stat_statements"));
+        assert!(!filtered.contains("COMMENT - EXTENSION pg_stat_statements"));
+        assert!(!filtered.contains("ACL - EXTENSION pg_stat_statements"));
+        assert!(!filtered.contains("SECURITY LABEL - EXTENSION pg_stat_statements"));
+        assert!(filtered.contains("EXTENSION - citext"));
+        assert!(filtered.contains("TABLE public app_document"));
     }
 
     #[test]
@@ -8462,10 +8714,17 @@ mod tests {
         let dump_args = pg_dump_args(&source.database, false);
         let schema_only_dump_args = pg_dump_args(&source.database, true);
         let restore_args = pg_restore_args(&target.database);
+        let dump_path = PathBuf::from("/tmp/pgsandbox-clone.dump");
+        let toc_path = PathBuf::from("/tmp/pgsandbox-clone.toc");
+        let restore_list_args = pg_restore_list_args(&dump_path);
+        let filtered_restore_args =
+            pg_restore_filtered_file_args(&target.database, &dump_path, &toc_path);
         let joined_args = dump_args
             .iter()
             .chain(schema_only_dump_args.iter())
             .chain(restore_args.iter())
+            .chain(restore_list_args.iter())
+            .chain(filtered_restore_args.iter())
             .cloned()
             .collect::<Vec<_>>()
             .join(" ");
@@ -8479,6 +8738,8 @@ mod tests {
         assert!(restore_args.contains(&"--single-transaction".to_string()));
         assert!(restore_args.contains(&"--exit-on-error".to_string()));
         assert!(restore_args.contains(&"target_db".to_string()));
+        assert_eq!(restore_list_args[0], "--list");
+        assert!(filtered_restore_args.contains(&format!("--use-list={}", toc_path.display())));
     }
 
     #[test]
@@ -8559,6 +8820,7 @@ mod tests {
             source: "external".to_string(),
             schema_only: false,
             installed_extensions: Vec::new(),
+            excluded_source_extensions: Vec::new(),
         })
         .unwrap();
         assert!(cloned.get("connectionString").is_none());
@@ -8673,6 +8935,7 @@ mod tests {
             source: "external".to_string(),
             schema_only: false,
             installed_extensions: Vec::new(),
+            excluded_source_extensions: Vec::new(),
         };
         let restored = CreateSandboxFromTemplateOutput {
             database_id: "db-id".to_string(),

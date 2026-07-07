@@ -13,8 +13,8 @@ managed local cluster, then writes MCP client config. PGSandbox also checks
 `/opt/homebrew/opt/postgresql/bin` and versioned locations from
 `postgresql@18` through `postgresql@13`, and explicit bin directory
 environment variables. The `clone_database` MCP tool additionally requires
-`pg_dump` and `pg_restore` because it streams a source database dump into a new
-sandbox.
+`pg_dump` and `pg_restore` because it restores a source database dump into a
+new sandbox.
 
 ## Agent-Assisted Setup
 

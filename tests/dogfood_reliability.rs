@@ -412,6 +412,7 @@ async fn exercise_clone(
             labels: Some([("suite".to_string(), json!("dogfood"))].into()),
             schema_only: Some(true),
             extensions: None,
+            exclude_source_extensions: None,
         })
         .await?;
 

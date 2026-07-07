@@ -168,6 +168,9 @@ Inputs:
 - `extensions`: optional list of extension names to install in the target
   sandbox before restore. Validation and availability rules match
   `create_database`.
+- `excludeSourceExtensions`: optional list of source extension names to skip
+  during restore. Names are normalized like `extensions` and are added to the
+  default source skip list, which includes `pg_stat_statements`.
 
 Returns:
 
@@ -180,12 +183,19 @@ Returns:
 - `source`: currently `external`
 - `schemaOnly`
 - `installedExtensions`: normalized extension names installed before restore
+- `excludedSourceExtensions`: normalized source extension names omitted from
+  the restore archive
 
 Notes:
 
 - Requires `pg_dump` and `pg_restore` on `PATH` for this tool only.
 - Requested extensions are installed in the empty target sandbox before
   `pg_restore` runs, so restored schemas can depend on those extension objects.
+- Source extension entries for `pg_stat_statements` are skipped by default
+  because sandbox roles commonly cannot create that observability extension.
+  Use `excludeSourceExtensions` to skip additional nonessential source
+  extensions, and use `extensions` for target extensions that should be
+  installed before restore.
 - If restore fails, PGSandbox attempts to delete the newly created sandbox.
 - Do not paste production URLs into prompts when a secret input or local
   environment variable can provide them.
