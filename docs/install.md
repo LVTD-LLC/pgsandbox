@@ -13,7 +13,7 @@ checks `PATH`, common package-manager and Postgres.app install locations such
 as `/opt/homebrew/opt/postgresql/bin`, `/usr/lib/postgresql/<major>/bin`, and
 versioned Homebrew locations from `postgresql@18` through `postgresql@13`, plus
 explicit bin directory environment variables. The `clone_database` MCP tool
-additionally requires `pg_dump` and `pg_restore` because it streams a source
+additionally requires `pg_dump` and `pg_restore` because it restores a source
 database dump into a new sandbox.
 
 ## Agent-Assisted Setup

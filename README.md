@@ -617,7 +617,7 @@ Postgres errors include SQLSTATE when available.
 | `ensure_postgres` | Install missing local Postgres server binaries with a supported package manager when available, then start a managed local profile. |
 | `doctor` | Return MCP-safe diagnostics and profile health. |
 | `create_database` | Create one isolated sandbox database and role, optionally installing requested extensions. |
-| `clone_database` | Clone an existing source database into a new sandbox with `pg_dump`/`pg_restore`, optionally installing requested extensions before restore. |
+| `clone_database` | Clone an existing source database into a new sandbox with `pg_dump`/`pg_restore`, optionally installing target extensions and skipping source-only extension entries. |
 | `delete_database` | Delete a metadata-owned sandbox database and role. |
 | `get_connection_string` | Return a redacted connection string by default, or raw credentials when explicitly requested. |
 | `run_sql` | Run SQL against a sandbox with bounded result rows. |
@@ -663,6 +663,24 @@ sandbox before running `CREATE EXTENSION IF NOT EXISTS`; unavailable or invalid
 names return `invalid_extensions` and the new sandbox is rolled back. For
 `clone_database`, requested extensions are installed in the empty target
 sandbox before `pg_restore` runs.
+
+For clone sources that include observability or environment-specific extensions
+that the sandbox role should not create, `clone_database` skips
+`pg_stat_statements` source extension entries by default. Pass
+`excludeSourceExtensions` to skip additional source extensions while still
+restoring the rest of the schema:
+
+```json
+{
+  "sourceDatabaseUrl": "postgres://...",
+  "schemaOnly": true,
+  "excludeSourceExtensions": ["auto_explain"]
+}
+```
+
+Use `extensions` for target extensions that should exist in the sandbox, and
+`excludeSourceExtensions` for source extension entries that should be omitted
+from the restore archive.
 
 ### SQL Execution
 
@@ -773,8 +791,10 @@ or a production-data import workflow.
 2. Create an empty tracked target sandbox.
 3. Install any requested target extensions using the sandbox role.
 4. Run `pg_dump` against the source database.
-5. Run `pg_restore` into the target sandbox using the sandbox role.
-6. Delete the target sandbox if restore fails.
+5. Skip source extension archive entries from `pg_stat_statements` and any
+   requested `excludeSourceExtensions`.
+6. Run `pg_restore` into the target sandbox using the sandbox role.
+7. Delete the target sandbox if restore fails.
 
 Newer-to-older clone paths fail before target creation with
 `restore_incompatible`. Cloning and template tools require `pg_dump` and
@@ -1605,6 +1625,10 @@ pg_restore --version
 
 Also check source and target Postgres major versions. Newer-to-older clone
 paths are rejected before creating the target sandbox.
+
+If clone restore fails on a source-only extension such as an observability
+extension, retry with `excludeSourceExtensions`. `pg_stat_statements` is skipped
+by default because sandbox roles commonly cannot create it.
 
 ### `run_repo_command` Rejects A Command
 

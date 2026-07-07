@@ -253,6 +253,13 @@ impl PgsandboxServer {
                     .map_or(0, |extensions| extensions.len())),
             ),
             (
+                "excludeSourceExtensionCount",
+                json!(input
+                    .exclude_source_extensions
+                    .as_ref()
+                    .map_or(0, |extensions| extensions.len())),
+            ),
+            (
                 "labelCount",
                 json!(input.labels.as_ref().map_or(0, |labels| labels.len())),
             ),

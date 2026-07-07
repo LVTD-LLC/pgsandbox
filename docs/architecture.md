@@ -191,7 +191,9 @@ The first cloning backend should favor portability and clarity:
 
 - create an empty sandbox database and scoped role
 - run `pg_dump` against the source database with ownership and privileges omitted
-- stream the dump into `pg_restore` connected as the sandbox role
+- restore the dump with `pg_restore` connected as the sandbox role, filtering
+  source extension archive entries such as `pg_stat_statements` when they are
+  not meant to be recreated in the sandbox
 - delete the destination sandbox if the clone fails
 
 This requires `pg_dump` and `pg_restore` for cloning and template tools. Normal
