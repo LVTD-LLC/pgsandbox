@@ -137,6 +137,27 @@ The installed CLI binary is the MCP server process that clients launch. Updating
 the CLI and restarting the MCP client updates the server. Rerun `setup` when the
 binary path, explicit admin URL, selected client, or scope changes.
 
+For Homebrew and GitHub install-script installs, the shortest path is:
+
+```bash
+pgsandbox-mcp upgrade
+```
+
+`upgrade` updates the installed binary, reruns `setup --client all`, runs
+`doctor`, and reminds you to restart MCP clients. It supports the same release
+targets as the GitHub installer: macOS and Linux on `x86_64` or `aarch64`.
+Homebrew installs are upgraded through Homebrew. GitHub install-script installs
+rerun the hosted installer into the current binary directory.
+
+Use these options to narrow or skip post-upgrade work:
+
+```bash
+pgsandbox-mcp upgrade --setup codex
+pgsandbox-mcp upgrade --no-setup
+pgsandbox-mcp upgrade --no-doctor
+pgsandbox-mcp upgrade --version 0.4.5
+```
+
 Homebrew can only upgrade after a newer GitHub release exists and the
 `LVTD-LLC/homebrew-tap` formula has been updated. If `brew upgrade
 LVTD-LLC/tap/pgsandbox-mcp` says the current version is already installed, the

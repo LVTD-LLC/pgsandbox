@@ -1030,6 +1030,8 @@ CLI commands after installation:
 | `pgsandbox-mcp setup --client codex --dry-run` | Print intended config without writing or preparing local Postgres. |
 | `pgsandbox-mcp doctor` | Check config and Postgres connectivity. |
 | `pgsandbox-mcp doctor --postgres-version 18` | Check a requested managed local major version. |
+| `pgsandbox-mcp upgrade` | Upgrade Homebrew/install-script installs, rerun setup for all clients, and run doctor. |
+| `pgsandbox-mcp upgrade --setup codex` | Upgrade and only refresh the Codex config. |
 | `pgsandbox-mcp local init` | Initialize managed local Postgres without starting it. |
 | `pgsandbox-mcp local start` | Initialize if needed and start managed local Postgres. |
 | `pgsandbox-mcp local status` | Show managed local status. |
@@ -1248,6 +1250,27 @@ pgsandbox-mcp doctor
 ```
 
 ### Update An Existing Installation
+
+For Homebrew and GitHub install-script installs, the shortest path is:
+
+```bash
+pgsandbox-mcp upgrade
+```
+
+`upgrade` updates the installed binary, reruns `setup --client all`, runs
+`doctor`, and reminds you to restart MCP clients. It supports the same release
+targets as the GitHub installer: macOS and Linux on `x86_64` or `aarch64`.
+Homebrew installs are upgraded through Homebrew. GitHub install-script installs
+rerun the hosted installer into the current binary directory.
+
+To update only one client config, skip post-upgrade steps, or pin a release:
+
+```bash
+pgsandbox-mcp upgrade --setup codex
+pgsandbox-mcp upgrade --no-setup
+pgsandbox-mcp upgrade --no-doctor
+pgsandbox-mcp upgrade --version 0.4.5
+```
 
 Homebrew:
 
