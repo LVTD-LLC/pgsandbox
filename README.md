@@ -1261,9 +1261,12 @@ pgsandbox-mcp upgrade
 `doctor`, and reminds you to restart MCP clients. It supports the same release
 targets as the GitHub installer: macOS and Linux on `x86_64` or `aarch64`.
 Homebrew installs are upgraded through Homebrew. GitHub install-script installs
-rerun the hosted installer into the current binary directory.
+rerun the hosted installer into the current binary directory. `--version` is
+only supported for GitHub install-script installs because Homebrew upgrades use
+the tap formula version.
 
-To update only one client config, skip post-upgrade steps, or pin a release:
+To update only one client config, skip post-upgrade steps, or pin a GitHub
+installer release:
 
 ```bash
 pgsandbox-mcp upgrade --setup codex

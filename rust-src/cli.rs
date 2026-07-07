@@ -180,6 +180,7 @@ async fn upgrade(args: &[String]) -> anyhow::Result<u8> {
 
     match plan.source {
         UpgradeInstallSource::Homebrew => {
+            ensure_homebrew_upgrade_options(&options)?;
             run_homebrew_upgrade(dry_run)?;
         }
         UpgradeInstallSource::DirectRelease => {
@@ -768,6 +769,16 @@ fn run_homebrew_upgrade(dry_run: bool) -> anyhow::Result<()> {
     run_status_command("brew", &["upgrade", "LVTD-LLC/tap/pgsandbox-mcp"], dry_run)
 }
 
+fn ensure_homebrew_upgrade_options(options: &BTreeMap<String, String>) -> anyhow::Result<()> {
+    if options.contains_key("version") {
+        anyhow::bail!(
+            "--version is only supported for GitHub install-script upgrades. Homebrew upgrades use the tap formula; omit --version or reinstall a pinned release with the GitHub installer."
+        );
+    }
+
+    Ok(())
+}
+
 async fn run_github_installer_upgrade(
     current_exe: &Path,
     options: &BTreeMap<String, String>,
@@ -1262,6 +1273,21 @@ mod tests {
         assert!(path_has_homebrew_cellar_pgsandbox(Path::new(
             "/opt/homebrew/Cellar/pgsandbox-mcp/0.4.5/bin/pgsandbox-mcp"
         )));
+    }
+
+    #[test]
+    fn homebrew_upgrade_rejects_pinned_version() {
+        let options = BTreeMap::from([("version".to_string(), "0.4.5".to_string())]);
+        let error = ensure_homebrew_upgrade_options(&options).unwrap_err();
+
+        assert!(error.to_string().contains("--version is only supported"));
+    }
+
+    #[test]
+    fn homebrew_upgrade_allows_default_options() {
+        let options = BTreeMap::new();
+
+        ensure_homebrew_upgrade_options(&options).unwrap();
     }
 
     #[test]
