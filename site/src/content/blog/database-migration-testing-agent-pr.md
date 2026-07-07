@@ -103,6 +103,8 @@ If the schema diff surprises the agent, the agent should fix the migration befor
 
 For a deeper version of this review artifact, use the [Postgres schema snapshots for agent migration reviews](https://pgsandbox-mcp.lvtd.dev/blog/postgres-schema-snapshots-agent-migration-reviews/) workflow. It focuses on named before/after checkpoints, compact object diffs, invalid-index checks, bounded data checks, and the exact PR evidence block a reviewer can trust.
 
+When the migration changes a query path or adds an index, pair the schema diff with a [Postgres EXPLAIN plan review](https://pgsandbox-mcp.lvtd.dev/blog/postgres-explain-plan-agent-sql/). A plan does not prove the migration succeeded, but it can show whether the affected query still touches the intended relations and whether Postgres estimates the access path the patch expects.
+
 ## Step 4: seed the data cases that make the migration risky
 
 Most dangerous migrations are dangerous because of data, not syntax.
