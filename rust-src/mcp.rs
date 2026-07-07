@@ -894,7 +894,6 @@ struct ToolErrorBody {
     resolved_profile: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     resolved_postgres_version: Option<String>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
     detected_versions: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     detail_handle: Option<Value>,
@@ -2064,6 +2063,28 @@ mod tests {
         assert!(first_error(&value)["detectedVersions"].is_array());
         assert!(value["detailHandles"][0].is_object());
         assert!(!text.contains("/very/long/path"));
+    }
+
+    #[test]
+    fn tool_error_body_serializes_empty_detected_versions_array() {
+        let body = ToolErrorBody {
+            code: "local_postgres_unavailable",
+            category: "postgres",
+            message: "Local Postgres 15 binaries are unavailable.".to_string(),
+            hint: "Install Postgres 15.".to_string(),
+            sqlstate: None,
+            requested_version: Some("15".to_string()),
+            source_version: None,
+            target_version: None,
+            resolved_profile: None,
+            resolved_postgres_version: None,
+            detected_versions: Vec::new(),
+            detail_handle: None,
+        };
+
+        let value = serde_json::to_value(body).unwrap();
+
+        assert_eq!(value["detectedVersions"], json!([]));
     }
 
     #[test]
