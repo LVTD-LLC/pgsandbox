@@ -31,6 +31,7 @@
 | /blog/database-migration-testing-agent-pr/ | Database Migration Testing Before Agent PRs | database migration testing; Postgres migration validation; validate migrations before an agent PR; agent migration proof loop; migration schema diff for coding agents | How-to tutorial for validating Postgres migrations in a disposable sandbox before an agent opens a PR. |
 | /blog/postgres-template-database-vs-task-sandbox/ | Postgres Template Databases vs Task Sandboxes | postgres template database; Postgres template database vs sandbox; task sandbox; reusable seeded sandbox; PGSandbox local template | Comparison for choosing between native Postgres templates, PGSandbox local template artifacts, and task-scoped sandboxes. |
 | /blog/postgres-schema-snapshots-agent-migration-reviews/ | How to Use Postgres Schema Snapshots for Agent Migration Reviews | postgres schema snapshots; postgres schema diff; schema snapshots for migration review; agent migration schema diff; before and after schema checkpoint | How-to tutorial for using named schema snapshots and compact diffs as agent migration review evidence. |
+| /blog/postgres-explain-plan-agent-sql/ | How to Use Postgres EXPLAIN Plans for Agent SQL Review | Postgres EXPLAIN plan for agent SQL; explain_query workflow; agent SQL plan review; query plan evidence for coding agents; EXPLAIN JSON sandbox review | How-to tutorial for using non-executing EXPLAIN plans, bounded SQL proof, and cleanup as an agent SQL review contract. |
 
 ## Changelog
 

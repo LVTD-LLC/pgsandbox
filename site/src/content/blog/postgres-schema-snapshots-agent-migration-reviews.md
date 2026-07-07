@@ -213,6 +213,8 @@ where payment_status is null;
 
 PGSandbox's `run_sql` returns bounded rows and supports row limits. That is the right shape for PR evidence. The reviewer needs counts, representative failures, and SQLSTATE details, not sensitive rows or a huge transcript.
 
+If a schema change is meant to alter a query path, add a [Postgres EXPLAIN plan review](https://pgsandbox-mcp.lvtd.dev/blog/postgres-explain-plan-agent-sql/) beside the bounded row checks. The plan shows whether Postgres expects to touch the intended relations before the agent treats execution output as proof.
+
 If the task needs realistic source shape, start with schema-only, synthetic, masked, or reduced data. A disposable sandbox limits where writes land. It does not make sensitive data safe to expose.
 
 ## Step 7: write the PR evidence block

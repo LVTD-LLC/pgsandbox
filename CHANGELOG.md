@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-07-07
+
+- Added the Astro Markdown blog post "How to Use Postgres EXPLAIN Plans for Agent SQL Review" with SEO ledger, link inventory, and inbound blog links.
+
 ## 2026-07-06
 
 - Released `pgsandbox-mcp` v0.4.4 with simplified managed-local onboarding, scoped expired cleanup filters, typed multi-statement `run_sql` result sets, stricter readonly and row-limit validation, classified `explain_query` statement errors, clone-source repair hints, and clearer agent workflow docs.

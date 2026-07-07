@@ -144,6 +144,8 @@ Before the agent runs generated SQL, decide:
 
 The row limit matters. A generated `SELECT *` against a realistic table can dump far more context than the agent needs. Bounded output is both a safety control and a usability control: the model gets the signal it needs without turning the database into a transcript export.
 
+When the generated SQL is more than a trivial lookup, inspect the [Postgres EXPLAIN plan for agent SQL review](https://pgsandbox-mcp.lvtd.dev/blog/postgres-explain-plan-agent-sql/) before you run it. The plan gives the reviewer a pre-execution check on relation names, node types, row estimates, and whether the agent's query is narrower than a broad table scan.
+
 PGSandbox's `run_sql` tool executes through the sandbox role and returns bounded results. For agent work, that is a better default than exposing a general admin SQL shell. The agent can still write a bad query. It gets a smaller place to be wrong and a smaller result envelope to reason over.
 
 For migrations and generated SQL patches, a useful proof record includes:
