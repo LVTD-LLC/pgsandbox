@@ -1061,11 +1061,16 @@ impl ToolErrorResponse {
         } else if lower.contains("restore_incompatible") {
             let (source_version, target_version) =
                 restore_incompatible_versions_from_message(&chain);
+            let hint = if lower.contains("transaction_timeout") {
+                "Use compatible pg_dump/pg_restore binaries for the target Postgres major version, retry with a newer target Postgres version that supports transaction_timeout, or create a dump that omits unsupported SET commands."
+            } else {
+                "Clone into the same or newer target Postgres major version, or create a dump that is compatible with the older target."
+            };
             ToolErrorBody {
                 code: "restore_incompatible",
                 category: "restore_incompatible",
                 message: chain.clone(),
-                hint: "Clone into the same or newer target Postgres major version, or create a dump that is compatible with the older target.".to_string(),
+                hint: hint.to_string(),
                 sqlstate: None,
                 requested_version: target_version
                     .clone()
@@ -2033,6 +2038,26 @@ mod tests {
         assert_eq!(value["detailHandles"][0]["tool"], "create_database");
         assert_eq!(value["detailHandles"][0]["resolvedProfile"], "local-pg16");
         assert_eq!(value["detailHandles"][0]["resolvedPostgresVersion"], "16");
+    }
+
+    #[test]
+    fn transaction_timeout_restore_incompatible_errors_include_tooling_hint() {
+        let result = tool_json::<()>(Err(anyhow::anyhow!(
+            "restore_incompatible: pg_restore failed because the dump/tooling emitted SET transaction_timeout, which the target Postgres server does not support."
+        )))
+        .unwrap();
+        let text = result.content[0].as_text().unwrap().text.clone();
+        let value = serde_json::from_str::<Value>(&text).unwrap();
+
+        assert_eq!(first_error(&value)["code"], "restore_incompatible");
+        assert!(first_error(&value)["message"]
+            .as_str()
+            .unwrap()
+            .contains("transaction_timeout"));
+        assert!(first_error(&value)["hint"]
+            .as_str()
+            .unwrap()
+            .contains("compatible pg_dump/pg_restore"));
     }
 
     #[test]

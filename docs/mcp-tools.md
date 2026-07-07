@@ -235,6 +235,10 @@ Notes:
 - Requested extensions are installed in the empty target sandbox before
   `pg_restore` runs, so restored schemas can depend on those extension objects.
 - If restore fails, PGSandbox attempts to delete the newly created sandbox.
+- Restore failures caused by unsupported dump-time settings such as
+  `transaction_timeout` return `category: "restore_incompatible"` with a hint
+  to use compatible `pg_dump`/`pg_restore` binaries, choose a newer target
+  Postgres version, or create a dump without unsupported `SET` commands.
 - Do not paste production URLs into prompts when a secret input or local
   environment variable can provide them.
 - Source inspection, source auth, source connection, and `pg_dump` permission
@@ -798,4 +802,6 @@ profile selection.
 Clone downgrades are not supported by default. PGSandbox checks the source and
 target Postgres majors before creating the target sandbox and returns
 `category: "restore_incompatible"` when the source major is newer than the
-target. The error includes `sourceVersion` and `targetVersion`.
+target. It also classifies `pg_restore` failures on unsupported
+`transaction_timeout` settings as `restore_incompatible`. Source-newer-than-target
+errors include `sourceVersion` and `targetVersion`.

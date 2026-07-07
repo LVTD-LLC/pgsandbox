@@ -6255,6 +6255,9 @@ fn clone_tool_failure_message(
     restore_stderr: &[u8],
 ) -> Option<String> {
     if !restore_success {
+        if let Some(message) = restore_transaction_timeout_compatibility_message(restore_stderr) {
+            return Some(message);
+        }
         return Some(format!(
             "pg_restore failed: {}",
             summarize_tool_stderr(restore_stderr)
@@ -6267,6 +6270,23 @@ fn clone_tool_failure_message(
         ));
     }
     None
+}
+
+fn restore_transaction_timeout_compatibility_message(restore_stderr: &[u8]) -> Option<String> {
+    let stderr = summarize_tool_stderr(restore_stderr);
+    let lower = stderr.to_ascii_lowercase();
+    if !lower.contains("transaction_timeout") || !lower.contains("configuration parameter") {
+        return None;
+    }
+
+    Some(format!(
+        "restore_incompatible: pg_restore failed because the dump/tooling emitted \
+         SET transaction_timeout, which the target Postgres server does not support. \
+         Use compatible pg_dump/pg_restore binaries for the target Postgres major \
+         version, retry with a newer target Postgres version that supports \
+         transaction_timeout, or create a dump that omits unsupported SET commands. \
+         pg_restore stderr: {stderr}"
+    ))
 }
 
 fn clamp_ttl(ttl_minutes: Option<i64>, profile: &SandboxProfile) -> anyhow::Result<u32> {
@@ -9325,6 +9345,22 @@ services:
 
         assert!(message.starts_with("pg_restore failed:"));
         assert!(message.contains("duplicate key"));
+    }
+
+    #[test]
+    fn transaction_timeout_restore_failure_is_version_compatibility_error() {
+        let message = clone_tool_failure_message(
+            true,
+            b"",
+            false,
+            br#"pg_restore: error: could not execute query: ERROR:  unrecognized configuration parameter "transaction_timeout"
+Command was: SET transaction_timeout = 0;"#,
+        )
+        .unwrap();
+
+        assert!(message.starts_with("restore_incompatible:"));
+        assert!(message.contains("transaction_timeout"));
+        assert!(message.contains("compatible pg_dump/pg_restore"));
     }
 
     #[test]
