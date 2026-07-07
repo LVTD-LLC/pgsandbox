@@ -188,6 +188,23 @@ impl LocalPostgresCluster {
         }
     }
 
+    pub fn matching_binaries_available(&self) -> anyhow::Result<bool> {
+        match self.resolve_binaries_without_starting() {
+            Ok(_) => Ok(true),
+            Err(error) if local_postgres_error_is_missing_binaries(&error) => Ok(false),
+            Err(error) => Err(error),
+        }
+    }
+
+    fn resolve_binaries_without_starting(&self) -> anyhow::Result<LocalPostgresBinaries> {
+        if self.data_dir().join("PG_VERSION").exists() {
+            self.ensure_data_dir_matches_requested_version()?;
+            let config = self.read_config()?;
+            return resolve_postgres_binaries_for_config(&config, self.postgres_version.as_deref());
+        }
+        resolve_postgres_binaries(self.postgres_version.as_deref())
+    }
+
     fn ensure_started_locked(&self) -> anyhow::Result<LocalClusterConfig> {
         let initialized = self.init_locked()?;
         if self.is_running()? {
@@ -1718,6 +1735,32 @@ mod tests {
         assert!(error
             .to_string()
             .contains("pacman does not provide versioned PostgreSQL"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn matching_binaries_available_detects_existing_versioned_binaries() {
+        let directory = tempfile::tempdir().unwrap();
+        let bin_dir = directory.path().join("bin");
+        fs::create_dir_all(&bin_dir).unwrap();
+        for binary in required_local_binaries() {
+            write_executable(
+                &bin_dir.join(binary),
+                "#!/bin/sh\necho 'postgres (PostgreSQL) 98.1'\nexit 0\n",
+            );
+        }
+
+        let key = "PGSANDBOX_POSTGRES_98_BIN_DIR";
+        let previous = env::var_os(key);
+        env::set_var(key, &bin_dir);
+        let cluster = LocalPostgresCluster::new_for_version(directory.path(), Some("98")).unwrap();
+        let available = cluster.matching_binaries_available().unwrap();
+        match previous {
+            Some(value) => env::set_var(key, value),
+            None => env::remove_var(key),
+        }
+
+        assert!(available);
     }
 
     #[test]

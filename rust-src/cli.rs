@@ -1146,11 +1146,15 @@ fn print_ensure_postgres_dry_run(
     println!("Dry run: managed local Postgres would be checked and started.");
     println!("Root: {}", cluster.root().display());
     if install_missing {
-        let plan = local_postgres_install_plan(postgres_version)?;
-        println!(
-            "If binaries are missing, PGSandbox would run: {}",
-            plan.display_command
-        );
+        if cluster.matching_binaries_available()? {
+            println!("Matching Postgres binaries are already available; no package install would be needed.");
+        } else {
+            let plan = local_postgres_install_plan(postgres_version)?;
+            println!(
+                "If binaries are missing, PGSandbox would run: {}",
+                plan.display_command
+            );
+        }
     } else {
         println!(
             "Missing Postgres binaries would not be installed because --no-install was provided."
