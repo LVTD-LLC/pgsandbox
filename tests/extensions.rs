@@ -32,10 +32,11 @@ async fn create_database_installs_requested_extensions_when_enabled() {
         .expect("create extension sandbox");
 
     let result = async {
-        if created.installed_extensions != [expected_extension.clone()] {
+        let expected_extensions = std::slice::from_ref(&expected_extension);
+        if created.installed_extensions.as_slice() != expected_extensions {
             anyhow::bail!(
                 "expected installedExtensions {:?}, got {:?}",
-                [expected_extension.clone()],
+                expected_extensions,
                 created.installed_extensions
             );
         }
