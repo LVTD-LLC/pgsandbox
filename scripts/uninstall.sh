@@ -392,6 +392,13 @@ cleanup_configs_for_server() {
     cleanup_json_config "$HOME/.config/Code/User/mcp.json" servers "$server_name"
     cleanup_json_config "$HOME/Library/Application Support/Claude/claude_desktop_config.json" mcpServers "$server_name"
     cleanup_json_config "$HOME/.config/Claude/claude_desktop_config.json" mcpServers "$server_name"
+    cleanup_json_config "$HOME/AppData/Roaming/Code/User/mcp.json" servers "$server_name"
+    cleanup_json_config "$HOME/AppData/Roaming/Claude/claude_desktop_config.json" mcpServers "$server_name"
+  fi
+
+  if [ -n "${APPDATA:-}" ]; then
+    cleanup_json_config "$APPDATA/Code/User/mcp.json" servers "$server_name"
+    cleanup_json_config "$APPDATA/Claude/claude_desktop_config.json" mcpServers "$server_name"
   fi
 }
 
