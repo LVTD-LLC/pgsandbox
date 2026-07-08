@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-07-08
+
+- Added the Astro Markdown blog post "How to Run Agent SQL with Bounded Postgres Results" with SEO ledger, link inventory, and inbound blog links.
+
 ## 2026-07-07
 
 - Released `pgsandbox-mcp` v0.4.6 with the upgrade command, sandbox extension workflows, resolved target version fields, managed-local auto-install helpers, clone/restore compatibility fixes, extension discovery, and Docker connection variants.

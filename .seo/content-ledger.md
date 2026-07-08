@@ -14,6 +14,7 @@
 | 2026-07-05 | Comparison / explainer | Postgres Template Databases vs Task Sandboxes | postgres-template-database-vs-task-sandbox | postgres template database | /docs/mcp-tools/, /docs/architecture/, /blog/how-to-create-postgres-test-database-agent-sql/, /blog/database-migration-testing-agent-pr/ | Astro Markdown source of truth; uses the native template vs PGSandbox local template artifact boundary as the information-gain framework. |
 | 2026-07-06 | How-to / tutorial | How to Use Postgres Schema Snapshots for Agent Migration Reviews | postgres-schema-snapshots-agent-migration-reviews | postgres schema diff | /docs/mcp-tools/, /docs/architecture/, /blog/database-migration-testing-agent-pr/, /blog/what-is-database-sandbox/, /blog/how-to-clone-postgres-database-sandbox/ | Astro Markdown source of truth; uses the review-grade schema snapshot contract as the information-gain framework. |
 | 2026-07-07 | How-to / tutorial | How to Use Postgres EXPLAIN Plans for Agent SQL Review | postgres-explain-plan-agent-sql | postgres explain plan | /docs/mcp-tools/, /docs/architecture/, /blog/how-to-create-postgres-test-database-agent-sql/, /blog/database-migration-testing-agent-pr/, /blog/postgres-schema-snapshots-agent-migration-reviews/ | Astro Markdown source of truth; uses the agent-specific EXPLAIN review contract as the information-gain framework. |
+| 2026-07-08 | How-to / tutorial | How to Run Agent SQL with Bounded Postgres Results | postgres-run-sql-bounded-results | postgres run sql | /docs/mcp-tools/, /docs/architecture/, /blog/what-is-database-sandbox/, /blog/postgres-explain-plan-agent-sql/, /blog/database-migration-testing-agent-pr/, /blog/how-to-create-postgres-test-database-agent-sql/ | Astro Markdown source of truth; uses the bounded result envelope and PR-ready SQL proof contract as the information-gain framework. |
 
 ## Removed
 
@@ -23,13 +24,12 @@
 
 ## Candidate Backlog
 
-Last researched: 2026-07-07
+Last researched: 2026-07-08
 
 | Rank | Score | Proposed Type | Title | Target Keyword | Volume | KD | Intent | SERP Read | Why It Fits |
 | --- | ---: | --- | --- | --- | ---: | ---: | --- | --- | --- |
-| 1 | 18 | How-to / tutorial | How to Run Agent SQL with Bounded Postgres Results | postgres run sql | TBD | TBD | Informational / operational | Web fallback shows recurring interest in safe Postgres MCP SQL execution, row limits, and read-only access; no DataForSEO credentials available for volume/KD. | Strong product-led fit around `run_sql`, `readonly`, typed result sets, row limits, and PR evidence. Distinct from EXPLAIN because it covers execution output after plan review. |
-| 2 | 16 | Guide / checklist | Postgres MCP Server Error Handling for Coding Agents | postgres mcp server errors | TBD | TBD | Informational | Repo has structured SQLSTATE, timeout, version, auth, readonly, and validation categories; generic SERPs under-cover agent-readable database errors. | Differentiated by PGSandbox's compact error envelope and remediation hints; useful AEO surface for troubleshooting. |
-| 3 | 15 | How-to / tutorial | How to Use Local Postgres Versions with Coding Agents | local postgres version | TBD | TBD | Informational | Repo supports managed local Postgres versions 13-18; current blog has no dedicated version-selection tutorial. | Product-led fit for `postgresVersion`, `list_profiles`, managed local profiles, and migration compatibility checks. |
+| 1 | 16 | Guide / checklist | Postgres MCP Server Error Handling for Coding Agents | postgres mcp server errors | TBD | TBD | Informational | Repo has structured SQLSTATE, timeout, version, auth, readonly, and validation categories; generic SERPs under-cover agent-readable database errors. | Differentiated by PGSandbox's compact error envelope and remediation hints; useful AEO surface for troubleshooting. |
+| 2 | 15 | How-to / tutorial | How to Use Local Postgres Versions with Coding Agents | local postgres version | TBD | TBD | Informational | Repo supports managed local Postgres versions 13-18; current blog has no dedicated version-selection tutorial. | Product-led fit for `postgresVersion`, `list_profiles`, managed local profiles, and migration compatibility checks. |
 
 ## Notes
 
@@ -45,3 +45,4 @@ Last researched: 2026-07-07
 - 2026-07-05 06:00 UTC cron selected the top remaining backlog candidate automatically per cron instruction. DataForSEO helper was installed but credentials were unavailable in the cron environment, so live keyword volume/KD stayed `TBD` and the run used web/primary-source fallback. New source-of-truth content file: `site/src/content/blog/postgres-template-database-vs-task-sandbox.md`.
 - 2026-07-06 cron selected the top remaining backlog candidate automatically per cron instruction. DataForSEO helper was installed but `DATAFORSEO_LOGIN` / `DATAFORSEO_PASSWORD` were unavailable, so live keyword volume/KD stayed `TBD` and the run used web/primary-source fallback. New source-of-truth content file: `site/src/content/blog/postgres-schema-snapshots-agent-migration-reviews.md`.
 - 2026-07-07 cron selected the refresh/backlog candidate automatically per cron instruction. DataForSEO helper was installed but credentials were unavailable, so live keyword volume/KD stayed `TBD` and the run used web/primary-source fallback. New source-of-truth content file: `site/src/content/blog/postgres-explain-plan-agent-sql.md`.
+- 2026-07-08 cron selected the top remaining backlog candidate automatically per cron instruction. DataForSEO skill metadata was present but the helper script was unavailable in this environment, so live keyword volume/KD stayed `TBD` and the run used web/primary-source fallback. New source-of-truth content file: `site/src/content/blog/postgres-run-sql-bounded-results.md`.

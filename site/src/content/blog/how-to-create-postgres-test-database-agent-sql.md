@@ -146,7 +146,7 @@ The row limit matters. A generated `SELECT *` against a realistic table can dump
 
 When the generated SQL is more than a trivial lookup, inspect the [Postgres EXPLAIN plan for agent SQL review](https://pgsandbox-mcp.lvtd.dev/blog/postgres-explain-plan-agent-sql/) before you run it. The plan gives the reviewer a pre-execution check on relation names, node types, row estimates, and whether the agent's query is narrower than a broad table scan.
 
-PGSandbox's `run_sql` tool executes through the sandbox role and returns bounded results. For agent work, that is a better default than exposing a general admin SQL shell. The agent can still write a bad query. It gets a smaller place to be wrong and a smaller result envelope to reason over.
+PGSandbox's `run_sql` tool executes through the sandbox role and returns bounded results. For agent work, that is a better default than exposing a general admin SQL shell. The agent can still write a bad query. It gets a smaller place to be wrong and a smaller result envelope to reason over. The [bounded `run_sql` workflow](https://pgsandbox-mcp.lvtd.dev/blog/postgres-run-sql-bounded-results/) covers readonly mode, `rowLimit`, typed result sets, and PR-ready result summaries in more detail.
 
 For migrations and generated SQL patches, a useful proof record includes:
 

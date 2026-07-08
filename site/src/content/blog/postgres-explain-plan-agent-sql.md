@@ -25,7 +25,7 @@ The agent-safe sequence is:
 3. Ask Postgres for a JSON EXPLAIN plan.
 4. Review relation names, node types, estimated rows, and total cost.
 5. Fix the query or schema if the plan contradicts the task.
-6. Run `run_sql` with `readonly: true` and a bounded `rowLimit` for read proof.
+6. Run [`run_sql` with bounded Postgres results](https://pgsandbox-mcp.lvtd.dev/blog/postgres-run-sql-bounded-results/) using `readonly: true` and a small `rowLimit` for read proof.
 7. Use an intentional mutation path only after review.
 8. Delete the sandbox or let TTL cleanup handle it.
 
@@ -165,7 +165,7 @@ Do not treat every sequential scan as a bug. A sequential scan over a tiny fixtu
 
 ## Step 4: use bounded SQL proof after the plan passes
 
-After the plan passes review, run a bounded proof query.
+After the plan passes review, run a [bounded proof query](https://pgsandbox-mcp.lvtd.dev/blog/postgres-run-sql-bounded-results/).
 
 PGSandbox's `run_sql` executes through sandbox role credentials, not the admin connection. Its docs define a default `rowLimit` of 100, allow `rowLimit: 0` for a zero-row preview, cap returned rows at 1000, and return ordered per-statement result sets for multi-statement SQL (https://pgsandbox-mcp.lvtd.dev/docs/mcp-tools/).
 
