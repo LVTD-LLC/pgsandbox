@@ -115,7 +115,7 @@ PostgreSQL `GRANT` controls privileges on database objects and role membership (
 
 Agents do not need unbounded data dumps to do most backend work.
 
-For migration validation, they usually need schema inspection, row counts, sample rows, and structured error messages. For bug reproduction, they need the failing shape, not every customer record. For generated SQL review, they need the query result and the plan, not a full table export. If the tool fails, the agent should follow a [Postgres MCP server error handling runbook](https://pgsandbox-mcp.lvtd.dev/blog/postgres-mcp-server-error-handling-coding-agents/) that branches on stable codes, categories, SQLSTATE, and hints.
+For migration validation, they usually need schema inspection, row counts, sample rows, and structured error messages. For bug reproduction, they need the failing shape, not every customer record. For generated SQL review, they need the query result and the plan, not a full table export. If the tool fails, the agent should follow a [Postgres MCP server error handling runbook](https://pgsandbox.lvtd.dev/blog/postgres-mcp-server-error-handling-coding-agents/) that branches on stable codes, categories, SQLSTATE, and hints.
 
 A good Postgres MCP server should make bounded results the default:
 
