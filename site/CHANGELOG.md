@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-07-09
+
+- Added the Astro Markdown blog post "Postgres MCP Server Error Handling for Coding Agents" with SEO ledger, link inventory, and inbound blog links.
+
 ## 2026-07-08
 
 - Released `pgsandbox` v0.4.7 with actionable local Postgres install diagnostics, consistent managed-local profile resolution, restore compatibility classification for filtered clone archives, and structured clone timeout cleanup details.

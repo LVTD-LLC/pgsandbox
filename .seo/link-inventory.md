@@ -33,6 +33,7 @@
 | /blog/postgres-schema-snapshots-agent-migration-reviews/ | How to Use Postgres Schema Snapshots for Agent Migration Reviews | postgres schema snapshots; postgres schema diff; schema snapshots for migration review; agent migration schema diff; before and after schema checkpoint | How-to tutorial for using named schema snapshots and compact diffs as agent migration review evidence. |
 | /blog/postgres-explain-plan-agent-sql/ | How to Use Postgres EXPLAIN Plans for Agent SQL Review | Postgres EXPLAIN plan for agent SQL; explain_query workflow; agent SQL plan review; query plan evidence for coding agents; EXPLAIN JSON sandbox review | How-to tutorial for using non-executing EXPLAIN plans, bounded SQL proof, and cleanup as an agent SQL review contract. |
 | /blog/postgres-run-sql-bounded-results/ | How to Run Agent SQL with Bounded Postgres Results | bounded Postgres results; run agent SQL safely; run_sql bounded proof; Postgres rowLimit workflow; agent SQL result envelope | How-to tutorial for using `run_sql`, readonly mode, row limits, typed result sets, and PR-ready SQL proof summaries. |
+| /blog/postgres-mcp-server-error-handling-coding-agents/ | Postgres MCP Server Error Handling for Coding Agents | Postgres MCP server error handling; MCP error handling for coding agents; stable Postgres MCP errors; SQLSTATE remediation envelope; agent database error runbook | Guide/checklist for branching on stable `errors[].code`, `category`, SQLSTATE, hints, and diagnostic handles instead of retrying blindly. |
 
 ## Changelog
 
