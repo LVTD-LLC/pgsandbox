@@ -18,9 +18,9 @@ use crate::{
         CreateTemplateFromSandboxInput, DatabaseSelector, DeleteSchemaSnapshotInput,
         DeleteTemplateInput, DescribeSchemaInput, DiffSchemaSnapshotInput, ExplainQueryInput,
         ListDatabasesInput, ListExtensionsInput, ListProfilesInput, ListSchemaSnapshotsInput,
-        ListTemplatesInput, PostgresSandboxManager, PrepareForRepoInput, ResolvedTargetContext,
-        RunRepoCommandInput, RunSqlInput, SchemaDiffInput, SeedDatabaseInput, UnknownProfileError,
-        ValidateSchemaChangeInput,
+        ListTemplatesInput, PostgresSandboxManager, PrepareForRepoInput, RepoCommandConnectionMode,
+        ResolvedTargetContext, RunRepoCommandInput, RunSqlInput, SchemaDiffInput,
+        SeedDatabaseInput, UnknownProfileError, ValidateSchemaChangeInput,
     },
     telemetry::{properties, Telemetry, EVENT_MCP_SERVER_STARTED, EVENT_MCP_TOOL_COMPLETED},
 };
@@ -523,19 +523,13 @@ impl PgsandboxServer {
     }
 
     #[tool(
-        description = "Run an explicit repo command against a sandbox database with DATABASE_URL and PG* env vars scoped to the sandbox."
+        description = "Run a direct repo command against a sandbox with bounded optional stdin, validated database URL aliases or Docker localContainer mode, and redacted/filterable bounded output; row/schema changes are untracked (changedObjects=null with a reason)."
     )]
     async fn run_repo_command(
         &self,
         Parameters(input): Parameters<RunRepoCommandInput>,
     ) -> Result<CallToolResult, ErrorData> {
-        let event_properties = properties([
-            ("hasProfile", json!(input.profile.is_some())),
-            ("hasDatabaseId", json!(input.database_id.is_some())),
-            ("hasDatabaseName", json!(input.database_name.is_some())),
-            ("hasCommand", json!(input.command.is_some())),
-            ("hasTimeout", json!(input.timeout_seconds.is_some())),
-        ]);
+        let event_properties = run_repo_command_event_properties(&input);
         self.tracked_tool(
             "run_repo_command",
             event_properties,
@@ -683,29 +677,14 @@ impl PgsandboxServer {
         .await
     }
 
-    #[tool(description = "List sandbox databases known to PGSandbox.")]
+    #[tool(
+        description = "List active sandbox databases known to PGSandbox; expired rows are excluded by default, and includeExpired=true reveals them."
+    )]
     async fn list_databases(
         &self,
         Parameters(input): Parameters<ListDatabasesInput>,
     ) -> Result<CallToolResult, ErrorData> {
-        let event_properties = properties([
-            ("hasProfile", json!(input.profile.is_some())),
-            (
-                "hasPostgresVersion",
-                json!(input.postgres_version.is_some()),
-            ),
-            (
-                "includeAllVersions",
-                json!(
-                    input.include_all_versions.unwrap_or(false)
-                        || input
-                            .postgres_version
-                            .as_deref()
-                            .is_some_and(|version| version.trim() == "*")
-                ),
-            ),
-            ("hasOwnerFilter", json!(input.owner.is_some())),
-        ]);
+        let event_properties = list_databases_event_properties(&input);
         self.tracked_tool(
             "list_databases",
             event_properties,
@@ -798,6 +777,62 @@ fn selector_properties(input: &DatabaseSelector) -> Map<String, Value> {
         ),
         ("hasDatabaseId", json!(input.database_id.is_some())),
         ("hasDatabaseName", json!(input.database_name.is_some())),
+    ])
+}
+
+fn run_repo_command_event_properties(input: &RunRepoCommandInput) -> Map<String, Value> {
+    let connection_mode = match input
+        .connection_mode
+        .unwrap_or(RepoCommandConnectionMode::Direct)
+    {
+        RepoCommandConnectionMode::Direct => "direct",
+        RepoCommandConnectionMode::LocalContainer => "localContainer",
+    };
+    properties([
+        ("hasProfile", json!(input.profile.is_some())),
+        ("hasDatabaseId", json!(input.database_id.is_some())),
+        ("hasDatabaseName", json!(input.database_name.is_some())),
+        ("hasCommand", json!(input.command.is_some())),
+        ("hasTimeout", json!(input.timeout_seconds.is_some())),
+        ("hasStdin", json!(input.stdin.is_some())),
+        (
+            "databaseUrlEnvNameCount",
+            json!(input.database_url_env_names.as_ref().map_or(0, Vec::len)),
+        ),
+        ("connectionMode", json!(connection_mode)),
+        ("stripAnsi", json!(input.strip_ansi.unwrap_or(false))),
+        ("stdoutLimit", json!(input.stdout_limit)),
+        ("stderrLimit", json!(input.stderr_limit)),
+        ("tailLines", json!(input.tail_lines)),
+        (
+            "suppressDockerLifecycle",
+            json!(input.suppress_docker_lifecycle.unwrap_or(false)),
+        ),
+    ])
+}
+
+fn list_databases_event_properties(input: &ListDatabasesInput) -> Map<String, Value> {
+    properties([
+        ("hasProfile", json!(input.profile.is_some())),
+        (
+            "hasPostgresVersion",
+            json!(input.postgres_version.is_some()),
+        ),
+        (
+            "includeAllVersions",
+            json!(
+                input.include_all_versions.unwrap_or(false)
+                    || input
+                        .postgres_version
+                        .as_deref()
+                        .is_some_and(|version| version.trim() == "*")
+            ),
+        ),
+        (
+            "includeExpired",
+            json!(input.include_expired.unwrap_or(false)),
+        ),
+        ("hasOwnerFilter", json!(input.owner.is_some())),
     ])
 }
 
@@ -2342,6 +2377,58 @@ mod tests {
         assert!(sanitized.contains("'postgres://pg:****@127.0.0.1/db'"));
         assert!(!sanitized.contains("secret@"));
         assert!(!sanitized.contains("another-secret@"));
+    }
+
+    #[test]
+    fn repo_workflow_metadata_is_agent_readable_and_privacy_safe() {
+        let repo_input = RunRepoCommandInput {
+            repo_path: "/tmp/repo".to_string(),
+            profile: None,
+            postgres_version: None,
+            database_id: Some("db-id".to_string()),
+            database_name: None,
+            command: Some(vec!["python".to_string(), "-".to_string()]),
+            timeout_seconds: Some(30),
+            stdin: Some("private script body".to_string()),
+            database_url_env_names: Some(vec![
+                "PRIVATE_DATABASE_URI".to_string(),
+                "PRIVATE_PG_URL".to_string(),
+            ]),
+            connection_mode: Some(crate::postgres::RepoCommandConnectionMode::LocalContainer),
+            strip_ansi: Some(true),
+            stdout_limit: Some(1_200),
+            stderr_limit: Some(2_400),
+            tail_lines: Some(25),
+            suppress_docker_lifecycle: Some(true),
+        };
+        let repo_properties = run_repo_command_event_properties(&repo_input);
+
+        assert_eq!(repo_properties["hasStdin"], true);
+        assert_eq!(repo_properties["databaseUrlEnvNameCount"], 2);
+        assert_eq!(repo_properties["connectionMode"], "localContainer");
+        assert_eq!(repo_properties["stripAnsi"], true);
+        assert_eq!(repo_properties["stdoutLimit"], 1_200);
+        assert_eq!(repo_properties["stderrLimit"], 2_400);
+        assert_eq!(repo_properties["tailLines"], 25);
+        assert_eq!(repo_properties["suppressDockerLifecycle"], true);
+        let serialized = serde_json::to_string(&repo_properties).unwrap();
+        assert!(!serialized.contains("private script body"));
+        assert!(!serialized.contains("PRIVATE_DATABASE_URI"));
+        assert!(!serialized.contains("PRIVATE_PG_URL"));
+
+        let list_properties = list_databases_event_properties(&ListDatabasesInput {
+            profile: None,
+            postgres_version: None,
+            include_all_versions: Some(false),
+            include_expired: Some(true),
+            owner: None,
+        });
+        assert_eq!(list_properties["includeExpired"], true);
+
+        let source = include_str!("mcp.rs");
+        assert!(source.contains("bounded optional stdin"));
+        assert!(source.contains("changedObjects=null"));
+        assert!(source.contains("includeExpired=true"));
     }
 
     #[test]

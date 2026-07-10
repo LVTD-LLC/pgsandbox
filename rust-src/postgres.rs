@@ -63,6 +63,9 @@ const MAX_COMMAND_OUTPUT_BYTES: usize = 8_000;
 const MAX_WORKFLOW_COMMAND_PARTS: usize = 16;
 const MAX_WORKFLOW_COMMAND_TOTAL_BYTES: usize = 2_048;
 const MAX_WORKFLOW_COMMAND_PART_BYTES: usize = 256;
+const MAX_WORKFLOW_STDIN_BYTES: usize = 65_536;
+const MAX_DATABASE_URL_ENV_NAMES: usize = 16;
+const MAX_REPO_COMMAND_REDACTION_OVERLAP_BYTES: usize = 256;
 const MAX_PROFILE_HINTS: usize = 20;
 const TEMPLATE_PRIVACY_WARNING: &str =
     "Templates are local PGSandbox artifacts. Do not create templates from production or sensitive data unless you have explicitly sanitized it.";
@@ -72,6 +75,8 @@ const DIRECT_CONNECTION_USAGE: &str =
     "Use from host commands, MCP repo commands, and tools running directly on this machine.";
 const LOCAL_CONTAINER_CONNECTION_USAGE: &str =
     "Use from Dockerized app services running on this machine. Docker Desktop supports host.docker.internal automatically; on Linux Docker add extra_hosts: [\"host.docker.internal:host-gateway\"] to the service.";
+const REPO_COMMAND_CHANGE_TRACKING_UNSUPPORTED: &str =
+    "run_repo_command cannot reliably observe row or schema writes made by the command or its child processes; inspect the sandbox with run_sql/schema_digest when side effects matter.";
 
 static CURSOR_QUERY_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?is)^\s*(?:--[^\n]*(?:\n|$)|/\*.*?\*/\s*)*(select|with|values|table)\b")
@@ -82,6 +87,9 @@ static TYPED_ROW_PREFIX_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?is)^\s*(?:--[^\n]*(?:\n|$)|/\*.*?\*/\s*)*(show|explain)\b")
         .expect("typed row prefix regex compiles")
 });
+
+static ANSI_ESCAPE_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\x1b\[[0-?]*[ -/]*[@-~]").expect("ANSI escape regex compiles"));
 
 #[derive(Clone)]
 pub struct PostgresSandboxManager {
@@ -324,6 +332,10 @@ pub struct ListDatabasesInput {
     pub profile: Option<String>,
     pub postgres_version: Option<String>,
     pub include_all_versions: Option<bool>,
+    #[schemars(
+        description = "Include expired-but-not-deleted sandboxes. Defaults to false so active listings stay focused on usable databases."
+    )]
+    pub include_expired: Option<bool>,
     pub owner: Option<String>,
 }
 
@@ -423,6 +435,47 @@ pub struct RunRepoCommandInput {
     pub database_name: Option<String>,
     pub command: Option<Vec<String>>,
     pub timeout_seconds: Option<u64>,
+    #[schemars(
+        description = "Optional UTF-8 content written to the command's standard input. The maximum is 65,536 bytes and NUL characters are rejected. Use this with direct interpreters such as ['python', '-'] to run multi-line scripts without creating repo files."
+    )]
+    pub stdin: Option<String>,
+    #[schemars(
+        length(max = 16),
+        description = "Optional additional environment variable names that receive the selected sandbox connection URL. At most 16 names are accepted; PATH and libpq connection variables are reserved case-insensitively."
+    )]
+    pub database_url_env_names: Option<Vec<String>>,
+    #[schemars(
+        description = "Choose the direct host-local URL or the Docker-friendly localContainer URL for the command environment."
+    )]
+    pub connection_mode: Option<RepoCommandConnectionMode>,
+    #[schemars(description = "Strip ANSI terminal escape sequences from captured output.")]
+    pub strip_ansi: Option<bool>,
+    #[schemars(
+        range(max = 8000),
+        description = "Maximum stdout bytes returned after output filtering, from 0 through 8,000."
+    )]
+    pub stdout_limit: Option<usize>,
+    #[schemars(
+        range(max = 8000),
+        description = "Maximum stderr bytes returned after output filtering, from 0 through 8,000."
+    )]
+    pub stderr_limit: Option<usize>,
+    #[schemars(
+        range(max = 1000),
+        description = "Return only the last N lines from each output stream, from 0 through 1,000."
+    )]
+    pub tail_lines: Option<usize>,
+    #[schemars(
+        description = "Suppress common Docker Compose container/network lifecycle status lines while preserving application output."
+    )]
+    pub suppress_docker_lifecycle: Option<bool>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, JsonSchema, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum RepoCommandConnectionMode {
+    Direct,
+    LocalContainer,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -1035,6 +1088,8 @@ pub struct WorkflowEnvelope<T: Serialize> {
     pub ok: bool,
     pub summary: String,
     pub changed_objects: Option<SchemaChangeCounts>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub changed_objects_unsupported_reason: Option<String>,
     pub warnings: Vec<String>,
     pub errors: Vec<WorkflowError>,
     pub detail_handles: Vec<Value>,
@@ -1371,6 +1426,38 @@ struct RepoPostgresVersionInference {
 struct RepoPostgresVersionResolution {
     version: Option<String>,
     source: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct DatabaseExpiryStatus {
+    expired: bool,
+    ttl_status: &'static str,
+    expires_in_seconds: i64,
+}
+
+#[derive(Debug)]
+struct RepoCommandExecutionOptions {
+    stdin: Option<String>,
+    database_url_env_names: Vec<String>,
+    strip_ansi: bool,
+    stdout_limit: usize,
+    stderr_limit: usize,
+    tail_lines: Option<usize>,
+    suppress_docker_lifecycle: bool,
+}
+
+impl Default for RepoCommandExecutionOptions {
+    fn default() -> Self {
+        Self {
+            stdin: None,
+            database_url_env_names: Vec::new(),
+            strip_ansi: false,
+            stdout_limit: MAX_COMMAND_OUTPUT_BYTES,
+            stderr_limit: MAX_COMMAND_OUTPUT_BYTES,
+            tail_lines: None,
+            suppress_docker_lifecycle: false,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -2206,6 +2293,7 @@ impl PostgresSandboxManager {
         &self,
         input: ListDatabasesInput,
     ) -> anyhow::Result<ListDatabasesOutput> {
+        let include_expired = input.include_expired.unwrap_or(false);
         if all_versions_requested(
             input.postgres_version.as_deref(),
             input.include_all_versions,
@@ -2225,7 +2313,7 @@ impl PostgresSandboxManager {
             let mut truncated = false;
             for profile in &profiles {
                 match self
-                    .list_databases_for_profile(profile, input.owner.as_ref())
+                    .list_databases_for_profile(profile, input.owner.as_ref(), include_expired)
                     .await
                 {
                     Ok(result) => {
@@ -2250,7 +2338,7 @@ impl PostgresSandboxManager {
 
         let profile =
             self.resolve_profile(input.profile.as_deref(), input.postgres_version.as_deref())?;
-        self.list_databases_for_profile(&profile, input.owner.as_ref())
+        self.list_databases_for_profile(&profile, input.owner.as_ref(), include_expired)
             .await
     }
 
@@ -2258,27 +2346,15 @@ impl PostgresSandboxManager {
         &self,
         profile: &SandboxProfile,
         owner: Option<&String>,
+        include_expired: bool,
     ) -> anyhow::Result<ListDatabasesOutput> {
         let (client, connection_task) = connect_admin(profile).await?;
         ensure_metadata_table(&client, profile).await?;
         let owner = owner.map(String::as_str);
         let rows = client
             .query(
-                &format!(
-                    r#"
-                      SELECT database_id, profile_name, database_name, role_name, owner, purpose, labels,
-                             created_at, expires_at, deleted_at
-                      FROM {}
-                      WHERE profile_name = $1
-                        AND deleted_at IS NULL
-                        AND ($2::text IS NULL OR owner = $2)
-                      ORDER BY created_at DESC
-                      LIMIT {}
-                    "#,
-                    quote_ident(METADATA_TABLE)?,
-                    LIST_DATABASES_LIMIT + 1
-                ),
-                &[&profile.name, &owner],
+                &list_databases_selection_sql()?,
+                &[&profile.name, &owner, &include_expired],
             )
             .await?;
         drop(client);
@@ -2921,24 +2997,61 @@ impl PostgresSandboxManager {
                 None,
             ));
         }
+        if let Err(error) = validate_repo_command_stdin(input.stdin.as_deref()) {
+            return Ok(workflow_failure("Repo command was not run.", error, None));
+        }
+        let database_url_env_names = input.database_url_env_names.unwrap_or_default();
+        if let Err(error) = validate_database_url_env_names(&database_url_env_names) {
+            return Ok(workflow_failure("Repo command was not run.", error, None));
+        }
+        if let Err(error) = validate_repo_command_output_options(
+            input.stdout_limit,
+            input.stderr_limit,
+            input.tail_lines,
+        ) {
+            return Ok(workflow_failure("Repo command was not run.", error, None));
+        }
         let command = match resolve_repo_schema_command(&repo_path, input.command)? {
             Ok(command) => command,
             Err(error) => return Ok(workflow_failure("Repo command was not run.", error, None)),
         };
         let timeout = workflow_timeout(input.timeout_seconds);
-        let postgres_version =
-            resolve_repo_postgres_version(&repo_path, input.postgres_version.clone())?;
+        let postgres_version = repo_command_selector_postgres_version(
+            &repo_path,
+            input.database_id.as_deref(),
+            input.postgres_version.clone(),
+        )?;
         let connection = self
             .get_connection_string(DatabaseSelector {
                 profile: input.profile,
-                postgres_version: postgres_version.version,
+                postgres_version,
                 database_id: input.database_id,
                 database_name: input.database_name,
             })
             .await?;
-        let command_result =
-            execute_repo_command(&repo_path, &command, &connection.connection_string, timeout)
-                .await?;
+        let database_url =
+            match repo_command_database_url(&connection.connection_string, input.connection_mode) {
+                Ok(database_url) => database_url,
+                Err(error) => {
+                    return Ok(workflow_failure("Repo command was not run.", error, None))
+                }
+            };
+        let command_result = execute_repo_command(
+            &repo_path,
+            &command,
+            &database_url,
+            timeout,
+            RepoCommandExecutionOptions {
+                stdin: input.stdin,
+                database_url_env_names,
+                strip_ansi: input.strip_ansi.unwrap_or(false),
+                stdout_limit: input.stdout_limit.unwrap_or(MAX_COMMAND_OUTPUT_BYTES),
+                stderr_limit: input.stderr_limit.unwrap_or(MAX_COMMAND_OUTPUT_BYTES),
+                tail_lines: input.tail_lines,
+                suppress_docker_lifecycle: input.suppress_docker_lifecycle.unwrap_or(false),
+            },
+        )
+        .await?;
         let output = command_workflow_output(
             &connection.database_id,
             &connection.database_name,
@@ -2947,9 +3060,8 @@ impl PostgresSandboxManager {
         let ok = output.exit_code == Some(0);
 
         Ok(if ok {
-            workflow_success(
+            workflow_success_without_change_tracking(
                 "Repo command completed successfully.",
-                None,
                 Vec::new(),
                 vec![json!({
                     "type": "repo-command-run",
@@ -2958,7 +3070,7 @@ impl PostgresSandboxManager {
                 output,
             )
         } else {
-            workflow_failure(
+            workflow_failure_without_change_tracking(
                 "Repo command failed.",
                 command_failure_workflow_error(
                     "Repo command",
@@ -3066,6 +3178,7 @@ impl PostgresSandboxManager {
             &command,
             &connection.connection_string,
             timeout,
+            RepoCommandExecutionOptions::default(),
         )
         .await
         {
@@ -3234,9 +3347,14 @@ impl PostgresSandboxManager {
                 database_name: input.database_name,
             })
             .await?;
-        let command_result =
-            execute_repo_command(&repo_path, &command, &connection.connection_string, timeout)
-                .await?;
+        let command_result = execute_repo_command(
+            &repo_path,
+            &command,
+            &connection.connection_string,
+            timeout,
+            RepoCommandExecutionOptions::default(),
+        )
+        .await?;
         let output = command_workflow_output(
             &connection.database_id,
             &connection.database_name,
@@ -3820,11 +3938,24 @@ fn workflow_success<T: Serialize>(
         ok: true,
         summary: summary.into(),
         changed_objects,
+        changed_objects_unsupported_reason: None,
         warnings,
         errors: Vec::new(),
         detail_handles,
         result: Some(result),
     }
+}
+
+fn workflow_success_without_change_tracking<T: Serialize>(
+    summary: impl Into<String>,
+    warnings: Vec<String>,
+    detail_handles: Vec<Value>,
+    result: T,
+) -> WorkflowEnvelope<T> {
+    let mut envelope = workflow_success(summary, None, warnings, detail_handles, result);
+    envelope.changed_objects_unsupported_reason =
+        Some(REPO_COMMAND_CHANGE_TRACKING_UNSUPPORTED.to_string());
+    envelope
 }
 
 fn workflow_failure<T: Serialize>(
@@ -3833,6 +3964,18 @@ fn workflow_failure<T: Serialize>(
     result: Option<T>,
 ) -> WorkflowEnvelope<T> {
     workflow_failure_with_changes(summary, SchemaChangeCounts::default(), error, result)
+}
+
+fn workflow_failure_without_change_tracking<T: Serialize>(
+    summary: impl Into<String>,
+    error: WorkflowError,
+    result: Option<T>,
+) -> WorkflowEnvelope<T> {
+    let mut envelope = workflow_failure(summary, error, result);
+    envelope.changed_objects = None;
+    envelope.changed_objects_unsupported_reason =
+        Some(REPO_COMMAND_CHANGE_TRACKING_UNSUPPORTED.to_string());
+    envelope
 }
 
 fn workflow_failure_with_changes<T: Serialize>(
@@ -3846,6 +3989,7 @@ fn workflow_failure_with_changes<T: Serialize>(
         ok: false,
         summary: summary.into(),
         changed_objects: Some(changed_objects),
+        changed_objects_unsupported_reason: None,
         warnings: Vec::new(),
         errors: vec![error],
         detail_handles: Vec::new(),
@@ -4516,6 +4660,18 @@ fn default_database_url_env() -> String {
     "DATABASE_URL".to_string()
 }
 
+fn repo_command_selector_postgres_version(
+    repo_path: &Path,
+    database_id: Option<&str>,
+    explicit_postgres_version: Option<String>,
+) -> anyhow::Result<Option<String>> {
+    if database_id.is_some() {
+        return Ok(explicit_postgres_version.map(|version| normalize_postgres_version(&version)));
+    }
+
+    Ok(resolve_repo_postgres_version(repo_path, explicit_postgres_version)?.version)
+}
+
 fn infer_repo_postgres_version(
     repo_path: &Path,
 ) -> anyhow::Result<Option<RepoPostgresVersionInference>> {
@@ -4829,6 +4985,101 @@ fn validate_workflow_command(command: &[String], label: &str) -> Result<(), Work
     Ok(())
 }
 
+fn validate_repo_command_stdin(stdin: Option<&str>) -> Result<(), WorkflowError> {
+    let Some(stdin) = stdin else {
+        return Ok(());
+    };
+    if stdin.contains('\0') {
+        return Err(workflow_error(
+            "invalid_stdin",
+            "Repo command stdin cannot contain NUL characters.",
+            Some("Pass UTF-8 text without NUL bytes.".to_string()),
+        ));
+    }
+    if stdin.len() > MAX_WORKFLOW_STDIN_BYTES {
+        return Err(workflow_error(
+            "stdin_too_large",
+            format!(
+                "Repo command stdin is {} bytes; the maximum is {MAX_WORKFLOW_STDIN_BYTES} bytes.",
+                stdin.len()
+            ),
+            Some(
+                "Use a shorter script or an existing executable repo script for larger workflows."
+                    .to_string(),
+            ),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_database_url_env_names(names: &[String]) -> Result<(), WorkflowError> {
+    const RESERVED: &[&str] = &[
+        "PATH",
+        "PGHOST",
+        "PGPORT",
+        "PGDATABASE",
+        "PGUSER",
+        "PGPASSWORD",
+        "PGSSLMODE",
+        "PGSSLROOTCERT",
+        "PGSSLCERT",
+        "PGSSLKEY",
+    ];
+    if names.len() > MAX_DATABASE_URL_ENV_NAMES {
+        return Err(workflow_error(
+            "too_many_env_aliases",
+            format!(
+                "databaseUrlEnvNames contains {} names; the maximum is {MAX_DATABASE_URL_ENV_NAMES}.",
+                names.len()
+            ),
+            Some("Pass only the application database URL variables needed by this command.".to_string()),
+        ));
+    }
+
+    for name in names {
+        let valid = !name.is_empty()
+            && name.len() <= 64
+            && name.bytes().enumerate().all(|(index, byte)| {
+                byte == b'_' || byte.is_ascii_alphabetic() || (index > 0 && byte.is_ascii_digit())
+            });
+        let normalized_name = name.to_ascii_uppercase();
+        if !valid || RESERVED.contains(&normalized_name.as_str()) {
+            return Err(workflow_error(
+                "invalid_env_alias",
+                format!("databaseUrlEnvNames contains invalid or reserved name `{name}`."),
+                Some("Use application-specific names such as DATABASE_URI, SQLALCHEMY_DATABASE_URI, or PG_URL. Libpq PG* variables and PATH are managed by PGSandbox.".to_string()),
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_repo_command_output_options(
+    stdout_limit: Option<usize>,
+    stderr_limit: Option<usize>,
+    tail_lines: Option<usize>,
+) -> Result<(), WorkflowError> {
+    if stdout_limit.is_some_and(|limit| limit > MAX_COMMAND_OUTPUT_BYTES)
+        || stderr_limit.is_some_and(|limit| limit > MAX_COMMAND_OUTPUT_BYTES)
+    {
+        return Err(workflow_error(
+            "invalid_output_limit",
+            format!(
+                "stdoutLimit and stderrLimit must be between 0 and {MAX_COMMAND_OUTPUT_BYTES} bytes."
+            ),
+            Some("Use tailLines to retain the end of noisy output within the bounded response.".to_string()),
+        ));
+    }
+    if tail_lines.is_some_and(|lines| lines > 1_000) {
+        return Err(workflow_error(
+            "invalid_tail_lines",
+            "tailLines must be between 0 and 1000.",
+            Some("Request only the final lines needed to diagnose the command.".to_string()),
+        ));
+    }
+    Ok(())
+}
+
 fn workflow_command_bounds_error(command: &[String], label: &str) -> WorkflowError {
     let part_count = command.len();
     let total_len = command.iter().map(String::len).sum::<usize>();
@@ -4944,6 +5195,7 @@ async fn execute_repo_command(
     command: &[String],
     database_url: &str,
     timeout: StdDuration,
+    mut options: RepoCommandExecutionOptions,
 ) -> anyhow::Result<CommandRunResult> {
     if !repo_path.is_dir() {
         anyhow::bail!("repoPath is not a directory: {}", repo_path.display());
@@ -4951,20 +5203,30 @@ async fn execute_repo_command(
     if !command_is_bounded(command) {
         anyhow::bail!("command is empty or too large");
     }
-    let env = database_command_env(database_url)?;
+    let env = database_command_env(database_url, &options.database_url_env_names)?;
+    let redaction_password = env.get("PGPASSWORD").cloned();
     let started = std::time::Instant::now();
+    let deadline = time::Instant::now() + timeout;
     let mut command_builder = Command::new(&command[0]);
     apply_command_env(&mut command_builder, &env);
     configure_repo_command_process(&mut command_builder);
+    let stdin = options.stdin.take();
+    let has_stdin = stdin.is_some();
+    let capture_tail = options.tail_lines.is_some();
     let mut child = command_builder
         .args(&command[1..])
         .current_dir(repo_path)
-        .stdin(Stdio::null())
+        .stdin(if has_stdin {
+            Stdio::piped()
+        } else {
+            Stdio::null()
+        })
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .kill_on_drop(true)
         .spawn()
         .with_context(|| format!("failed to start command `{}`", command[0]))?;
+    let process_group_id = child.id();
     let stdout = child
         .stdout
         .take()
@@ -4973,33 +5235,117 @@ async fn execute_repo_command(
         .stderr
         .take()
         .context("stderr pipe was not available")?;
-    let stdout_task = tokio::spawn(read_bounded_output(stdout));
-    let stderr_task = tokio::spawn(read_bounded_output(stderr));
-    let status = match time::timeout(timeout, child.wait()).await {
-        Ok(status) => status?,
+    let mut stdin_task = stdin.and_then(|stdin| {
+        child.stdin.take().map(|mut child_stdin| {
+            tokio::spawn(async move {
+                child_stdin
+                    .write_all(stdin.as_bytes())
+                    .await
+                    .context("failed to write repo command stdin")?;
+                child_stdin
+                    .shutdown()
+                    .await
+                    .context("failed to close repo command stdin")?;
+                anyhow::Ok(())
+            })
+        })
+    });
+    let capture_limit = repo_command_capture_limit(database_url, redaction_password.as_deref());
+    let mut stdout_task = tokio::spawn(read_bounded_output_mode(
+        stdout,
+        capture_tail,
+        capture_limit,
+    ));
+    let mut stderr_task = tokio::spawn(read_bounded_output_mode(
+        stderr,
+        capture_tail,
+        capture_limit,
+    ));
+    let mut timed_out = false;
+    let mut stdin_delivery_error = None;
+    let mut stdout_result = None;
+    let mut stderr_result = None;
+    let exit_code = match time::timeout_at(deadline, child.wait()).await {
+        Ok(status) => status?.code(),
         Err(_) => {
-            terminate_repo_command(&mut child).await;
-            let (stdout, stdout_truncated) = stdout_task.await.context("stdout task failed")??;
-            let (stderr, stderr_truncated) = stderr_task.await.context("stderr task failed")??;
-            return Ok(CommandRunResult {
-                command: command.to_vec(),
-                elapsed_ms: started.elapsed().as_millis(),
-                exit_code: None,
-                timed_out: true,
-                stdout,
-                stderr: append_timeout_message(stderr, timeout),
-                stdout_truncated,
-                stderr_truncated,
-            });
+            timed_out = true;
+            None
         }
     };
-    let (stdout, stdout_truncated) = stdout_task.await.context("stdout task failed")??;
-    let (stderr, stderr_truncated) = stderr_task.await.context("stderr task failed")??;
+
+    if !timed_out {
+        if let Some(task) = stdin_task.as_mut() {
+            match time::timeout_at(deadline, task).await {
+                Ok(result) => {
+                    stdin_delivery_error = result.context("stdin task failed")?.err();
+                }
+                Err(_) => timed_out = true,
+            }
+        }
+    }
+    if !timed_out {
+        match time::timeout_at(deadline, &mut stdout_task).await {
+            Ok(result) => stdout_result = Some(result.context("stdout task failed")??),
+            Err(_) => timed_out = true,
+        }
+    }
+    if !timed_out {
+        match time::timeout_at(deadline, &mut stderr_task).await {
+            Ok(result) => stderr_result = Some(result.context("stderr task failed")??),
+            Err(_) => timed_out = true,
+        }
+    }
+
+    let (exit_code, stdout, stdout_truncated, stderr, stderr_truncated) = if timed_out {
+        if let Some(task) = stdin_task.as_ref() {
+            task.abort();
+        }
+        stdout_task.abort();
+        stderr_task.abort();
+        terminate_repo_command(&mut child, process_group_id).await;
+        (None, String::new(), false, String::new(), false)
+    } else {
+        if exit_code == Some(0) {
+            if let Some(error) = stdin_delivery_error {
+                return Err(error).context("repo command stdin delivery failed");
+            }
+        }
+        let (stdout, stdout_truncated) = stdout_result.context("stdout result was unavailable")?;
+        let (stderr, stderr_truncated) = stderr_result.context("stderr result was unavailable")?;
+        (
+            exit_code,
+            stdout,
+            stdout_truncated,
+            stderr,
+            stderr_truncated,
+        )
+    };
+    let stderr = if timed_out {
+        append_timeout_message(stderr, timeout)
+    } else {
+        stderr
+    };
+    let (stdout, stdout_truncated) = process_repo_command_output(
+        stdout,
+        stdout_truncated,
+        options.stdout_limit,
+        &options,
+        database_url,
+        redaction_password.as_deref(),
+    );
+    let (stderr, stderr_truncated) = process_repo_command_output(
+        stderr,
+        stderr_truncated,
+        options.stderr_limit,
+        &options,
+        database_url,
+        redaction_password.as_deref(),
+    );
     Ok(CommandRunResult {
         command: command.to_vec(),
         elapsed_ms: started.elapsed().as_millis(),
-        exit_code: status.code(),
-        timed_out: false,
+        exit_code,
+        timed_out,
         stdout,
         stderr,
         stdout_truncated,
@@ -5014,9 +5360,9 @@ fn configure_repo_command_process(command: &mut Command) {
     }
 }
 
-async fn terminate_repo_command(child: &mut tokio::process::Child) {
+async fn terminate_repo_command(child: &mut tokio::process::Child, process_group_id: Option<u32>) {
     #[cfg(unix)]
-    if let Some(process_group_id) = child.id().and_then(|pid| i32::try_from(pid).ok()) {
+    if let Some(process_group_id) = process_group_id.and_then(|pid| i32::try_from(pid).ok()) {
         // Negating the spawned child pid targets the process group created above.
         unsafe {
             libc::kill(-process_group_id, libc::SIGKILL);
@@ -5033,7 +5379,19 @@ fn apply_command_env(command: &mut Command, env: &BTreeMap<String, String>) {
     }
 }
 
+#[cfg(test)]
 async fn read_bounded_output<R>(mut reader: R) -> anyhow::Result<(String, bool)>
+where
+    R: AsyncRead + Unpin,
+{
+    read_bounded_output_mode(&mut reader, false, MAX_COMMAND_OUTPUT_BYTES).await
+}
+
+async fn read_bounded_output_mode<R>(
+    mut reader: R,
+    capture_tail: bool,
+    capture_limit: usize,
+) -> anyhow::Result<(String, bool)>
 where
     R: AsyncRead + Unpin,
 {
@@ -5045,20 +5403,126 @@ where
         if count == 0 {
             break;
         }
-        let remaining = MAX_COMMAND_OUTPUT_BYTES.saturating_sub(output.len());
-        if remaining > 0 {
-            let take = remaining.min(count);
-            output.extend_from_slice(&buffer[..take]);
-            if take < count {
+        if capture_tail {
+            output.extend_from_slice(&buffer[..count]);
+            if output.len() > capture_limit {
+                let excess = output.len() - capture_limit;
+                output.drain(..excess);
                 truncated = true;
-                break;
             }
         } else {
-            truncated = true;
-            break;
+            let remaining = capture_limit.saturating_sub(output.len());
+            let take = remaining.min(count);
+            output.extend_from_slice(&buffer[..take]);
+            truncated |= take < count;
         }
     }
     Ok((String::from_utf8_lossy(&output).to_string(), truncated))
+}
+
+fn repo_command_capture_limit(database_url: &str, database_password: Option<&str>) -> usize {
+    let longest_redaction_token = database_password
+        .map(str::len)
+        .unwrap_or(0)
+        .max(database_url.len());
+    let overlap = longest_redaction_token
+        .saturating_sub(1)
+        .min(MAX_REPO_COMMAND_REDACTION_OVERLAP_BYTES);
+    MAX_COMMAND_OUTPUT_BYTES + overlap
+}
+
+fn process_repo_command_output(
+    output: String,
+    mut truncated: bool,
+    limit: usize,
+    options: &RepoCommandExecutionOptions,
+    database_url: &str,
+    database_password: Option<&str>,
+) -> (String, bool) {
+    let mut output = output;
+    if options.strip_ansi {
+        output = ANSI_ESCAPE_RE.replace_all(&output, "").into_owned();
+    }
+    output = redact_repo_command_output(&output, database_url, database_password);
+    if options.suppress_docker_lifecycle {
+        output = output
+            .split_inclusive('\n')
+            .filter(|line| !is_docker_lifecycle_line(line))
+            .collect();
+    }
+    if let Some(tail_lines) = options.tail_lines {
+        let had_trailing_newline = output.ends_with('\n');
+        let lines = output.lines().collect::<Vec<_>>();
+        let start = lines.len().saturating_sub(tail_lines);
+        truncated |= start > 0;
+        output = lines[start..].join("\n");
+        if had_trailing_newline && !output.is_empty() {
+            output.push('\n');
+        }
+    }
+    let (output, limit_truncated) =
+        truncate_output_bytes(output, limit, options.tail_lines.is_some());
+    (output, truncated || limit_truncated)
+}
+
+fn redact_repo_command_output(
+    output: &str,
+    database_url: &str,
+    database_password: Option<&str>,
+) -> String {
+    let mut redacted = output.replace(database_url, "[REDACTED]");
+    if let Some(password) = database_password.filter(|password| !password.is_empty()) {
+        redacted = redacted.replace(password, "[REDACTED]");
+    }
+    redacted
+}
+
+fn is_docker_lifecycle_line(line: &str) -> bool {
+    let line = ANSI_ESCAPE_RE.replace_all(line, "");
+    let line = line.trim();
+    let lifecycle_subject = line.starts_with("Container ")
+        || line.starts_with("Network ")
+        || line.starts_with("Volume ")
+        || line.starts_with("[+]");
+    lifecycle_subject
+        && [
+            " Creating",
+            " Created",
+            " Starting",
+            " Started",
+            " Stopping",
+            " Stopped",
+            " Removing",
+            " Removed",
+            " Waiting",
+            " Healthy",
+            " Running",
+        ]
+        .iter()
+        .any(|status| line.contains(status))
+}
+
+fn truncate_output_bytes(mut output: String, limit: usize, keep_tail: bool) -> (String, bool) {
+    if output.len() <= limit {
+        return (output, false);
+    }
+    if limit == 0 {
+        return (String::new(), true);
+    }
+    if keep_tail {
+        let mut start = output.len() - limit;
+        while !output.is_char_boundary(start) {
+            start += 1;
+        }
+        output.drain(..start);
+    } else {
+        let mut end = limit;
+        while !output.is_char_boundary(end) {
+            end -= 1;
+        }
+        output.truncate(end);
+    }
+    (output, true)
 }
 
 fn append_timeout_message(mut stderr: String, timeout: StdDuration) -> String {
@@ -5114,7 +5578,12 @@ fn validate_schema_change_output(
     }
 }
 
-fn database_command_env(database_url: &str) -> anyhow::Result<BTreeMap<String, String>> {
+fn database_command_env(
+    database_url: &str,
+    database_url_env_names: &[String],
+) -> anyhow::Result<BTreeMap<String, String>> {
+    validate_database_url_env_names(database_url_env_names)
+        .map_err(|error| anyhow::anyhow!(error.message))?;
     let connection = pg_tool_connection_from_url(database_url)?;
     let mut env = connection.env;
     env.insert("PGDATABASE".to_string(), connection.database);
@@ -5123,6 +5592,9 @@ fn database_command_env(database_url: &str) -> anyhow::Result<BTreeMap<String, S
         "PGSANDBOX_DATABASE_URL".to_string(),
         database_url.to_string(),
     );
+    for name in database_url_env_names {
+        env.insert(name.clone(), database_url.to_string());
+    }
     Ok(env)
 }
 
@@ -5697,6 +6169,24 @@ fn active_owner_quota_sql() -> anyhow::Result<String> {
             AND expires_at > now()
         "#,
         quote_ident(METADATA_TABLE)?
+    ))
+}
+
+fn list_databases_selection_sql() -> anyhow::Result<String> {
+    Ok(format!(
+        r#"
+          SELECT database_id, profile_name, database_name, role_name, owner, purpose, labels,
+                 created_at, expires_at, deleted_at
+          FROM {}
+          WHERE profile_name = $1
+            AND deleted_at IS NULL
+            AND ($2::text IS NULL OR owner = $2)
+            AND ($3::boolean OR expires_at > now())
+          ORDER BY created_at DESC
+          LIMIT {}
+        "#,
+        quote_ident(METADATA_TABLE)?,
+        LIST_DATABASES_LIMIT + 1
     ))
 }
 
@@ -6408,6 +6898,24 @@ fn local_container_connection_string(connection_string: &str) -> Option<String> 
     }
     url.set_host(Some("host.docker.internal")).ok()?;
     Some(url.to_string())
+}
+
+fn repo_command_database_url(
+    connection_string: &str,
+    connection_mode: Option<RepoCommandConnectionMode>,
+) -> Result<String, WorkflowError> {
+    match connection_mode.unwrap_or(RepoCommandConnectionMode::Direct) {
+        RepoCommandConnectionMode::Direct => Ok(connection_string.to_string()),
+        RepoCommandConnectionMode::LocalContainer => {
+            local_container_connection_string(connection_string).ok_or_else(|| {
+                workflow_error(
+                "local_container_unavailable",
+                "connectionMode=localContainer requires a sandbox connection with a loopback host.",
+                Some("Use connectionMode=direct for non-local profiles.".to_string()),
+            )
+            })
+        }
+    }
 }
 
 fn is_loopback_host(host: &str) -> bool {
@@ -7555,6 +8063,7 @@ fn record_summary_to_json(row: &Row) -> Value {
     let created_at = row.get::<_, DateTime<Utc>>("created_at");
     let expires_at = row.get::<_, DateTime<Utc>>("expires_at");
     let deleted_at = row.get::<_, Option<DateTime<Utc>>>("deleted_at");
+    let expiry_status = database_expiry_status(expires_at, Utc::now());
     json!({
         "databaseId": database_id,
         "profile": profile_name,
@@ -7566,7 +8075,20 @@ fn record_summary_to_json(row: &Row) -> Value {
         "createdAt": created_at,
         "expiresAt": expires_at,
         "deletedAt": deleted_at,
+        "expired": expiry_status.expired,
+        "ttlStatus": expiry_status.ttl_status,
+        "expiresInSeconds": expiry_status.expires_in_seconds,
     })
+}
+
+fn database_expiry_status(expires_at: DateTime<Utc>, now: DateTime<Utc>) -> DatabaseExpiryStatus {
+    let expires_in_seconds = expires_at.signed_duration_since(now).num_seconds();
+    let expired = expires_at <= now;
+    DatabaseExpiryStatus {
+        expired,
+        ttl_status: if expired { "expired" } else { "active" },
+        expires_in_seconds,
+    }
 }
 
 fn record_to_json(record: &SandboxRecord) -> Value {
@@ -8085,6 +8607,7 @@ mod tests {
             &command,
             test_database_url(),
             StdDuration::from_secs(1),
+            RepoCommandExecutionOptions::default(),
         )
         .await
         .unwrap();
@@ -8108,6 +8631,7 @@ mod tests {
             &command,
             test_database_url(),
             StdDuration::from_secs(5),
+            RepoCommandExecutionOptions::default(),
         )
         .await
         .unwrap();
@@ -8118,6 +8642,347 @@ mod tests {
         assert_eq!(result.stderr, "warning");
         assert!(!result.stdout_truncated);
         assert!(!result.stderr_truncated);
+    }
+
+    #[tokio::test]
+    async fn execute_repo_command_writes_requested_stdin_without_repo_files() {
+        let directory = tempfile::tempdir().unwrap();
+        let command = vec!["sh".to_string(), "-c".to_string(), "cat".to_string()];
+
+        let result = execute_repo_command(
+            directory.path(),
+            &command,
+            test_database_url(),
+            StdDuration::from_secs(5),
+            RepoCommandExecutionOptions {
+                stdin: Some("print('smoke')\n".to_string()),
+                ..RepoCommandExecutionOptions::default()
+            },
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(result.exit_code, Some(0));
+        assert_eq!(result.stdout, "print('smoke')\n");
+        assert!(directory.path().read_dir().unwrap().next().is_none());
+    }
+
+    #[tokio::test]
+    async fn execute_repo_command_filters_noisy_output_and_redacts_injected_secrets() {
+        let directory = tempfile::tempdir().unwrap();
+        let command = vec!["sh".to_string()];
+
+        let result = execute_repo_command(
+            directory.path(),
+            &command,
+            test_database_url(),
+            StdDuration::from_secs(5),
+            RepoCommandExecutionOptions {
+                stdin: Some(
+                    "printf '\u{1b}[31mfirst\u{1b}[0m\\nContainer app Created\\nfinal\\n'; printf \"$DATABASE_URL\\n$PGPASSWORD\\n\" >&2\n"
+                        .to_string(),
+                ),
+                strip_ansi: true,
+                stdout_limit: 100,
+                stderr_limit: 200,
+                tail_lines: Some(2),
+                suppress_docker_lifecycle: true,
+                ..RepoCommandExecutionOptions::default()
+            },
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(result.stdout, "first\nfinal\n");
+        assert!(!result.stderr.contains("secret"));
+        assert!(!result.stderr.contains("postgres://sandbox:"));
+        assert!(result.stderr.contains("[REDACTED]"));
+    }
+
+    #[tokio::test]
+    async fn repo_command_redaction_keeps_head_boundary_secret_out_of_output() {
+        let database_url = test_database_url();
+        let password = "secret";
+        let raw = format!("{}{}END", "x".repeat(7_976), database_url);
+        let capture_limit = repo_command_capture_limit(database_url, Some(password));
+        let (captured, capture_truncated) =
+            read_bounded_output_mode(raw.as_bytes(), false, capture_limit)
+                .await
+                .unwrap();
+        let (output, _) = process_repo_command_output(
+            captured,
+            capture_truncated,
+            MAX_COMMAND_OUTPUT_BYTES,
+            &RepoCommandExecutionOptions::default(),
+            database_url,
+            Some(password),
+        );
+
+        assert!(output.contains("[REDACTED]"));
+        assert!(!output.contains("postgres://sandbox:secre"));
+        assert!(!output.contains(password));
+        assert!(output.len() <= MAX_COMMAND_OUTPUT_BYTES);
+    }
+
+    #[tokio::test]
+    async fn repo_command_redaction_keeps_tail_boundary_secret_out_of_output() {
+        let database_url = test_database_url();
+        let password = "secret";
+        let password_offset = database_url.find(password).unwrap();
+        let desired_old_tail_start = password_offset + 1;
+        let padding_len = MAX_COMMAND_OUTPUT_BYTES + desired_old_tail_start - database_url.len();
+        let raw = format!("{database_url}{}", "x".repeat(padding_len));
+        let capture_limit = repo_command_capture_limit(database_url, Some(password));
+        let (captured, capture_truncated) =
+            read_bounded_output_mode(raw.as_bytes(), true, capture_limit)
+                .await
+                .unwrap();
+        let options = RepoCommandExecutionOptions {
+            tail_lines: Some(1_000),
+            ..RepoCommandExecutionOptions::default()
+        };
+        let (output, _) = process_repo_command_output(
+            captured,
+            capture_truncated,
+            MAX_COMMAND_OUTPUT_BYTES,
+            &options,
+            database_url,
+            Some(password),
+        );
+
+        assert!(output.contains("[REDACTED]"));
+        assert!(!output.contains("ecret@"));
+        assert!(!output.contains(password));
+        assert!(output.len() <= MAX_COMMAND_OUTPUT_BYTES);
+    }
+
+    #[tokio::test]
+    async fn repo_command_capture_memory_stays_at_calculated_limit() {
+        let capture_limit = repo_command_capture_limit(test_database_url(), Some("secret"));
+        let raw = "x".repeat(capture_limit + 4_096);
+
+        for capture_tail in [false, true] {
+            let (captured, truncated) =
+                read_bounded_output_mode(raw.as_bytes(), capture_tail, capture_limit)
+                    .await
+                    .unwrap();
+            assert_eq!(captured.len(), capture_limit);
+            assert!(truncated);
+        }
+    }
+
+    #[test]
+    fn repo_command_capture_overlap_has_an_explicit_memory_cap() {
+        let oversized_url = format!(
+            "postgres://sandbox:secret@localhost/app?padding={}",
+            "x".repeat(MAX_REPO_COMMAND_REDACTION_OVERLAP_BYTES * 2)
+        );
+        let generated_password = "p".repeat(64);
+
+        assert_eq!(
+            repo_command_capture_limit(&oversized_url, Some("secret")),
+            MAX_COMMAND_OUTPUT_BYTES + MAX_REPO_COMMAND_REDACTION_OVERLAP_BYTES
+        );
+        assert_eq!(
+            repo_command_capture_limit("postgres://localhost/app", Some(&generated_password)),
+            MAX_COMMAND_OUTPUT_BYTES + generated_password.len() - 1
+        );
+    }
+
+    #[test]
+    fn repo_command_redacts_ansi_interleaved_password_after_stripping() {
+        let options = RepoCommandExecutionOptions {
+            strip_ansi: true,
+            ..RepoCommandExecutionOptions::default()
+        };
+        let (output, _) = process_repo_command_output(
+            "before sec\u{1b}[31mret after".to_string(),
+            false,
+            MAX_COMMAND_OUTPUT_BYTES,
+            &options,
+            test_database_url(),
+            Some("secret"),
+        );
+
+        assert_eq!(output, "before [REDACTED] after");
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn repo_command_timeout_covers_descendants_holding_output_pipes() {
+        let directory = tempfile::tempdir().unwrap();
+        let command = vec!["sh".to_string(), "-c".to_string(), "sleep 2 &".to_string()];
+
+        let result = time::timeout(
+            StdDuration::from_secs(1),
+            execute_repo_command(
+                directory.path(),
+                &command,
+                test_database_url(),
+                StdDuration::from_millis(150),
+                RepoCommandExecutionOptions::default(),
+            ),
+        )
+        .await
+        .expect("repo command exceeded its full lifecycle timeout")
+        .unwrap();
+
+        assert!(result.timed_out, "{result:?}");
+        assert_eq!(result.exit_code, None);
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn repo_command_reports_stdin_delivery_failure_for_successful_child() {
+        let directory = tempfile::tempdir().unwrap();
+        let command = vec![
+            "sh".to_string(),
+            "-c".to_string(),
+            "exec 0<&-; sleep 0.2; exit 0".to_string(),
+        ];
+
+        let error = execute_repo_command(
+            directory.path(),
+            &command,
+            test_database_url(),
+            StdDuration::from_secs(2),
+            RepoCommandExecutionOptions {
+                stdin: Some("x".repeat(2 * 1024 * 1024)),
+                ..RepoCommandExecutionOptions::default()
+            },
+        )
+        .await
+        .unwrap_err();
+
+        assert!(error.to_string().contains("stdin"), "{error:#}");
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn repo_command_timeout_takes_precedence_over_stdin_delivery_failure() {
+        let directory = tempfile::tempdir().unwrap();
+        let command = vec![
+            "sh".to_string(),
+            "-c".to_string(),
+            "exec 0<&-; sleep 2".to_string(),
+        ];
+
+        let result = execute_repo_command(
+            directory.path(),
+            &command,
+            test_database_url(),
+            StdDuration::from_millis(50),
+            RepoCommandExecutionOptions {
+                stdin: Some("x".repeat(2 * 1024 * 1024)),
+                ..RepoCommandExecutionOptions::default()
+            },
+        )
+        .await
+        .unwrap();
+
+        assert!(result.timed_out, "{result:?}");
+        assert_eq!(result.exit_code, None);
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn repo_command_timeout_message_respects_stderr_limits() {
+        let directory = tempfile::tempdir().unwrap();
+        let command = vec!["sh".to_string(), "-c".to_string(), "sleep 2".to_string()];
+
+        for limit in [0, 12] {
+            let result = execute_repo_command(
+                directory.path(),
+                &command,
+                test_database_url(),
+                StdDuration::from_millis(50),
+                RepoCommandExecutionOptions {
+                    stderr_limit: limit,
+                    ..RepoCommandExecutionOptions::default()
+                },
+            )
+            .await
+            .unwrap();
+
+            assert!(result.timed_out, "{result:?}");
+            assert!(result.stderr.len() <= limit, "{result:?}");
+            assert!(result.stderr_truncated, "{result:?}");
+        }
+    }
+
+    #[test]
+    fn repo_command_output_truncation_is_utf8_safe_for_head_and_tail() {
+        let output = "éé".to_string();
+        let (head, head_truncated) = truncate_output_bytes(output.clone(), 3, false);
+        let (tail, tail_truncated) = truncate_output_bytes(output, 3, true);
+
+        assert_eq!(head, "é");
+        assert_eq!(tail, "é");
+        assert!(head_truncated);
+        assert!(tail_truncated);
+    }
+
+    #[test]
+    fn repo_command_tail_lines_returns_only_the_requested_suffix() {
+        let options = RepoCommandExecutionOptions {
+            tail_lines: Some(1),
+            ..RepoCommandExecutionOptions::default()
+        };
+        let (output, truncated) = process_repo_command_output(
+            "first\nsecond\nthird\n".to_string(),
+            false,
+            MAX_COMMAND_OUTPUT_BYTES,
+            &options,
+            test_database_url(),
+            Some("secret"),
+        );
+
+        assert_eq!(output, "third\n");
+        assert!(truncated);
+    }
+
+    #[test]
+    fn repo_command_option_validation_rejects_each_over_limit_value() {
+        let stdout =
+            validate_repo_command_output_options(Some(MAX_COMMAND_OUTPUT_BYTES + 1), None, None)
+                .unwrap_err();
+        let stderr =
+            validate_repo_command_output_options(None, Some(MAX_COMMAND_OUTPUT_BYTES + 1), None)
+                .unwrap_err();
+        let tail = validate_repo_command_output_options(None, None, Some(1_001)).unwrap_err();
+
+        assert_eq!(stdout.code, "invalid_output_limit");
+        assert_eq!(stderr.code, "invalid_output_limit");
+        assert_eq!(tail.code, "invalid_tail_lines");
+    }
+
+    #[test]
+    fn repo_command_env_aliases_reject_managed_names_case_insensitively() {
+        for name in [
+            "path",
+            "pghost",
+            "PGSSLMODE",
+            "pgsslrootcert",
+            "PGSSLCERT",
+            "pgsslkey",
+        ] {
+            let error = validate_database_url_env_names(&[name.to_string()]).unwrap_err();
+            assert_eq!(error.code, "invalid_env_alias", "{name}");
+        }
+        assert!(validate_database_url_env_names(&["PG_URL".to_string()]).is_ok());
+
+        let too_many = (0..=MAX_DATABASE_URL_ENV_NAMES)
+            .map(|index| format!("DATABASE_URL_{index}"))
+            .collect::<Vec<_>>();
+        let error = validate_database_url_env_names(&too_many).unwrap_err();
+        assert_eq!(error.code, "too_many_env_aliases");
+    }
+
+    #[test]
+    fn docker_lifecycle_filter_recognizes_ansi_prefixed_lines() {
+        assert!(is_docker_lifecycle_line(
+            "\u{1b}[2K Container app Started\u{1b}[0m\n"
+        ));
     }
 
     #[tokio::test]
@@ -8134,6 +8999,7 @@ mod tests {
             &command,
             test_database_url(),
             StdDuration::from_secs(5),
+            RepoCommandExecutionOptions::default(),
         )
         .await
         .unwrap();
@@ -8154,6 +9020,7 @@ mod tests {
             &command,
             test_database_url(),
             StdDuration::from_secs(1),
+            RepoCommandExecutionOptions::default(),
         )
         .await
         .unwrap();
@@ -8524,6 +9391,34 @@ mod tests {
     }
 
     #[test]
+    fn list_databases_schema_exposes_include_expired_filter() {
+        let schema = serde_json::to_value(schemars::schema_for!(ListDatabasesInput)).unwrap();
+        assert!(schema.pointer("/properties/includeExpired").is_some());
+    }
+
+    #[test]
+    fn database_expiry_status_is_explicit_and_agent_readable() {
+        let now = Utc::now();
+        let active = database_expiry_status(now + chrono::Duration::minutes(10), now);
+        let expired = database_expiry_status(now - chrono::Duration::minutes(10), now);
+
+        assert!(!active.expired);
+        assert_eq!(active.ttl_status, "active");
+        assert_eq!(active.expires_in_seconds, 600);
+        assert!(expired.expired);
+        assert_eq!(expired.ttl_status, "expired");
+        assert_eq!(expired.expires_in_seconds, -600);
+    }
+
+    #[test]
+    fn list_databases_sql_excludes_expired_rows_unless_requested() {
+        let sql = list_databases_selection_sql().unwrap();
+
+        assert!(sql.contains("($3::boolean OR expires_at > now())"));
+        assert!(sql.contains("deleted_at IS NULL"));
+    }
+
+    #[test]
     fn all_version_profile_scan_skips_deferred_managed_local_without_starting() {
         let mut config = test_config();
         config.managed_local.enabled = true;
@@ -8563,6 +9458,7 @@ mod tests {
                 profile: None,
                 postgres_version: None,
                 include_all_versions: Some(true),
+                include_expired: None,
                 owner: None,
             })
             .await
@@ -9888,6 +10784,30 @@ services:
     }
 
     #[test]
+    fn database_id_ignores_repo_inferred_version_but_keeps_explicit_constraints() {
+        let directory = tempfile::tempdir().unwrap();
+        let repo = directory.path();
+        let config = RepoProjectConfig {
+            migration_command: None,
+            seed_command: None,
+            database_url_env: "DATABASE_URL".to_string(),
+            postgres_version: Some("13".to_string()),
+            prepared_at: Utc::now(),
+        };
+        write_repo_project_config(repo, &config).unwrap();
+
+        let inferred = repo_command_selector_postgres_version(repo, Some("db-id"), None).unwrap();
+        let explicit =
+            repo_command_selector_postgres_version(repo, Some("db-id"), Some("18".to_string()))
+                .unwrap();
+        let by_name = repo_command_selector_postgres_version(repo, None, None).unwrap();
+
+        assert_eq!(inferred, None);
+        assert_eq!(explicit.as_deref(), Some("18"));
+        assert_eq!(by_name.as_deref(), Some("13"));
+    }
+
+    #[test]
     fn migration_commands_are_generic_bounded_non_shell_argv() {
         let directory = tempfile::tempdir().unwrap();
         let repo = directory.path();
@@ -10112,6 +11032,7 @@ services:
     fn command_env_injects_database_url_and_pg_vars() {
         let env = database_command_env(
             "postgres://sandbox:p%40ss@localhost:65432/app_db?sslmode=disable",
+            &[],
         )
         .unwrap();
 
@@ -10122,6 +11043,112 @@ services:
             env.get("DATABASE_URL").map(String::as_str),
             Some("postgres://sandbox:p%40ss@localhost:65432/app_db?sslmode=disable")
         );
+    }
+
+    #[test]
+    fn command_env_supports_validated_aliases_and_docker_connection_mode() {
+        let selected = repo_command_database_url(
+            "postgres://sandbox:p%40ss@localhost:65432/app_db?sslmode=disable",
+            Some(RepoCommandConnectionMode::LocalContainer),
+        )
+        .unwrap();
+        let aliases = vec!["DATABASE_URI".to_string(), "PG_URL".to_string()];
+        let env = database_command_env(&selected, &aliases).unwrap();
+
+        assert!(selected.contains("host.docker.internal"));
+        assert_eq!(
+            env.get("PGHOST").map(String::as_str),
+            Some("host.docker.internal")
+        );
+        assert_eq!(
+            env.get("DATABASE_URI").map(String::as_str),
+            Some(selected.as_str())
+        );
+        assert_eq!(
+            env.get("PG_URL").map(String::as_str),
+            Some(selected.as_str())
+        );
+
+        let error = validate_database_url_env_names(&["1INVALID".to_string()]).unwrap_err();
+        assert_eq!(error.code, "invalid_env_alias");
+    }
+
+    #[test]
+    fn run_repo_command_schema_exposes_agent_workflow_controls() {
+        let schema = serde_json::to_value(schemars::schema_for!(RunRepoCommandInput)).unwrap();
+        let properties = schema
+            .pointer("/properties")
+            .and_then(Value::as_object)
+            .expect("run_repo_command schema properties");
+
+        for field in [
+            "stdin",
+            "databaseUrlEnvNames",
+            "connectionMode",
+            "stripAnsi",
+            "stdoutLimit",
+            "stderrLimit",
+            "tailLines",
+            "suppressDockerLifecycle",
+        ] {
+            assert!(
+                properties.contains_key(field),
+                "missing schema field {field}"
+            );
+        }
+
+        assert_eq!(properties["databaseUrlEnvNames"]["maxItems"], json!(16));
+        assert_eq!(properties["stdoutLimit"]["maximum"], json!(8_000));
+        assert_eq!(properties["stderrLimit"]["maximum"], json!(8_000));
+        assert_eq!(properties["tailLines"]["maximum"], json!(1_000));
+        assert!(properties["stdin"]["description"]
+            .as_str()
+            .unwrap()
+            .contains("65,536 bytes"));
+        assert!(properties["stdin"]["description"]
+            .as_str()
+            .unwrap()
+            .contains("NUL"));
+        assert!(properties["databaseUrlEnvNames"]["description"]
+            .as_str()
+            .unwrap()
+            .contains("reserved"));
+    }
+
+    #[test]
+    fn repo_command_stdin_is_bounded_and_rejects_nul() {
+        assert!(validate_repo_command_stdin(Some("print('ok')\n")).is_ok());
+
+        let oversized = "x".repeat(MAX_WORKFLOW_STDIN_BYTES + 1);
+        let size_error = validate_repo_command_stdin(Some(&oversized)).unwrap_err();
+        let nul_error = validate_repo_command_stdin(Some("before\0after")).unwrap_err();
+
+        assert_eq!(size_error.code, "stdin_too_large");
+        assert_eq!(nul_error.code, "invalid_stdin");
+    }
+
+    #[test]
+    fn repo_command_envelopes_explain_that_row_changes_are_untracked() {
+        let success = workflow_success_without_change_tracking(
+            "Repo command completed successfully.",
+            Vec::new(),
+            Vec::new(),
+            json!({"exitCode": 0}),
+        );
+        let failure = workflow_failure_without_change_tracking(
+            "Repo command failed.",
+            workflow_error("repo_command_failed", "failed", None),
+            Some(json!({"exitCode": 1})),
+        );
+
+        for envelope in [success, failure] {
+            let value = serde_json::to_value(envelope).unwrap();
+            assert_eq!(value["changedObjects"], Value::Null);
+            assert_eq!(
+                value["changedObjectsUnsupportedReason"],
+                REPO_COMMAND_CHANGE_TRACKING_UNSUPPORTED
+            );
+        }
     }
 
     #[test]

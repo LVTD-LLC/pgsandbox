@@ -21,6 +21,8 @@ that envelope.
 - `ok`: whether the requested operation completed
 - `summary`: short human-readable outcome
 - `changedObjects`: optional counts for schema changes
+- `changedObjectsUnsupportedReason`: present when `changedObjects` is null
+  because a workflow cannot observe the relevant mutations reliably
 - `warnings`: bounded warnings; present on every envelope, even when empty
 - `errors`: structured `code`, `category`, `message`, and optional `hint`
 - `detailHandles`: opaque pointers agents can use in follow-up calls
@@ -679,6 +681,26 @@ Inputs:
 - `databaseId` or `databaseName`
 - `command`: optional argv array; defaults to `.pgsandbox/project.json`
 - `timeoutSeconds`: optional timeout, capped by the server
+- `stdin`: optional UTF-8 text written to the child process standard input,
+  capped at 65,536 bytes with NUL characters rejected. Use direct argv such as
+  `["python", "-"]` for multi-line scripts without temporary repo files.
+- `databaseUrlEnvNames`: optional validated application env aliases, such as
+  `DATABASE_URI`, `SQLALCHEMY_DATABASE_URI`, or `PG_URL`. PGSandbox-owned
+  libpq variables and `PATH` cannot be overridden.
+- `connectionMode`: optional `direct` (default) or `localContainer`. The latter
+  injects the Docker-friendly `host.docker.internal` URL and requires a
+  loopback sandbox profile.
+- `stripAnsi`: optional boolean that removes ANSI escape sequences from output
+- `stdoutLimit` / `stderrLimit`: optional returned-byte limits from 0 through
+  8,000 per stream
+- `tailLines`: optional final-line count from 0 through 1,000. Tail capture
+  retains the end of noisy streams instead of the beginning.
+- `suppressDockerLifecycle`: optional boolean that removes common Docker
+  Compose container/network/volume lifecycle status lines
+
+When `databaseId` is supplied, it is the primary profile/version lookup key.
+Repo config or Compose version inference does not constrain that id. Explicit
+`profile` or `postgresVersion` inputs still act as intentional constraints.
 
 The command runs with `repoPath` as current directory. The argv array must be
 short, non-empty, free of NUL/newline characters, and is executed directly
@@ -705,6 +727,17 @@ directly, such as `["./scripts/seed.sh"]` after `chmod +x scripts/seed.sh` if
 needed, or split the work into separate tool calls instead of sending a shell
 snippet.
 
+For an ephemeral script that does not belong in the repository, use stdin:
+
+```json
+{
+  "repoPath": "/absolute/path/to/repo",
+  "databaseId": "sandbox-id",
+  "command": ["python", "-"],
+  "stdin": "print('run smoke assertions')\n"
+}
+```
+
 Returns bounded command output with `databaseId`, `databaseName`, `command`,
 `elapsedMs`, `exitCode`, `timedOut`, `stdout`, `stderr`,
 `stdoutTruncated`, and `stderrTruncated`. When the command exceeds
@@ -712,6 +745,12 @@ Returns bounded command output with `databaseId`, `databaseName`, `command`,
 `code: "command_timeout"` and `category: "timeout"`; `result.exitCode`
 remains `null`, `result.timedOut` is `true`, and `stderr` may include the
 human-readable timeout line.
+
+Captured output always redacts the injected database URL and password. Because
+the command and its descendants can write through any connection path,
+`changedObjects` is null and `changedObjectsUnsupportedReason` explains that
+row/schema changes are not tracked. Use `run_sql` for direct inspection or
+`validate_schema_change` when a before/after schema diff is required.
 
 ### `validate_schema_change`
 
@@ -841,6 +880,8 @@ Inputs:
 - `includeAllVersions`: optional boolean. When true, lists across configured
   profiles and running managed-local version profiles. Do not combine with
   `profile`.
+- `includeExpired`: optional boolean, defaults to false. Set true to include
+  expired-but-not-deleted sandboxes.
 - `owner`: optional owner filter
 
 Returns:
@@ -849,7 +890,8 @@ Returns:
 - `profiles`: profiles included in the listing
 - `databases`: database metadata without full secrets, using camelCase keys
   such as `databaseId`, `databaseName`, `roleName`, `profile`, `createdAt`, and
-  `expiresAt`.
+  `expiresAt`. Every entry also includes `expired`, `ttlStatus` (`active` or
+  `expired`), and signed `expiresInSeconds`.
 - `truncated`: whether more matching records exist beyond the returned page
 - `failures`: profile-level failures for all-version listings. Each entry has
   `profile`, `category: "profile_unavailable"`, and a safe `message`.

@@ -7,7 +7,8 @@ use pgsandbox::{
         CreateSchemaSnapshotInput, CreateTemplateFromSandboxInput, DatabaseSelector,
         DeleteTemplateInput, DescribeSchemaInput, DiffSchemaSnapshotInput, ExplainQueryInput,
         ListDatabasesInput, ListSchemaSnapshotsInput, ListTemplatesInput, PostgresSandboxManager,
-        RunSqlInput, SchemaDiffBaseDigest, SchemaDiffInput, ValidateSchemaChangeInput,
+        RunRepoCommandInput, RunSqlInput, SchemaDiffBaseDigest, SchemaDiffInput,
+        ValidateSchemaChangeInput,
     },
 };
 use serde_json::json;
@@ -180,10 +181,13 @@ async fn run_suite(
             sql: "CREATE TABLE accounts(id serial PRIMARY KEY, email text UNIQUE, active boolean NOT NULL DEFAULT true); INSERT INTO accounts(email) VALUES ('a@example.com'), ('b@example.com'), ('c@example.com'); CREATE VIEW active_accounts AS SELECT id, email FROM accounts WHERE active;".to_string(),
             readonly: None,
             row_limit: None,
-        })
+    })
         .await?;
     assert_eq!(seeded.returned_row_count, 0);
-    assert_eq!(seeded.affected_row_count, Some(3));
+    assert!(seeded
+        .result_sets
+        .iter()
+        .any(|result_set| result_set.affected_row_count == Some(3)));
 
     let limited = manager
         .run_sql(RunSqlInput {
@@ -309,6 +313,7 @@ async fn run_suite(
     exercise_templates(manager, database_id, owner).await?;
     exercise_clone(manager, profile, connection_string, owner).await?;
 
+    exercise_run_repo_command(manager, database_id).await?;
     validate_repo_command(manager, owner).await?;
 
     let remaining = manager
@@ -316,6 +321,7 @@ async fn run_suite(
             profile: None,
             postgres_version: Some("*".to_string()),
             include_all_versions: Some(true),
+            include_expired: None,
             owner: Some(owner.to_string()),
         })
         .await?;
@@ -425,6 +431,61 @@ async fn exercise_clone(
             database_name: None,
         })
         .await?;
+
+    Ok(())
+}
+
+async fn exercise_run_repo_command(
+    manager: &PostgresSandboxManager,
+    database_id: &str,
+) -> anyhow::Result<()> {
+    let directory = tempfile::tempdir()?;
+    let marker = "pgsandbox-run-repo-command-stdin";
+    let envelope = manager
+        .run_repo_command(RunRepoCommandInput {
+            repo_path: directory.path().display().to_string(),
+            profile: None,
+            postgres_version: None,
+            database_id: Some(database_id.to_string()),
+            database_name: None,
+            command: Some(vec![
+                "psql".to_string(),
+                "-X".to_string(),
+                "-v".to_string(),
+                "ON_ERROR_STOP=1".to_string(),
+                "-At".to_string(),
+            ]),
+            timeout_seconds: Some(20),
+            stdin: Some(format!("SELECT '{marker}';\n")),
+            database_url_env_names: Some(vec!["PG_URL".to_string()]),
+            connection_mode: None,
+            strip_ansi: Some(true),
+            stdout_limit: Some(256),
+            stderr_limit: Some(256),
+            tail_lines: Some(5),
+            suppress_docker_lifecycle: Some(true),
+        })
+        .await?;
+
+    assert!(envelope.ok, "{envelope:?}");
+    assert!(envelope.changed_objects.is_none());
+    assert!(envelope
+        .changed_objects_unsupported_reason
+        .as_deref()
+        .is_some_and(|reason| reason.contains("cannot reliably observe")));
+    let serialized = serde_json::to_value(&envelope)?;
+    assert!(serialized["changedObjects"].is_null());
+    assert!(serialized["changedObjectsUnsupportedReason"].is_string());
+
+    let output = envelope.result.expect("run_repo_command output");
+    assert_eq!(output.database_id, database_id);
+    assert_eq!(output.exit_code, Some(0));
+    assert!(!output.timed_out);
+    assert_eq!(output.stdout.trim(), marker);
+    assert!(output.stderr.is_empty(), "{}", output.stderr);
+    assert!(!output.stdout_truncated);
+    assert!(!output.stderr_truncated);
+    assert!(directory.path().read_dir()?.next().is_none());
 
     Ok(())
 }

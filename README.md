@@ -19,8 +19,9 @@ shared developer database.
 - Returns bounded, typed SQL result sets so agents do not dump unbounded rows.
 - Describes schemas, computes schema digests, diffs schemas, creates named
   schema snapshots, and returns `EXPLAIN (FORMAT JSON)` plans.
-- Runs repo migration and seed commands with sandbox credentials injected
-  through environment variables instead of rewriting project settings.
+- Runs repo migration, seed, and smoke commands with sandbox credentials
+  injected through environment variables or validated app-specific aliases,
+  plus bounded stdin and output controls instead of temporary repo files.
 - Returns host-local and Docker-friendly connection variants so containerized
   local apps can reach a host-managed sandbox without guessing the right host.
 - Creates reusable local template artifacts from PGSandbox-owned sandboxes.
@@ -194,7 +195,9 @@ pgsandbox smoke-test
 ```
 
 The smoke test creates a sandbox, runs SQL, validates serialization behavior,
-and deletes the sandbox before exiting.
+and deletes the sandbox before exiting. Its default output is a compact list of
+pass/fail results. Use `pgsandbox smoke-test --verbose` to include the full
+structured SQL result dictionaries for diagnostics.
 
 You can also inspect the managed local runtime directly:
 
@@ -250,6 +253,10 @@ Linux Docker, add this to the service:
 extra_hosts:
   - "host.docker.internal:host-gateway"
 ```
+
+For `run_repo_command`, set `connectionMode: "localContainer"` and add app
+aliases such as `databaseUrlEnvNames: ["DATABASE_URI"]`; PGSandbox injects the
+Docker-friendly URL without returning the raw value in command metadata.
 
 For direct CLI troubleshooting, this command starts the MCP server over stdio:
 
@@ -794,6 +801,7 @@ Repo workflow tools are intentionally conservative:
   `env`, `sudo`, and `nsenter`.
 - They inject sandbox credentials into the child process environment.
 - They return bounded stdout/stderr with truncation flags.
+- They redact the injected database URL and password from captured output.
 - They do not permanently rewrite application configuration.
 
 Injected database environment variables include:
@@ -807,6 +815,46 @@ PGDATABASE
 PGUSER
 PGPASSWORD
 ```
+
+When `databaseId` is present, `run_repo_command` resolves the owning
+profile/Postgres version from sandbox metadata. Repo-inferred versions are not
+allowed to override that id; an explicitly supplied conflicting profile/version
+still fails normally.
+
+Use `stdin` with a direct interpreter to run a multi-line smoke without writing
+a temporary file into the repo:
+
+```json
+{
+  "repoPath": "/absolute/path/to/repo",
+  "databaseId": "sandbox-id",
+  "command": ["python", "-"],
+  "stdin": "print('run app smoke here')\n"
+}
+```
+
+`stdin` accepts up to 65,536 UTF-8 bytes and rejects NUL characters. The normal
+no-shell command validation remains in force.
+
+Dockerized apps and repos with nonstandard settings can select the connection
+variant and validated aliases directly:
+
+```json
+{
+  "repoPath": "/absolute/path/to/repo",
+  "databaseId": "sandbox-id",
+  "command": ["docker", "compose", "run", "--rm", "web", "python", "manage.py", "check"],
+  "connectionMode": "localContainer",
+  "databaseUrlEnvNames": ["DATABASE_URI"]
+}
+```
+
+Noisy commands can request `stripAnsi`, `stdoutLimit`, `stderrLimit`,
+`tailLines`, and `suppressDockerLifecycle`. Limits remain bounded to 8,000
+bytes per stream. `run_repo_command` reports `changedObjects: null` with
+`changedObjectsUnsupportedReason` because writes made by a child process cannot
+be observed reliably; use `run_sql`, `schema_digest`, or
+`validate_schema_change` when side effects must be measured.
 
 Good command examples:
 
@@ -1166,7 +1214,8 @@ CLI commands after installation:
 | `pgsandbox local status` | Show managed local status. |
 | `pgsandbox local stop` | Stop managed local Postgres. |
 | `pgsandbox local start --postgres-version 18 --install-missing` | Start versioned local profile `local-pg18`, installing binaries with a supported package manager when available. |
-| `pgsandbox smoke-test` | Create, query, and delete a sandbox. |
+| `pgsandbox smoke-test` | Create, query, and delete a sandbox with concise result lines. |
+| `pgsandbox smoke-test --verbose` | Include full structured SQL result dictionaries in the smoke output. |
 | `pgsandbox smoke-test --postgres-version 18` | Smoke test a specific local major version. |
 
 Site commands:
@@ -1738,6 +1787,16 @@ To direct commands or an executable repo script:
 ["./scripts/seed.sh"]
 ```
 
+For a one-off multi-line Python script, keep the direct-command boundary and
+send the script over stdin:
+
+```json
+{
+  "command": ["python", "-"],
+  "stdin": "print('smoke')\n"
+}
+```
+
 ### Repo Workflow Has No Migration Command
 
 Pass a command directly:
@@ -1798,6 +1857,9 @@ local profiles. If the sandbox cannot be resolved:
 ### Expired Sandboxes Remain
 
 Cleanup is explicit unless you run it from a scheduler or call the MCP tool.
+`list_databases` excludes expired sandboxes by default. Pass
+`includeExpired: true` to inspect them; every returned database includes
+`expired`, `ttlStatus`, and signed `expiresInSeconds` fields.
 
 Profile-scoped dry run:
 

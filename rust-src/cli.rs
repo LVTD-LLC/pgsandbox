@@ -25,8 +25,8 @@ use crate::{
         DatabaseSelector, DeleteSchemaSnapshotInput, DeleteTemplateInput, DescribeSchemaInput,
         DiffSchemaSnapshotInput, ExplainQueryInput, ListDatabasesInput, ListExtensionsInput,
         ListProfilesInput, ListSchemaSnapshotsInput, ListTemplatesInput, PostgresSandboxManager,
-        PrepareForRepoInput, RunRepoCommandInput, RunSqlInput, SchemaDiffInput, SeedDatabaseInput,
-        ValidateSchemaChangeInput,
+        PrepareForRepoInput, RunRepoCommandInput, RunSqlInput, RunSqlOutput, SchemaDiffInput,
+        SeedDatabaseInput, ValidateSchemaChangeInput,
     },
     setup::{
         build_launch_config, config_snippet, parse_client, parse_scope, resolve_targets,
@@ -1161,6 +1161,7 @@ async fn local(args: &[String]) -> anyhow::Result<u8> {
 async fn smoke_test(args: &[String]) -> anyhow::Result<u8> {
     let started = std::time::Instant::now();
     let options = parse_options(args)?;
+    let verbose = options.contains_key("verbose");
     let env = if options.contains_key("admin-url") || options.contains_key("postgres-version") {
         let mut env = std::env::vars().collect::<Vec<_>>();
         if let Some(admin_url) = options.get("admin-url") {
@@ -1280,7 +1281,10 @@ async fn smoke_test(args: &[String]) -> anyhow::Result<u8> {
                 == Some("12:34:56-05:00"),
             "TIMETZ value did not serialize as text"
         );
-        println!("{}", serde_json::to_string_pretty(&inserted)?);
+        println!(
+            "{}",
+            render_smoke_test_result("insert serialization", &inserted, verbose)?
+        );
 
         let inserted_with_comment = manager
             .run_sql(RunSqlInput {
@@ -1302,7 +1306,14 @@ async fn smoke_test(args: &[String]) -> anyhow::Result<u8> {
                 == Some("beta"),
             "INSERT ... RETURNING with a trailing line comment did not return the inserted row"
         );
-        println!("{}", serde_json::to_string_pretty(&inserted_with_comment)?);
+        println!(
+            "{}",
+            render_smoke_test_result(
+                "trailing-comment INSERT RETURNING",
+                &inserted_with_comment,
+                verbose,
+            )?
+        );
 
         let updated = manager
             .run_sql(RunSqlInput {
@@ -1319,7 +1330,10 @@ async fn smoke_test(args: &[String]) -> anyhow::Result<u8> {
             updated.affected_row_count == Some(1) && updated.rows.is_empty(),
             "DML with 'returning' inside a string literal was not handled as a direct query"
         );
-        println!("{}", serde_json::to_string_pretty(&updated)?);
+        println!(
+            "{}",
+            render_smoke_test_result("non-returning update", &updated, verbose)?
+        );
 
         let query = manager
             .run_sql(RunSqlInput {
@@ -1386,7 +1400,10 @@ async fn smoke_test(args: &[String]) -> anyhow::Result<u8> {
                 == Some("12:34:56-05:00"),
             "SELECT query did not preserve the TIMETZ value"
         );
-        println!("{}", serde_json::to_string_pretty(&query)?);
+        println!(
+            "{}",
+            render_smoke_test_result("typed SELECT serialization", &query, verbose)?
+        );
 
         let readonly_literal = manager
             .run_sql(RunSqlInput {
@@ -1408,7 +1425,10 @@ async fn smoke_test(args: &[String]) -> anyhow::Result<u8> {
                 == Some("rollback"),
             "readonly guard rejected or altered a safe string literal"
         );
-        println!("{}", serde_json::to_string_pretty(&readonly_literal)?);
+        println!(
+            "{}",
+            render_smoke_test_result("readonly literal guard", &readonly_literal, verbose)?
+        );
 
         manager
             .delete_database(DatabaseSelector {
@@ -1436,6 +1456,11 @@ async fn smoke_test(args: &[String]) -> anyhow::Result<u8> {
     }
 
     let success = result.is_ok();
+    let elapsed_ms = started.elapsed().as_millis();
+    println!(
+        "Smoke test: {} ({elapsed_ms}ms)",
+        if success { "PASS" } else { "FAIL" }
+    );
     telemetry
         .capture(
             crate::telemetry::EVENT_CLI_COMMAND_COMPLETED,
@@ -1446,15 +1471,34 @@ async fn smoke_test(args: &[String]) -> anyhow::Result<u8> {
                     serde_json::json!(options.contains_key("admin-url")),
                 ),
                 ("success", serde_json::json!(success)),
-                (
-                    "elapsedMs",
-                    serde_json::json!(started.elapsed().as_millis()),
-                ),
+                ("elapsedMs", serde_json::json!(elapsed_ms)),
             ]),
         )
         .await;
     result?;
     Ok(0)
+}
+
+fn render_smoke_test_result(
+    label: &str,
+    output: &RunSqlOutput,
+    verbose: bool,
+) -> anyhow::Result<String> {
+    if verbose {
+        return Ok(format!(
+            "PASS {label}\n{}",
+            serde_json::to_string_pretty(output)?
+        ));
+    }
+
+    let affected = output
+        .affected_row_count
+        .map(|count| count.to_string())
+        .unwrap_or_else(|| "n/a".to_string());
+    Ok(format!(
+        "PASS {label} (rows={}, affected={affected}, {}ms)",
+        output.returned_row_count, output.elapsed_ms
+    ))
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1520,6 +1564,10 @@ fn parse_options(args: &[String]) -> anyhow::Result<BTreeMap<String, String>> {
             }
             "--no-install" => {
                 options.insert("no-install".to_string(), "true".to_string());
+                index += 1;
+            }
+            "--verbose" => {
+                options.insert("verbose".to_string(), "true".to_string());
                 index += 1;
             }
             "-c" => {
@@ -2061,6 +2109,9 @@ Postgres ensure options:
   --no-install                        Do not install missing Postgres binaries
   --dry-run                           Print what would be checked or installed
 
+Smoke-test options:
+  --verbose                           Print full structured SQL result dictionaries
+
 Extension discovery options:
   --profile <profile>                 Target a configured profile
   --postgres-version <major>          Target a managed local Postgres version
@@ -2264,6 +2315,39 @@ mod tests {
             Some("true")
         );
         assert_eq!(options.get("no-install").map(String::as_str), Some("true"));
+    }
+
+    #[test]
+    fn parse_options_accepts_smoke_test_verbose_flag() {
+        let options = parse_options(&args(&["--verbose"])).unwrap();
+
+        assert_eq!(options.get("verbose").map(String::as_str), Some("true"));
+    }
+
+    #[test]
+    fn smoke_test_results_are_concise_unless_verbose() {
+        let output = crate::postgres::RunSqlOutput {
+            database_id: "db-id".to_string(),
+            database_name: "pgsandbox_smoke_123".to_string(),
+            returned_row_count: 1,
+            affected_row_count: Some(1),
+            total_row_count_known: true,
+            rows: vec![serde_json::json!({"name": "alpha"})],
+            result_sets: Vec::new(),
+            truncated: false,
+            elapsed_ms: 12,
+        };
+
+        let concise = render_smoke_test_result("insert serialization", &output, false).unwrap();
+        let verbose = render_smoke_test_result("insert serialization", &output, true).unwrap();
+
+        assert_eq!(
+            concise,
+            "PASS insert serialization (rows=1, affected=1, 12ms)"
+        );
+        assert!(!concise.contains("databaseId"));
+        assert!(verbose.contains("\"databaseId\": \"db-id\""));
+        assert!(verbose.contains("\"name\": \"alpha\""));
     }
 
     #[test]
