@@ -1,7 +1,10 @@
 # Changelog
 
-## 2026-07-10
+## 2026-07-11
 
+- Released `pgsandbox` v0.4.9 with more reliable agent repo workflows: database-id-first profile resolution, bounded stdin, Docker URL env aliases, explicit untracked-change semantics, redacted/filterable command output, clearer expired listings, concise smoke-test results, and preserved command output on timeout.
+
+## 2026-07-10
 - Improved agent repo workflows with database-id-first profile resolution,
   bounded stdin, Docker URL env aliases, explicit untracked-change semantics,
   redacted/filterable command output, clearer expired listings, and concise

@@ -164,7 +164,7 @@ installer release:
 pgsandbox upgrade --setup codex
 pgsandbox upgrade --no-setup
 pgsandbox upgrade --no-doctor
-pgsandbox upgrade --version 0.4.8
+pgsandbox upgrade --version 0.4.9
 ```
 
 Homebrew can only upgrade after a newer GitHub release exists and the

@@ -1,6 +1,6 @@
 [package]
 name = "pgsandbox"
-version = "0.4.8"
+version = "0.4.9"
 edition = "2021"
 description = "CLI and MCP server for disposable Postgres sandboxes."
 license = "MIT"
