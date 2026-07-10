@@ -1,6 +1,6 @@
 {
   "name": "pgsandbox",
-  "version": "0.4.7",
+  "version": "0.4.8",
   "description": "CLI and MCP server for disposable Postgres sandboxes.",
   "private": true,
   "scripts": {

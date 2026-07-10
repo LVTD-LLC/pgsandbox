@@ -71,7 +71,9 @@ already current, the tap formula still points at that version.
 The workflow requires a `HOMEBREW_TAP_PAT` repository secret in
 `LVTD-LLC/pgsandbox`. Use a fine-grained token with `Contents: Read and
 write` and `Pull requests: Read and write` access to `LVTD-LLC/homebrew-tap`, or
-an equivalent classic PAT.
+an equivalent classic PAT. When the secret is absent, the workflow reports a
+warning and skips the automatic tap PR so a release can still be followed by a
+manual tap update.
 
 After the Homebrew tap PR merges, verify from the tap checkout:
 

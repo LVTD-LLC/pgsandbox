@@ -2,6 +2,7 @@
 
 ## 2026-07-10
 
+- Released `pgsandbox` v0.4.8 with the renamed `pgsandbox` CLI and package, CLI parity for the public MCP tools, safe uninstall support, and aligned GitHub release and Homebrew packaging.
 - Added the Astro Markdown blog post "How to Use Local Postgres Versions with Coding Agents" with SEO ledger, link inventory, and inbound blog links.
 
 ## 2026-07-09

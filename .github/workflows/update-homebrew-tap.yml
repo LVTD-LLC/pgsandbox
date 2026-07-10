@@ -14,21 +14,25 @@ jobs:
     runs-on: macos-latest
     env:
       TAP_REPOSITORY: LVTD-LLC/homebrew-tap
-      FORMULA_PATH: Formula/pgsandbox-mcp.rb
+      FORMULA_PATH: Formula/pgsandbox.rb
     steps:
       - name: Check required secret
+        id: tap-auth
+        continue-on-error: true
         env:
           HOMEBREW_TAP_PAT: ${{ secrets.HOMEBREW_TAP_PAT }}
         run: |
           if [ -z "${HOMEBREW_TAP_PAT:-}" ]; then
-            echo "::error::HOMEBREW_TAP_PAT is required to update LVTD-LLC/homebrew-tap"
+            echo "::warning::HOMEBREW_TAP_PAT is not configured; skipping the automatic Homebrew tap PR"
             exit 1
           fi
 
-      - name: Check out pgsandbox-mcp
+      - name: Check out pgsandbox
+        if: steps.tap-auth.outcome == 'success'
         uses: actions/checkout@v6.0.2
 
       - name: Derive release version
+        if: steps.tap-auth.outcome == 'success'
         id: release
         run: |
           tag="$GITHUB_REF_NAME"
@@ -51,7 +55,7 @@ jobs:
               ;;
           esac
 
-          asset="pgsandbox-mcp-${version}.tar.gz"
+          asset="pgsandbox-${version}.tar.gz"
 
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "version=$version" >> "$GITHUB_OUTPUT"
@@ -59,6 +63,7 @@ jobs:
           echo "archive=dist/$asset" >> "$GITHUB_OUTPUT"
 
       - name: Download release asset
+        if: steps.tap-auth.outcome == 'success'
         id: archive
         env:
           GH_TOKEN: ${{ github.token }}
@@ -82,21 +87,21 @@ jobs:
           fi
 
       - name: Set up Node
-        if: steps.archive.outputs.found != 'true'
+        if: steps.tap-auth.outcome == 'success' && steps.archive.outputs.found != 'true'
         uses: actions/setup-node@v6.4.0
         with:
           node-version: 22
 
       - name: Set up Rust
-        if: steps.archive.outputs.found != 'true'
+        if: steps.tap-auth.outcome == 'success' && steps.archive.outputs.found != 'true'
         uses: dtolnay/rust-toolchain@1.91.1
 
       - name: Cache Rust build
-        if: steps.archive.outputs.found != 'true'
+        if: steps.tap-auth.outcome == 'success' && steps.archive.outputs.found != 'true'
         uses: Swatinem/rust-cache@v2.9.1
 
       - name: Build release asset
-        if: steps.archive.outputs.found != 'true'
+        if: steps.tap-auth.outcome == 'success' && steps.archive.outputs.found != 'true'
         env:
           ARCHIVE: ${{ steps.release.outputs.archive }}
         run: |
@@ -108,7 +113,7 @@ jobs:
           fi
 
       - name: Upload built release asset
-        if: steps.archive.outputs.found != 'true'
+        if: steps.tap-auth.outcome == 'success' && steps.archive.outputs.found != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.release.outputs.tag }}
@@ -119,6 +124,7 @@ jobs:
             --clobber
 
       - name: Compute release asset SHA256
+        if: steps.tap-auth.outcome == 'success'
         id: checksum
         env:
           ARCHIVE: ${{ steps.release.outputs.archive }}
@@ -133,6 +139,7 @@ jobs:
           echo "Release asset SHA256: $sha256"
 
       - name: Check out Homebrew tap
+        if: steps.tap-auth.outcome == 'success'
         uses: actions/checkout@v6.0.2
         with:
           repository: ${{ env.TAP_REPOSITORY }}
@@ -140,6 +147,7 @@ jobs:
           path: homebrew-tap
 
       - name: Update formula
+        if: steps.tap-auth.outcome == 'success'
         env:
           VERSION: ${{ steps.release.outputs.version }}
           SHA256: ${{ steps.checksum.outputs.sha256 }}
@@ -147,6 +155,7 @@ jobs:
           sh scripts/update-homebrew-formula.sh "homebrew-tap/$FORMULA_PATH" "$VERSION" "$SHA256"
 
       - name: Open Homebrew tap PR
+        if: steps.tap-auth.outcome == 'success'
         env:
           GH_TOKEN: ${{ secrets.HOMEBREW_TAP_PAT }}
           VERSION: ${{ steps.release.outputs.version }}
@@ -155,8 +164,8 @@ jobs:
           ASSET: ${{ steps.release.outputs.asset }}
         working-directory: homebrew-tap
         run: |
-          branch="pgsandbox-mcp-${VERSION}"
-          title="Update pgsandbox-mcp to ${VERSION}"
+          branch="pgsandbox-${VERSION}"
+          title="Update pgsandbox to ${VERSION}"
           body_file="$(mktemp)"
 
           git config user.name "github-actions[bot]"
@@ -176,7 +185,7 @@ jobs:
             exit 0
           fi
 
-          git commit -m "chore: update pgsandbox-mcp to ${VERSION}"
+          git commit -m "chore: update pgsandbox to ${VERSION}"
           if [ "$branch_exists" = true ]; then
             git push --force-with-lease origin "$branch"
           else
@@ -184,10 +193,10 @@ jobs:
           fi
 
           cat > "$body_file" <<EOF
-          Updates \`Formula/pgsandbox-mcp.rb\` for pgsandbox-mcp ${VERSION}.
+          Updates \`Formula/pgsandbox.rb\` for pgsandbox ${VERSION}.
 
-          - Release: https://github.com/LVTD-LLC/pgsandbox-mcp/releases/tag/${TAG}
-          - Asset: https://github.com/LVTD-LLC/pgsandbox-mcp/releases/download/${TAG}/${ASSET}
+          - Release: https://github.com/LVTD-LLC/pgsandbox/releases/tag/${TAG}
+          - Asset: https://github.com/LVTD-LLC/pgsandbox/releases/download/${TAG}/${ASSET}
           - SHA256: \`${SHA256}\`
 
           This keeps the formula pinned to an immutable versioned release asset.
