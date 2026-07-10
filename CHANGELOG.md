@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-07-10
+
+- Added the Astro Markdown blog post "How to Use Local Postgres Versions with Coding Agents" with SEO ledger, link inventory, and inbound blog links.
+
 ## 2026-07-09
 
 - Added the Astro Markdown blog post "Postgres MCP Server Error Handling for Coding Agents" with SEO ledger, link inventory, and inbound blog links.

@@ -155,6 +155,8 @@ Profile and version errors should move the agent toward diagnostics, not toward 
 
 PGSandbox supports explicit profiles and managed local Postgres versions. If an agent requests `postgresVersion: "18"`, the managed local path can use a versioned profile such as `local-pg18`. If it supplies both `profile` and `postgresVersion`, the pair must match. A mismatch returns `version_mismatch`.
 
+For agents deciding which selector to use and when to pin a fixed profile, use [How to Use Local Postgres Versions with Coding Agents](https://pgsandbox.lvtd.dev/blog/how-to-use-local-postgres-versions-with-coding-agents/).
+
 Use this recovery flow:
 
 | Error | First diagnostic |

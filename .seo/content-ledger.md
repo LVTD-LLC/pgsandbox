@@ -16,6 +16,7 @@
 | 2026-07-07 | How-to / tutorial | How to Use Postgres EXPLAIN Plans for Agent SQL Review | postgres-explain-plan-agent-sql | postgres explain plan | /docs/mcp-tools/, /docs/architecture/, /blog/how-to-create-postgres-test-database-agent-sql/, /blog/database-migration-testing-agent-pr/, /blog/postgres-schema-snapshots-agent-migration-reviews/ | Astro Markdown source of truth; uses the agent-specific EXPLAIN review contract as the information-gain framework. |
 | 2026-07-08 | How-to / tutorial | How to Run Agent SQL with Bounded Postgres Results | postgres-run-sql-bounded-results | postgres run sql | /docs/mcp-tools/, /docs/architecture/, /blog/what-is-database-sandbox/, /blog/postgres-explain-plan-agent-sql/, /blog/database-migration-testing-agent-pr/, /blog/how-to-create-postgres-test-database-agent-sql/ | Astro Markdown source of truth; uses the bounded result envelope and PR-ready SQL proof contract as the information-gain framework. |
 | 2026-07-09 | Guide / checklist | Postgres MCP Server Error Handling for Coding Agents | postgres-mcp-server-error-handling-coding-agents | postgres mcp server errors | /docs/mcp-tools/, /blog/what-is-database-sandbox/, /blog/postgres-explain-plan-agent-sql/, /blog/postgres-run-sql-bounded-results/, /blog/postgres-mcp-server-safety-checklist/ | Astro Markdown source of truth; uses the stable remediation envelope for agent-readable Postgres MCP failures as the information-gain framework. |
+| 2026-07-10 | How-to / tutorial | How to Use Local Postgres Versions with Coding Agents | how-to-use-local-postgres-versions-with-coding-agents | local postgres version | /docs/mcp-tools/, /docs/architecture/, /docs/install/, /blog/postgres-mcp-server-error-handling-coding-agents/, /blog/postgres-explain-plan-agent-sql/ | Astro Markdown source of truth; uses managed local profile/version selectors and recovery flow as the information-gain framework. |
 
 ## Removed
 
@@ -25,11 +26,11 @@
 
 ## Candidate Backlog
 
-Last researched: 2026-07-09
+Last researched: 2026-07-10
 
 | Rank | Score | Proposed Type | Title | Target Keyword | Volume | KD | Intent | SERP Read | Why It Fits |
 | --- | ---: | --- | --- | --- | ---: | ---: | --- | --- | --- |
-| 1 | 15 | How-to / tutorial | How to Use Local Postgres Versions with Coding Agents | local postgres version | TBD | TBD | Informational | Repo supports managed local Postgres versions 13-18; current blog has no dedicated version-selection tutorial. | Product-led fit for `postgresVersion`, `list_profiles`, managed local profiles, and migration compatibility checks. |
+No remaining backlog items.
 
 ## Notes
 
@@ -47,3 +48,4 @@ Last researched: 2026-07-09
 - 2026-07-07 cron selected the refresh/backlog candidate automatically per cron instruction. DataForSEO helper was installed but credentials were unavailable, so live keyword volume/KD stayed `TBD` and the run used web/primary-source fallback. New source-of-truth content file: `site/src/content/blog/postgres-explain-plan-agent-sql.md`.
 - 2026-07-08 cron selected the top remaining backlog candidate automatically per cron instruction. DataForSEO skill metadata was present but the helper script was unavailable in this environment, so live keyword volume/KD stayed `TBD` and the run used web/primary-source fallback. New source-of-truth content file: `site/src/content/blog/postgres-run-sql-bounded-results.md`.
 - 2026-07-09 cron selected the top remaining backlog candidate automatically per cron instruction. Live research used PostgreSQL and Model Context Protocol primary docs plus repo implementation/docs; keyword volume/KD stayed `TBD` under the fallback path. New source-of-truth content file: `site/src/content/blog/postgres-mcp-server-error-handling-coding-agents.md`.
+- 2026-07-10 cron selected the top remaining backlog candidate automatically per cron instruction. Live research used PostgreSQL docs, MCP specification docs, and repo implementation/docs; keyword volume/KD remained `TBD` under fallback due to unavailable DataForSEO SERP credentials in this run. New source-of-truth content file: `site/src/content/blog/how-to-use-local-postgres-versions-with-coding-agents.md`.

@@ -57,7 +57,7 @@ Generic "migration succeeded" output is too thin. A good proof needs enough data
 
 Start with a database that exists only for the agent task.
 
-The target should not be production, staging, or the shared development database. It should be a [database sandbox](https://pgsandbox.lvtd.dev/blog/what-is-database-sandbox/) with its own authority, state, data boundary, time limit, and cleanup path.
+The target should not be production, staging, or the shared development database. It should be a [database sandbox](https://pgsandbox.lvtd.dev/blog/what-is-database-sandbox/) with its own authority, state, data boundary, time limit, and cleanup path. If migration reliability depends on a specific major version, start with the [Local Postgres versioning guide](https://pgsandbox.lvtd.dev/blog/how-to-use-local-postgres-versions-with-coding-agents/) and pin that selector before running the migration command.
 
 With PGSandbox, the first move is to create a sandbox database with a short name hint, owner, labels, and TTL. The [PGSandbox tool contract](https://pgsandbox.lvtd.dev/docs/mcp-tools/) documents `create_database` as the lifecycle tool that creates an isolated database and login role. The [architecture docs](https://pgsandbox.lvtd.dev/docs/architecture/) describe the resource model: one database, one scoped role, TTL metadata, and cleanup tied to tracked resources.
 
