@@ -1,6 +1,8 @@
 # Changelog
 
 ## 2026-07-11
+ 
+- Added the Astro Markdown blog post "How to Use cleanup_expired for Stale PGSandbox Resources" with SEO ledger, link inventory, and inbound blog links.
 
 - Released `pgsandbox` v0.4.9 with more reliable agent repo workflows: database-id-first profile resolution, bounded stdin, Docker URL env aliases, explicit untracked-change semantics, redacted/filterable command output, clearer expired listings, concise smoke-test results, and preserved command output on timeout.
 

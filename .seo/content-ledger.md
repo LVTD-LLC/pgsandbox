@@ -17,6 +17,7 @@
 | 2026-07-08 | How-to / tutorial | How to Run Agent SQL with Bounded Postgres Results | postgres-run-sql-bounded-results | postgres run sql | /docs/mcp-tools/, /docs/architecture/, /blog/what-is-database-sandbox/, /blog/postgres-explain-plan-agent-sql/, /blog/database-migration-testing-agent-pr/, /blog/how-to-create-postgres-test-database-agent-sql/ | Astro Markdown source of truth; uses the bounded result envelope and PR-ready SQL proof contract as the information-gain framework. |
 | 2026-07-09 | Guide / checklist | Postgres MCP Server Error Handling for Coding Agents | postgres-mcp-server-error-handling-coding-agents | postgres mcp server errors | /docs/mcp-tools/, /blog/what-is-database-sandbox/, /blog/postgres-explain-plan-agent-sql/, /blog/postgres-run-sql-bounded-results/, /blog/postgres-mcp-server-safety-checklist/ | Astro Markdown source of truth; uses the stable remediation envelope for agent-readable Postgres MCP failures as the information-gain framework. |
 | 2026-07-10 | How-to / tutorial | How to Use Local Postgres Versions with Coding Agents | how-to-use-local-postgres-versions-with-coding-agents | local postgres version | /docs/mcp-tools/, /docs/architecture/, /docs/install/, /blog/postgres-mcp-server-error-handling-coding-agents/, /blog/postgres-explain-plan-agent-sql/ | Astro Markdown source of truth; uses managed local profile/version selectors and recovery flow as the information-gain framework. |
+| 2026-07-11 | How-to / tutorial | How to Use cleanup_expired for Stale PGSandbox Resources | how-to-use-cleanup-expired-for-stale-pgsandbox-resources | cleanup_expired | /docs/mcp-tools/, /docs/architecture/, /docs/agent-workflows/, /blog/postgres-run-sql-bounded-results/ | Astro Markdown source of truth; uses `cleanup_expired` dry-run/scope/failure semantics as a dedicated post-hygiene playbook. |
 
 ## Removed
 
@@ -26,11 +27,12 @@
 
 ## Candidate Backlog
 
-Last researched: 2026-07-10
+Last researched: 2026-07-11
 
 | Rank | Score | Proposed Type | Title | Target Keyword | Volume | KD | Intent | SERP Read | Why It Fits |
 | --- | ---: | --- | --- | --- | ---: | ---: | --- | --- | --- |
-No remaining backlog items.
+| 1 | 30 | Comparison | cleanup_expired vs manual database retention workflows | cleanup_expired | TBD | TBD | informational | 2026-07-11 fallback | Compare metadata-driven cleanup against manual Postgres cleanup and owner/superuser-based SQL cleanup for operational safety notes. |
+| 2 | 28 | Guide | How to design owner and label policy for shared PGSandbox profiles | postgres sandbox cleanup | TBD | TBD | informational | 2026-07-11 fallback | Operational tagging pattern for multi-agent, multi-profile cleanup reliability and audit clarity. |
 
 ## Notes
 
@@ -49,3 +51,4 @@ No remaining backlog items.
 - 2026-07-08 cron selected the top remaining backlog candidate automatically per cron instruction. DataForSEO skill metadata was present but the helper script was unavailable in this environment, so live keyword volume/KD stayed `TBD` and the run used web/primary-source fallback. New source-of-truth content file: `site/src/content/blog/postgres-run-sql-bounded-results.md`.
 - 2026-07-09 cron selected the top remaining backlog candidate automatically per cron instruction. Live research used PostgreSQL and Model Context Protocol primary docs plus repo implementation/docs; keyword volume/KD stayed `TBD` under the fallback path. New source-of-truth content file: `site/src/content/blog/postgres-mcp-server-error-handling-coding-agents.md`.
 - 2026-07-10 cron selected the top remaining backlog candidate automatically per cron instruction. Live research used PostgreSQL docs, MCP specification docs, and repo implementation/docs; keyword volume/KD remained `TBD` under fallback due to unavailable DataForSEO SERP credentials in this run. New source-of-truth content file: `site/src/content/blog/how-to-use-local-postgres-versions-with-coding-agents.md`.
+- 2026-07-11 cron selected the top remaining backlog candidate automatically per cron instruction. Live research used PGSandbox MCP docs plus PostgreSQL `DROP DATABASE` reference; keyword volume/KD remained `TBD` under fallback. New source-of-truth content file: `site/src/content/blog/how-to-use-cleanup-expired-for-stale-pgsandbox-resources.md`.
