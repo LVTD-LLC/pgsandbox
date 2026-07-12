@@ -115,6 +115,8 @@ For one-off maintenance on shared operator machines, start narrow first (`owner`
 
 The agent workflow docs show the same pattern: list by owner first, then call `cleanup_expired` with `includeAllVersions: true` as a separate step when you need the broad view (https://pgsandbox.lvtd.dev/docs/agent-workflows/).
 
+If you are deciding whether a stale resource should go through PGSandbox metadata or a human-run SQL cleanup, use the [cleanup_expired vs manual Postgres cleanup comparison](/blog/cleanup-expired-vs-manual-postgres-cleanup/) before widening scope.
+
 ## Recommended operational patterns
 
 ### Pattern A: Routine cleanup after agent sessions

@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-07-12
+
+- Added the Astro Markdown blog post "cleanup_expired vs Manual Postgres Cleanup for Agent Sandboxes" with SEO ledger, link inventory, and inbound blog links.
+
 ## 2026-07-11
  
 - Added the Astro Markdown blog post "How to Use cleanup_expired for Stale PGSandbox Resources" with SEO ledger, link inventory, and inbound blog links.

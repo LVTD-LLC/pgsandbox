@@ -135,6 +135,8 @@ A generic `DROP DATABASE` tool is too broad. A cleanup tool should delete only d
 
 PGSandbox's model is intentionally narrow: create tracked sandboxes, list tracked sandboxes, delete tracked sandboxes, and clean up expired tracked sandboxes. The destructive operation is scoped to resources PGSandbox created for the selected profile.
 
+For stale resources, the operational split is simple: use metadata-backed cleanup for PGSandbox-created resources, and reserve manual SQL for resources outside that contract. The [cleanup_expired vs manual Postgres cleanup guide](/blog/cleanup-expired-vs-manual-postgres-cleanup/) walks through that decision.
+
 That pattern is worth copying even if you do not use PGSandbox. Before adding a destructive tool to a Postgres MCP server, ask:
 
 - Can it delete anything the server did not create?
