@@ -19,6 +19,7 @@
 | 2026-07-10 | How-to / tutorial | How to Use Local Postgres Versions with Coding Agents | how-to-use-local-postgres-versions-with-coding-agents | local postgres version | /docs/mcp-tools/, /docs/architecture/, /docs/install/, /blog/postgres-mcp-server-error-handling-coding-agents/, /blog/postgres-explain-plan-agent-sql/ | Astro Markdown source of truth; uses managed local profile/version selectors and recovery flow as the information-gain framework. |
 | 2026-07-11 | How-to / tutorial | How to Use cleanup_expired for Stale PGSandbox Resources | how-to-use-cleanup-expired-for-stale-pgsandbox-resources | cleanup_expired | /docs/mcp-tools/, /docs/architecture/, /docs/agent-workflows/, /blog/postgres-run-sql-bounded-results/ | Astro Markdown source of truth; uses `cleanup_expired` dry-run/scope/failure semantics as a dedicated post-hygiene playbook. |
 | 2026-07-12 | Comparison | cleanup_expired vs Manual Postgres Cleanup for Agent Sandboxes | cleanup-expired-vs-manual-postgres-cleanup | cleanup_expired | /docs/mcp-tools/, /docs/architecture/, /blog/how-to-use-cleanup-expired-for-stale-pgsandbox-resources/, /blog/postgres-mcp-server-safety-checklist/, /blog/postgres-run-sql-bounded-results/ | Astro Markdown source of truth; compares metadata-backed cleanup with manual PostgreSQL cleanup and role-removal fallback paths. |
+| 2026-07-13 | Guide | Owner and Label Policy for Shared PGSandbox Profiles | owner-label-policy-shared-pgsandbox-profiles | postgres sandbox cleanup | /docs/mcp-tools/, /docs/architecture/, /blog/how-to-use-cleanup-expired-for-stale-pgsandbox-resources/, /blog/cleanup-expired-vs-manual-postgres-cleanup/, /blog/postgres-mcp-server-safety-checklist/ | Astro Markdown source of truth; uses a concrete owner/label taxonomy and cleanup selection contract as the information-gain framework. |
 
 ## Removed
 
@@ -28,11 +29,12 @@
 
 ## Candidate Backlog
 
-Last researched: 2026-07-12
+Last researched: 2026-07-13
 
 | Rank | Score | Proposed Type | Title | Target Keyword | Volume | KD | Intent | SERP Read | Why It Fits |
 | --- | ---: | --- | --- | --- | ---: | ---: | --- | --- | --- |
-| 1 | 28 | Guide | How to design owner and label policy for shared PGSandbox profiles | postgres sandbox cleanup | TBD | TBD | informational | 2026-07-11 fallback | Operational tagging pattern for multi-agent, multi-profile cleanup reliability and audit clarity. |
+| 1 | 26 | How-to / tutorial | How to choose TTL values for agent Postgres sandboxes | postgres test database cleanup | TBD | TBD | informational | 2026-07-13 fallback | Adjacent to cleanup policy; gives operators a retention matrix by task type without duplicating `cleanup_expired`. |
+| 2 | 24 | Guide / checklist | Per-owner sandbox quotas for coding agents | postgres sandbox quotas | TBD | TBD | informational | 2026-07-13 fallback | Connects profile config, owner policy, and failure prevention for shared agent machines. |
 
 ## Notes
 
@@ -53,3 +55,4 @@ Last researched: 2026-07-12
 - 2026-07-10 cron selected the top remaining backlog candidate automatically per cron instruction. Live research used PostgreSQL docs, MCP specification docs, and repo implementation/docs; keyword volume/KD remained `TBD` under fallback due to unavailable DataForSEO SERP credentials in this run. New source-of-truth content file: `site/src/content/blog/how-to-use-local-postgres-versions-with-coding-agents.md`.
 - 2026-07-11 cron selected the top remaining backlog candidate automatically per cron instruction. Live research used PGSandbox MCP docs plus PostgreSQL `DROP DATABASE` reference; keyword volume/KD remained `TBD` under fallback. New source-of-truth content file: `site/src/content/blog/how-to-use-cleanup-expired-for-stale-pgsandbox-resources.md`.
 - 2026-07-12 cron selected the top remaining backlog candidate automatically per cron instruction. Live research used PGSandbox MCP docs plus PostgreSQL `DROP DATABASE`, `REASSIGN OWNED`, and role-removal primary docs; keyword volume/KD remained `TBD` under fallback. New source-of-truth content file: `site/src/content/blog/cleanup-expired-vs-manual-postgres-cleanup.md`.
+- 2026-07-13 cron selected the top remaining backlog candidate automatically per cron instruction. DataForSEO was unavailable (`DATAFORSEO_LOGIN` / helper script missing), so live research used PGSandbox docs/repo implementation plus PostgreSQL JSONB, `DROP DATABASE`, and role-removal primary docs. Keyword volume/KD remained `TBD` under fallback. New source-of-truth content file: `site/src/content/blog/owner-label-policy-shared-pgsandbox-profiles.md`.

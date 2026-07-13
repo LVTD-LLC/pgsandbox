@@ -117,6 +117,8 @@ The agent workflow docs show the same pattern: list by owner first, then call `c
 
 If you are deciding whether a stale resource should go through PGSandbox metadata or a human-run SQL cleanup, use the [cleanup_expired vs manual Postgres cleanup comparison](/blog/cleanup-expired-vs-manual-postgres-cleanup/) before widening scope.
 
+If multiple agents or repositories share the same profile, define an [owner and label policy for shared PGSandbox profiles](/blog/owner-label-policy-shared-pgsandbox-profiles/) before running broad cleanup. The policy is what keeps `owner` filters from becoming too wide.
+
 ## Recommended operational patterns
 
 ### Pattern A: Routine cleanup after agent sessions
@@ -224,6 +226,7 @@ A database with no TTL cannot be selected as stale. Set TTL intentionally for ro
 - [PGSandbox Architecture Notes](https://pgsandbox.lvtd.dev/docs/architecture/) for metadata and resource lifecycle details.
 - [PGSandbox Agent Workflows](https://pgsandbox.lvtd.dev/docs/agent-workflows/) for practical cleanup recipes.
 - [PostgreSQL `DROP DATABASE` reference](https://www.postgresql.org/docs/current/sql-dropdatabase.html) for owner/superuser requirements when manual fallback is unavoidable.
+- [Owner and Label Policy for Shared PGSandbox Profiles](/blog/owner-label-policy-shared-pgsandbox-profiles/) for cleanup-safe owner and label taxonomy.
 
 ## FAQ
 

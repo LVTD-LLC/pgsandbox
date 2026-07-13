@@ -160,6 +160,8 @@ Use this policy when several agents or repos share local Postgres profiles:
 
 That policy gives agents a narrow path most of the time and leaves manual SQL for cases where an operator actually needs database-admin authority.
 
+For a concrete taxonomy, use the [owner and label policy for shared PGSandbox profiles](/blog/owner-label-policy-shared-pgsandbox-profiles/). It turns the table above into repeatable `owner`, `repo`, `task`, `workflow`, and `retention` fields that cleanup can select safely.
+
 ## What a PR-ready cleanup note should include
 
 For `cleanup_expired`, include the selection and result:
@@ -214,6 +216,7 @@ Labels are the difference between "clean up whatever this owner touched" and "cl
 ## Related pages
 
 - [How to Use cleanup_expired for Stale PGSandbox Resources](/blog/how-to-use-cleanup-expired-for-stale-pgsandbox-resources/)
+- [Owner and Label Policy for Shared PGSandbox Profiles](/blog/owner-label-policy-shared-pgsandbox-profiles/)
 - [Postgres MCP Server Safety Checklist for Coding Agents](/blog/postgres-mcp-server-safety-checklist/)
 - [How to Run Agent SQL with Bounded Postgres Results](/blog/postgres-run-sql-bounded-results/)
 - [MCP tool contract](/docs/mcp-tools/)
