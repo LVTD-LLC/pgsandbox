@@ -394,6 +394,8 @@ Branches get renamed and reused. Use branch as supporting context, not as the pr
 
 Some sandboxes should be deleted on success. Others should live until TTL for review. A `retention` label keeps that difference visible.
 
+The [Postgres sandbox TTL guide](/blog/postgres-sandbox-ttl-values/) provides a retention-budget method and starting ranges for direct SQL checks, migration validation, repository commands, and human review holds.
+
 ### Mistake: making labels too personal
 
 Prefer role or lane identifiers. The cleanup system needs operational ownership, not personal data.

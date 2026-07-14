@@ -220,6 +220,8 @@ If the cleanup response shows unfinished profile state, stop and run a scoped fo
 
 A database with no TTL cannot be selected as stale. Set TTL intentionally for routine work unless the workflow has a stronger explicit retention reason.
 
+Use the [Postgres sandbox TTL guide](/blog/postgres-sandbox-ttl-values/) to choose a value from task runtime, review needs, and recovery margin instead of copying the same timeout into every workflow.
+
 ## Related pages you should check first
 
 - [PGSandbox MCP Tool Contract](https://pgsandbox.lvtd.dev/docs/mcp-tools/) for all cleanup inputs and output fields.
