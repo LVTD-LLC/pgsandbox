@@ -141,7 +141,7 @@ Choose the two values separately:
 - **Default:** the 75th or 90th percentile of routine task runtime plus a small recovery margin.
 - **Maximum:** the longest approved debugging or review hold, not an effectively permanent setting.
 
-Pair retention with a per-owner quota on shared profiles. A short TTL limits age; a quota limits how many active sandboxes one owner can accumulate before those deadlines arrive. These controls solve different problems.
+Pair retention with a per-owner quota on shared profiles. A short TTL limits age; a quota limits how many active sandboxes one owner can accumulate before those deadlines arrive. These controls solve different problems. The [Postgres sandbox quota guide](/blog/postgres-sandbox-quotas-coding-agents/) explains the exact owner/profile accounting boundary and a safe quota-error recovery flow.
 
 Revisit the policy after a week or a representative batch of tasks. Count sandboxes deleted on success, cleaned after expiry, and still active near their deadline. If routine tasks often expire while active, the budget is too short or sandbox creation happens too early. If most sandboxes wait for TTL despite successful tasks, the closeout workflow is missing explicit deletion.
 
@@ -207,6 +207,7 @@ Keep it only when the reviewer needs the live database. Start with 120-240 minut
 - [PGSandbox architecture](/docs/architecture/)
 - [Database migration testing before agent PRs](/blog/database-migration-testing-agent-pr/)
 - [Owner and label policy for shared PGSandbox profiles](/blog/owner-label-policy-shared-pgsandbox-profiles/)
+- [Postgres sandbox quotas for coding agents](/blog/postgres-sandbox-quotas-coding-agents/)
 - [How to use cleanup_expired for stale resources](/blog/how-to-use-cleanup-expired-for-stale-pgsandbox-resources/)
 
 <script type="application/ld+json">

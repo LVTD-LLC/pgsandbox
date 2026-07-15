@@ -116,7 +116,7 @@ Poor owner values:
 | Secrets, database URLs, or hostnames | They should never enter metadata or PR notes. |
 | One-off random ids only | Hard for humans to group during recovery. |
 
-The owner should be stable enough to support per-owner quotas. PGSandbox supports optional per-owner active sandbox quotas in profile config, so a high-cardinality owner value can make quota behavior less useful.
+The owner should be stable enough to support per-owner quotas. PGSandbox supports optional per-owner active sandbox quotas in profile config, so a high-cardinality owner value can make quota behavior less useful. The [Postgres sandbox quota guide](/blog/postgres-sandbox-quotas-coding-agents/) shows how exact owner matching, TTL state, and profile scope determine the active count.
 
 ## A label taxonomy that survives cleanup
 
@@ -420,6 +420,7 @@ No. Start with the default or explicit profile. Use all-version cleanup only whe
 
 ## Related pages
 
+- [Postgres Sandbox Quotas for Coding Agents](/blog/postgres-sandbox-quotas-coding-agents/)
 - [How to Use cleanup_expired for Stale PGSandbox Resources](/blog/how-to-use-cleanup-expired-for-stale-pgsandbox-resources/)
 - [cleanup_expired vs Manual Postgres Cleanup for Agent Sandboxes](/blog/cleanup-expired-vs-manual-postgres-cleanup/)
 - [Postgres MCP Server Safety Checklist for Coding Agents](/blog/postgres-mcp-server-safety-checklist/)
