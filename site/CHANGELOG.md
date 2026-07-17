@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-07-17
+
+- Added the Astro Markdown blog post "PostgreSQL ROLE vs USER for Agent Database Access" with SEO ledger, link inventory, and inbound blog links.
+
 ## 2026-07-16
 
 - Added the Astro Markdown blog post "Per-Sandbox Postgres Roles for Coding Agents" with SEO ledger, link inventory, and inbound blog links.

@@ -23,6 +23,7 @@
 | 2026-07-14 | How-to / tutorial | Postgres Test Database Cleanup: Choosing Sandbox TTLs | postgres-sandbox-ttl-values | postgres test database cleanup | /docs/mcp-tools/, /docs/architecture/, /docs/agent-workflows/, /blog/how-to-use-cleanup-expired-for-stale-pgsandbox-resources/, /blog/owner-label-policy-shared-pgsandbox-profiles/, /blog/database-migration-testing-agent-pr/ | Astro Markdown source of truth; uses task runtime + review buffer + recovery margin as the retention-budget framework. |
 | 2026-07-15 | Guide / checklist | Postgres Sandbox Quotas for Coding Agents | postgres-sandbox-quotas-coding-agents | postgres sandbox quotas | /docs/architecture/, /docs/mcp-tools/, /blog/postgres-sandbox-ttl-values/, /blog/owner-label-policy-shared-pgsandbox-profiles/, /blog/postgres-mcp-server-safety-checklist/ | Astro Markdown source of truth; documents the exact owner/profile/TTL quota boundary and the five-part active-sandbox budget. |
 | 2026-07-16 | Guide / checklist | Per-Sandbox Postgres Roles for Coding Agents | per-sandbox-postgres-roles-coding-agents | postgres role per database | /docs/architecture/, /docs/mcp-tools/, /blog/postgres-mcp-server-safety-checklist/, /blog/postgres-run-sql-bounded-results/, /blog/postgres-sandbox-quotas-coding-agents/ | Astro Markdown source of truth; uses the lifecycle authority vs task authority vs cluster access matrix as the information-gain framework. |
+| 2026-07-17 | Definition / comparison | PostgreSQL ROLE vs USER for Agent Database Access | postgres-role-vs-user-agent-access | postgres role vs user | /docs/architecture/, /docs/mcp-tools/, /blog/per-sandbox-postgres-roles-coding-agents/, /blog/postgres-mcp-server-safety-checklist/, /blog/postgres-run-sql-bounded-results/ | Astro Markdown source of truth; uses authentication identity vs privilege carrier vs object owner as the information-gain framework. |
 
 ## Removed
 
@@ -32,11 +33,11 @@
 
 ## Candidate Backlog
 
-Last researched: 2026-07-16
+Last researched: 2026-07-17
 
 | Rank | Score | Proposed Type | Title | Target Keyword | Volume | KD | Intent | SERP Read | Why It Fits |
 | --- | ---: | --- | --- | --- | ---: | ---: | --- | --- | --- |
-| 1 | 21 | Definition / comparison | PostgreSQL ROLE vs USER for agent database access | postgres role vs user | TBD | TBD | informational | 2026-07-16 web fallback | Clarifies PostgreSQL's unified role model and maps login roles, group roles, ownership, and agent credentials to practical MCP access design. |
+No unshipped candidates remain after the 2026-07-17 run. Refresh the opportunity pool before the next piece.
 
 ## Notes
 
@@ -61,3 +62,4 @@ Last researched: 2026-07-16
 - 2026-07-14 cron selected the top remaining backlog candidate automatically per cron instruction. DataForSEO credentials and the helper script were unavailable, so live research used the PGSandbox docs/repo implementation, PostgreSQL database-removal docs, GitHub Actions timeout docs, and SERP/web fallback. Keyword volume/KD remained `TBD`. New source-of-truth content file: `site/src/content/blog/postgres-sandbox-ttl-values.md`.
 - 2026-07-15 cron selected the top remaining backlog candidate automatically per cron instruction. DataForSEO credentials and the helper script were unavailable, so live research used the PGSandbox source/docs, PostgreSQL connection and role docs, MCP security guidance, and SERP/web fallback. Keyword volume/KD remained `TBD`. New source-of-truth content file: `site/src/content/blog/postgres-sandbox-quotas-coding-agents.md`.
 - 2026-07-16 cron selected the top remaining backlog candidate automatically per cron instruction. DataForSEO credentials and the helper script were unavailable, so live research used the PGSandbox source/docs, PostgreSQL role/privilege/authentication docs, MCP security guidance, and SERP/web fallback. Keyword volume/KD remained `TBD`. New source-of-truth content file: `site/src/content/blog/per-sandbox-postgres-roles-coding-agents.md`.
+- 2026-07-17 cron selected the top backlog candidate automatically per cron instruction. DataForSEO credentials were unavailable and Firecrawl search returned no usable output, so live research used current PostgreSQL 18 role, membership, catalog, privilege, and session-identity docs, MCP security guidance, the PGSandbox source/docs, and web SERP fallback. Keyword volume/KD remained `TBD`. New source-of-truth content file: `site/src/content/blog/postgres-role-vs-user-agent-access.md`.

@@ -16,6 +16,8 @@ sortOrder: 134
 ---
 A per-sandbox Postgres role gives each coding-agent task its own login identity and database owner. The lifecycle service uses an admin connection to create and delete resources; the agent runs migrations, seeds, and validation SQL through the generated role. This removes broad lifecycle authority from the normal task path and makes the database and credential one disposable unit.
 
+PostgreSQL does not store users and roles as separate object types. If the terminology is the confusing part, start with [PostgreSQL ROLE vs USER for agent access](/blog/postgres-role-vs-user-agent-access/): it explains the `LOGIN` default, `NOLOGIN` capability roles, memberships, and ownership before this guide applies them to a per-sandbox boundary.
+
 The important caveat is that PostgreSQL roles are cluster-wide, not database-local. A role created for one sandbox is valid throughout the cluster. Database ownership and object privileges limit what it can do, while `CONNECT`, `pg_hba.conf`, role memberships, and default grants determine where it can authenticate and what else it can reach. "One role per database" is a useful authority boundary, but it is not a network or cluster boundary by itself.
 
 This guide turns that distinction into a practical operating model:

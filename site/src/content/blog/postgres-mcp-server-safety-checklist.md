@@ -61,6 +61,8 @@ For Postgres, the enforcement must live in the server code and the database priv
 
 ## 2. Separate lifecycle authority from task SQL
 
+PostgreSQL users are roles with `LOGIN`, not a separate identity type. The [PostgreSQL ROLE vs USER guide](/blog/postgres-role-vs-user-agent-access/) shows how login identity, privilege membership, and object ownership should be reviewed separately for agent credentials.
+
 A safe Postgres MCP server should not use one powerful connection for everything.
 
 There are two jobs:
