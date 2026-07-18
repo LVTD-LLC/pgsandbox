@@ -42,6 +42,7 @@
 | /blog/postgres-sandbox-quotas-coding-agents/ | Postgres Sandbox Quotas for Coding Agents | Postgres sandbox quotas; per-owner sandbox quota; maxActiveDatabasesPerOwner; coding-agent database limits; active sandbox budget | Guide to exact owner/profile quota accounting, configuration, recovery, and current concurrency boundaries. |
 | /blog/per-sandbox-postgres-roles-coding-agents/ | Per-Sandbox Postgres Roles for Coding Agents | per-sandbox Postgres role; Postgres role per database; coding-agent database role; task-scoped Postgres login; sandbox role authority boundary | Guide to separating lifecycle authority, task-database ownership, and cluster access for coding-agent Postgres workflows. |
 | /blog/postgres-role-vs-user-agent-access/ | PostgreSQL ROLE vs USER for Agent Database Access | postgres role vs user; PostgreSQL user vs role; login role for coding agents; PostgreSQL agent credential; LOGIN vs NOLOGIN role | Definition and comparison of PostgreSQL's unified role model, login semantics, membership, ownership, and agent credential design. |
+| /blog/docker-connect-host-postgres/ | Connect a Docker Container to Host PostgreSQL Safely | docker connect to host Postgres; Docker container to host PostgreSQL; host.docker.internal Postgres; Docker Compose host-gateway Postgres; PGSandbox localContainer connection | How-to for choosing the correct client-side URL, verifying listener and HBA boundaries, injecting sandbox credentials, and collecting database proof. |
 
 ## Changelog
 

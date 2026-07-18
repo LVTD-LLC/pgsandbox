@@ -75,6 +75,8 @@ For Rails, Django, Ecto, Flyway, Atlas, Knex, Drizzle, or a custom SQL runner, t
 
 PGSandbox's repo workflow tools are built for this. `prepare_for_repo` writes a secret-free `.pgsandbox/project.json` with explicit command arrays. `validate_schema_change` runs an explicit or configured schema-change command against a fresh or selected sandbox, captures a before schema digest, captures an after digest, and returns a compact schema diff with bounded command output.
 
+If the repository's migration command runs inside Docker Compose while PostgreSQL stays on the host, use the [Docker-to-host PostgreSQL connection guide](/blog/docker-connect-host-postgres/) to choose the container URL, verify the listener and HBA path, and keep the sandbox credential out of tracked Compose files.
+
 The command should be an argv array, not a shell string. That keeps the proof boring in the best way: the agent cannot smuggle extra shell behavior into the validation command, and the reviewer can see the exact program and arguments.
 
 ## Step 3: capture the before and after schema

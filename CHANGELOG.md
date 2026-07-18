@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-07-18
+
+- Added the Astro Markdown blog post "Connect a Docker Container to Host PostgreSQL Safely" with SEO ledger, link inventory, inbound blog links, and canonical site configuration aligned to the production domain.
+
 ## 2026-07-17
 
 - Added the Astro Markdown blog post "PostgreSQL ROLE vs USER for Agent Database Access" with SEO ledger, link inventory, and inbound blog links.
