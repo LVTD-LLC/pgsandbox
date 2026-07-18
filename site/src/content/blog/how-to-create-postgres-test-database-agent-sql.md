@@ -9,7 +9,7 @@ tags: ["Postgres", "test database", "AI agents", "MCP", "SQL validation"]
 category: "Engineering"
 metaTitle: "Postgres Test Database for Agent SQL"
 metaDescription: "Create a Postgres test database for agent-generated SQL with scoped roles, migrations, seed data, bounded queries, and cleanup."
-canonicalUrl: "https://pgsandbox.lvtd.dev/blog/how-to-create-postgres-test-database-agent-sql/"
+canonicalUrl: "https://pgsandbox-mcp.lvtd.dev/blog/how-to-create-postgres-test-database-agent-sql/"
 heroImageUrl: ""
 featured: false
 sortOrder: 60
@@ -45,7 +45,7 @@ Good cases include:
 
 Do not create a database for every question. If the task is only reading model definitions or explaining a query plan, source files and schema docs may be enough. A test database is worth the setup when execution changes the answer.
 
-The important difference is that agent-generated SQL is not just text. Once an MCP server exposes a `run_sql`-style tool, the model has an operational path into state. The [Postgres MCP server safety checklist](https://pgsandbox.lvtd.dev/blog/postgres-mcp-server-safety-checklist/) covers that broader access review. This guide focuses on the test database itself.
+The important difference is that agent-generated SQL is not just text. Once an MCP server exposes a `run_sql`-style tool, the model has an operational path into state. The [Postgres MCP server safety checklist](https://pgsandbox-mcp.lvtd.dev/blog/postgres-mcp-server-safety-checklist/) covers that broader access review. This guide focuses on the test database itself.
 
 ## Step 1: choose the smallest useful state
 
@@ -63,7 +63,7 @@ Use the smallest state that can expose the failure or validate the change:
 
 A blank database is safest, but it is not always honest. A generated SQL query can pass against three clean rows and still fail against nullable legacy data, partial indexes, or enum values that only exist in a long-lived database.
 
-The practical decision is the data shape. If you choose that poorly, the agent can produce a false proof even though every command appears to succeed. For repeatable seeded states, use the [Postgres template database vs task sandbox](https://pgsandbox.lvtd.dev/blog/postgres-template-database-vs-task-sandbox/) guide to decide whether the state belongs in a native Postgres template, a PGSandbox local template artifact, or a one-off sandbox.
+The practical decision is the data shape. If you choose that poorly, the agent can produce a false proof even though every command appears to succeed. For repeatable seeded states, use the [Postgres template database vs task sandbox](https://pgsandbox-mcp.lvtd.dev/blog/postgres-template-database-vs-task-sandbox/) guide to decide whether the state belongs in a native Postgres template, a PGSandbox local template artifact, or a one-off sandbox.
 
 ## Step 2: create the database with lifecycle authority
 
@@ -94,7 +94,7 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public
 
 Those statements are intentionally generic. In a real workflow, generate the names and password, avoid logging the password, and store enough metadata to know who owns the test database and when it expires.
 
-PGSandbox handles that lifecycle through its [MCP tool contract](https://pgsandbox.lvtd.dev/docs/mcp-tools/): `create_database` creates an isolated database and login role, returns scoped connection details, and records metadata for later listing and cleanup. The [architecture docs](https://pgsandbox.lvtd.dev/docs/architecture/) describe the resource model behind that boundary.
+PGSandbox handles that lifecycle through its [MCP tool contract](https://pgsandbox-mcp.lvtd.dev/docs/mcp-tools/): `create_database` creates an isolated database and login role, returns scoped connection details, and records metadata for later listing and cleanup. The [architecture docs](https://pgsandbox-mcp.lvtd.dev/docs/architecture/) describe the resource model behind that boundary.
 
 ## Step 3: apply migrations before SQL validation
 
@@ -128,7 +128,7 @@ If a production-shaped bug really needs realistic data, use a masked source or a
 
 That makes dump-and-restore a practical clone path, but it does not make every source safe. If rows are sensitive, the agent should not see them just because a test database is temporary.
 
-When realistic state matters, follow the [Postgres clone database sandbox guide](https://pgsandbox.lvtd.dev/blog/how-to-clone-postgres-database-sandbox/): read from the source, restore into a newly created sandbox, omit ownership and privilege restoration where possible, and run task SQL only against the destination.
+When realistic state matters, follow the [Postgres clone database sandbox guide](https://pgsandbox-mcp.lvtd.dev/blog/how-to-clone-postgres-database-sandbox/): read from the source, restore into a newly created sandbox, omit ownership and privilege restoration where possible, and run task SQL only against the destination.
 
 ## Step 5: run generated SQL with bounded output
 
@@ -144,9 +144,9 @@ Before the agent runs generated SQL, decide:
 
 The row limit matters. A generated `SELECT *` against a realistic table can dump far more context than the agent needs. Bounded output is both a safety control and a usability control: the model gets the signal it needs without turning the database into a transcript export.
 
-When the generated SQL is more than a trivial lookup, inspect the [Postgres EXPLAIN plan for agent SQL review](https://pgsandbox.lvtd.dev/blog/postgres-explain-plan-agent-sql/) before you run it. The plan gives the reviewer a pre-execution check on relation names, node types, row estimates, and whether the agent's query is narrower than a broad table scan.
+When the generated SQL is more than a trivial lookup, inspect the [Postgres EXPLAIN plan for agent SQL review](https://pgsandbox-mcp.lvtd.dev/blog/postgres-explain-plan-agent-sql/) before you run it. The plan gives the reviewer a pre-execution check on relation names, node types, row estimates, and whether the agent's query is narrower than a broad table scan.
 
-PGSandbox's `run_sql` tool executes through the sandbox role and returns bounded results. For agent work, that is a better default than exposing a general admin SQL shell. The agent can still write a bad query. It gets a smaller place to be wrong and a smaller result envelope to reason over. The [bounded `run_sql` workflow](https://pgsandbox.lvtd.dev/blog/postgres-run-sql-bounded-results/) covers readonly mode, `rowLimit`, typed result sets, and PR-ready result summaries in more detail.
+PGSandbox's `run_sql` tool executes through the sandbox role and returns bounded results. For agent work, that is a better default than exposing a general admin SQL shell. The agent can still write a bad query. It gets a smaller place to be wrong and a smaller result envelope to reason over. The [bounded `run_sql` workflow](https://pgsandbox-mcp.lvtd.dev/blog/postgres-run-sql-bounded-results/) covers readonly mode, `rowLimit`, typed result sets, and PR-ready result summaries in more detail.
 
 For migrations and generated SQL patches, a useful proof record includes:
 
@@ -157,7 +157,7 @@ For migrations and generated SQL patches, a useful proof record includes:
 - Any errors in structured form.
 - Whether cleanup succeeded.
 
-For a migration-specific version of that proof record, see [database migration testing before agent PRs](https://pgsandbox.lvtd.dev/blog/database-migration-testing-agent-pr/). It focuses on running the repo migration command, capturing schema diffs, seeding risky data cases, and turning the result into a reviewable PR note.
+For a migration-specific version of that proof record, see [database migration testing before agent PRs](https://pgsandbox-mcp.lvtd.dev/blog/database-migration-testing-agent-pr/). It focuses on running the repo migration command, capturing schema diffs, seeding risky data cases, and turning the result into a reviewable PR note.
 
 That record is what a human reviewer can trust. "The agent said it tested it" is not enough.
 
@@ -175,7 +175,7 @@ A safe cleanup path should:
 - Support TTL-based cleanup for interrupted sessions.
 - Report cleanup failures clearly.
 
-This is where a task-scoped [database sandbox](https://pgsandbox.lvtd.dev/blog/what-is-database-sandbox/) is cleaner than a manually named test database. The sandbox has an owner, a TTL, labels, and metadata. If the agent stops halfway through a task, the cleanup process still has something concrete to inspect.
+This is where a task-scoped [database sandbox](https://pgsandbox-mcp.lvtd.dev/blog/what-is-database-sandbox/) is cleaner than a manually named test database. The sandbox has an owner, a TTL, labels, and metadata. If the agent stops halfway through a task, the cleanup process still has something concrete to inspect.
 
 ## A complete agent SQL proof loop
 
@@ -223,7 +223,7 @@ No. Use a dedicated database when the task needs execution proof against real Po
 
 ### Can I use Docker instead?
 
-Yes. A containerized Postgres service is a good test boundary for many teams. PGSandbox is useful when you already have a Postgres host or managed local cluster and want the smaller unit to be a task database and role, not a whole new database server. For the tradeoff in detail, read the [Testcontainers vs disposable Postgres sandboxes comparison](https://pgsandbox.lvtd.dev/blog/testcontainers-vs-disposable-postgres-sandboxes/).
+Yes. A containerized Postgres service is a good test boundary for many teams. PGSandbox is useful when you already have a Postgres host or managed local cluster and want the smaller unit to be a task database and role, not a whole new database server. For the tradeoff in detail, read the [Testcontainers vs disposable Postgres sandboxes comparison](https://pgsandbox-mcp.lvtd.dev/blog/testcontainers-vs-disposable-postgres-sandboxes/).
 
 ### Should an agent ever test against production?
 

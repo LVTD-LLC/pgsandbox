@@ -9,7 +9,7 @@ tags: ["Postgres", "MCP", "postgres sandboxes", "cleanup", "agent safety"]
 category: "Engineering"
 metaTitle: "Use cleanup_expired for Stale PGSandbox Databases"
 metaDescription: "A practical PGSandbox guide for running cleanup_expired safely: dry-run first, owner/label filters, cross-version cleanup, and safe recovery when resources stay behind."
-canonicalUrl: "https://pgsandbox.lvtd.dev/blog/how-to-use-cleanup-expired-for-stale-pgsandbox-resources/"
+canonicalUrl: "https://pgsandbox-mcp.lvtd.dev/blog/how-to-use-cleanup-expired-for-stale-pgsandbox-resources/"
 heroImageUrl: ""
 featured: false
 sortOrder: 131
@@ -18,7 +18,7 @@ When PGSandbox sandboxes stop deleting themselves, stale task databases are the 
 
 **Direct answer for this question**: Use `cleanup_expired` for TTL cleanup, but run it as `dryRun` first, and only then remove what is truly stale and scoped to resources PGSandbox created.
 
-The official contract for `cleanup_expired` is explicit: use `dryRun` to preview matches, then run without `dryRun` to delete those expired resources (https://pgsandbox.lvtd.dev/docs/mcp-tools/).
+The official contract for `cleanup_expired` is explicit: use `dryRun` to preview matches, then run without `dryRun` to delete those expired resources (https://pgsandbox-mcp.lvtd.dev/docs/mcp-tools/).
 
 ## What `cleanup_expired` is designed to handle
 
@@ -28,14 +28,14 @@ PGSandbox’s design starts with a metadata-first model:
 - each has `createdAt` and `expiresAt`,
 - destructive actions are expected to be metadata-bound, not name-based.
 
-The architecture notes and cleanup section say cleanup should only delete databases listed in metadata and matching the configured prefix (https://pgsandbox.lvtd.dev/docs/architecture/).
+The architecture notes and cleanup section say cleanup should only delete databases listed in metadata and matching the configured prefix (https://pgsandbox-mcp.lvtd.dev/docs/architecture/).
 
 That matters for two reasons:
 
 1. **You can recover safely**. Cleanup has enough context to prove what it selected.
 2. **You do not delete arbitrary databases** if a human typo lands on a command string.
 
-`cleanup_expired` also supports owner and label filters, which keeps cleanup actionable in shared environments where multiple agents or workflows share the same Postgres profile (https://pgsandbox.lvtd.dev/docs/mcp-tools/).
+`cleanup_expired` also supports owner and label filters, which keeps cleanup actionable in shared environments where multiple agents or workflows share the same Postgres profile (https://pgsandbox-mcp.lvtd.dev/docs/mcp-tools/).
 
 ## Why stale sandboxes happen in day-to-day agent workflows
 
@@ -113,7 +113,7 @@ The tool supports three typical modes:
 
 For one-off maintenance on shared operator machines, start narrow first (`owner` + `labels`), then widen only if your first pass intentionally needs cross-version scope.
 
-The agent workflow docs show the same pattern: list by owner first, then call `cleanup_expired` with `includeAllVersions: true` as a separate step when you need the broad view (https://pgsandbox.lvtd.dev/docs/agent-workflows/).
+The agent workflow docs show the same pattern: list by owner first, then call `cleanup_expired` with `includeAllVersions: true` as a separate step when you need the broad view (https://pgsandbox-mcp.lvtd.dev/docs/agent-workflows/).
 
 If you are deciding whether a stale resource should go through PGSandbox metadata or a human-run SQL cleanup, use the [cleanup_expired vs manual Postgres cleanup comparison](/blog/cleanup-expired-vs-manual-postgres-cleanup/) before widening scope.
 
@@ -224,9 +224,9 @@ Use the [Postgres sandbox TTL guide](/blog/postgres-sandbox-ttl-values/) to choo
 
 ## Related pages you should check first
 
-- [PGSandbox MCP Tool Contract](https://pgsandbox.lvtd.dev/docs/mcp-tools/) for all cleanup inputs and output fields.
-- [PGSandbox Architecture Notes](https://pgsandbox.lvtd.dev/docs/architecture/) for metadata and resource lifecycle details.
-- [PGSandbox Agent Workflows](https://pgsandbox.lvtd.dev/docs/agent-workflows/) for practical cleanup recipes.
+- [PGSandbox MCP Tool Contract](https://pgsandbox-mcp.lvtd.dev/docs/mcp-tools/) for all cleanup inputs and output fields.
+- [PGSandbox Architecture Notes](https://pgsandbox-mcp.lvtd.dev/docs/architecture/) for metadata and resource lifecycle details.
+- [PGSandbox Agent Workflows](https://pgsandbox-mcp.lvtd.dev/docs/agent-workflows/) for practical cleanup recipes.
 - [PostgreSQL `DROP DATABASE` reference](https://www.postgresql.org/docs/current/sql-dropdatabase.html) for owner/superuser requirements when manual fallback is unavoidable.
 - [Owner and Label Policy for Shared PGSandbox Profiles](/blog/owner-label-policy-shared-pgsandbox-profiles/) for cleanup-safe owner and label taxonomy.
 

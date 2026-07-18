@@ -9,7 +9,7 @@ tags: ["database sandbox", "Postgres", "AI agents", "MCP", "database testing"]
 category: "Engineering"
 metaTitle: "What Is a Database Sandbox?"
 metaDescription: "Learn what a database sandbox is, how it differs from branches and test transactions, and why coding agents need scoped Postgres sandboxes."
-canonicalUrl: "https://pgsandbox.lvtd.dev/blog/what-is-database-sandbox/"
+canonicalUrl: "https://pgsandbox-mcp.lvtd.dev/blog/what-is-database-sandbox/"
 heroImageUrl: ""
 featured: false
 sortOrder: 50
@@ -53,9 +53,9 @@ This is the useful distinction: the sandbox boundary can be a transaction, a con
 
 For example, Ecto's SQL Sandbox is a transactional test mechanism. Its docs describe a pool for concurrent transactional tests, where explicit checkout wraps a connection in a transaction and controls which processes can access it (https://hexdocs.pm/ecto_sql/Ecto.Adapters.SQL.Sandbox.html). That is a strong fit for framework test isolation.
 
-Testcontainers is a different pattern. Its docs describe on-demand isolated infrastructure and note that each pipeline can run with an isolated set of services, avoiding test data pollution (https://testcontainers.com/getting-started/). That is a strong fit when the test should use real dependencies in throwaway containers. The [Testcontainers vs disposable Postgres sandboxes comparison](https://pgsandbox.lvtd.dev/blog/testcontainers-vs-disposable-postgres-sandboxes/) breaks down when a service-container boundary is better than a task database and role.
+Testcontainers is a different pattern. Its docs describe on-demand isolated infrastructure and note that each pipeline can run with an isolated set of services, avoiding test data pollution (https://testcontainers.com/getting-started/). That is a strong fit when the test should use real dependencies in throwaway containers. The [Testcontainers vs disposable Postgres sandboxes comparison](https://pgsandbox-mcp.lvtd.dev/blog/testcontainers-vs-disposable-postgres-sandboxes/) breaks down when a service-container boundary is better than a task database and role.
 
-Database branching is another pattern. As covered in [Database Branching vs Disposable Postgres Sandboxes](https://pgsandbox.lvtd.dev/blog/database-branching-vs-postgres-sandboxes/), branches are usually environment primitives. They work well when the database should follow a pull request, preview app, staging environment, or developer workspace.
+Database branching is another pattern. As covered in [Database Branching vs Disposable Postgres Sandboxes](https://pgsandbox-mcp.lvtd.dev/blog/database-branching-vs-postgres-sandboxes/), branches are usually environment primitives. They work well when the database should follow a pull request, preview app, staging environment, or developer workspace.
 
 A task database is smaller. It exists for one unit of work, and then it goes away.
 
@@ -73,7 +73,7 @@ That contract is the information that most generic sandbox definitions skip. "Is
 
 If the sandbox uses the same credential as production, authority is not isolated. If it restores private data without masking or approval, data is not isolated. If nobody owns cleanup, time is not isolated. If the delete operation can drop databases the workflow did not create, cleanup is not isolated.
 
-PGSandbox uses this contract as the product shape. One task gets one database, one scoped login role, TTL metadata, labels, bounded SQL results, and cleanup tied to resources PGSandbox created. The [architecture docs](https://pgsandbox.lvtd.dev/docs/architecture/) describe that resource model in more detail.
+PGSandbox uses this contract as the product shape. One task gets one database, one scoped login role, TTL metadata, labels, bounded SQL results, and cleanup tied to resources PGSandbox created. The [architecture docs](https://pgsandbox-mcp.lvtd.dev/docs/architecture/) describe that resource model in more detail.
 
 ## Why coding agents change the requirement
 
@@ -85,9 +85,9 @@ MCP makes the capability easier to wire into agent clients. The official MCP int
 
 That means a Postgres sandbox for an MCP client should be more than a connection string. It should be a database lifecycle surface with a narrow tool contract.
 
-The [PGSandbox tool contract](https://pgsandbox.lvtd.dev/docs/mcp-tools/) is intentionally small: create a sandbox, clone a source into a sandbox, run bounded SQL, describe schema, list tracked sandboxes, delete a tracked sandbox, and clean up expired resources. That does not make an agent incapable of bad SQL. It gives the bad SQL a smaller place to land.
+The [PGSandbox tool contract](https://pgsandbox-mcp.lvtd.dev/docs/mcp-tools/) is intentionally small: create a sandbox, clone a source into a sandbox, run bounded SQL, describe schema, list tracked sandboxes, delete a tracked sandbox, and clean up expired resources. That does not make an agent incapable of bad SQL. It gives the bad SQL a smaller place to land.
 
-When the task is specifically about generated SQL or migrations, the practical workflow is a [Postgres test database for agent-generated SQL](https://pgsandbox.lvtd.dev/blog/how-to-create-postgres-test-database-agent-sql/): create a task database, apply the right schema state, run the agent SQL through a scoped role, capture bounded proof, and clean up the resource.
+When the task is specifically about generated SQL or migrations, the practical workflow is a [Postgres test database for agent-generated SQL](https://pgsandbox-mcp.lvtd.dev/blog/how-to-create-postgres-test-database-agent-sql/): create a task database, apply the right schema state, run the agent SQL through a scoped role, capture bounded proof, and clean up the resource.
 
 ## What a Postgres sandbox needs
 
@@ -101,7 +101,7 @@ The third primitive is restore. PostgreSQL's `pg_dump` docs describe custom and 
 
 Those details matter in a sandbox. A source database may have owners and grants that should not be recreated in the destination. A failed restore should not leave a half-valid workspace unless the operator deliberately keeps it for inspection.
 
-That is why the [Postgres clone database sandbox guide](https://pgsandbox.lvtd.dev/blog/how-to-clone-postgres-database-sandbox/) recommends a one-way clone path: read from the source, restore into a newly created disposable destination, run task SQL only against the sandbox role, and clean up the destination afterward.
+That is why the [Postgres clone database sandbox guide](https://pgsandbox-mcp.lvtd.dev/blog/how-to-clone-postgres-database-sandbox/) recommends a one-way clone path: read from the source, restore into a newly created disposable destination, run task SQL only against the sandbox role, and clean up the destination afterward.
 
 ## When to use a database sandbox
 
@@ -151,7 +151,7 @@ The model is:
 
 That makes the sandbox concrete. It is not a vibe around "safe testing." It is a database, role, metadata row, tool contract, and cleanup path.
 
-If you are already reviewing database access for agents, start with the [Postgres MCP server safety checklist](https://pgsandbox.lvtd.dev/blog/postgres-mcp-server-safety-checklist/). If you want to wire the local tool into Codex, Cursor, VS Code, or Claude Desktop, the [install guide](https://pgsandbox.lvtd.dev/docs/install/) covers the setup path.
+If you are already reviewing database access for agents, start with the [Postgres MCP server safety checklist](https://pgsandbox-mcp.lvtd.dev/blog/postgres-mcp-server-safety-checklist/). If you want to wire the local tool into Codex, Cursor, VS Code, or Claude Desktop, the [install guide](https://pgsandbox-mcp.lvtd.dev/docs/install/) covers the setup path.
 
 ## FAQ
 

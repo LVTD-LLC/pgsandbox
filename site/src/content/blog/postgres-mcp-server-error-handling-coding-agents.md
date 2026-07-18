@@ -9,7 +9,7 @@ tags: ["Postgres", "MCP", "error handling", "AI agents", "SQL"]
 category: "Engineering"
 metaTitle: "Postgres MCP Server Error Handling for Agents"
 metaDescription: "Handle Postgres MCP server errors with stable codes, SQLSTATE, categories, hints, diagnostics, and safe retry rules for coding agents."
-canonicalUrl: "https://pgsandbox.lvtd.dev/blog/postgres-mcp-server-error-handling-coding-agents/"
+canonicalUrl: "https://pgsandbox-mcp.lvtd.dev/blog/postgres-mcp-server-error-handling-coding-agents/"
 heroImageUrl: ""
 featured: false
 sortOrder: 120
@@ -29,7 +29,7 @@ The short runbook is:
 7. Use `detailHandles` for safe follow-up tools such as `list_profiles`, `doctor`, or `describe_schema`.
 8. Do not echo raw database URLs, credentials, or full source connection strings into the agent transcript.
 
-The information-gain point is the remediation envelope. A generic Postgres MCP server can return "tool failed" and leave the agent to guess. PGSandbox turns common database failures into reviewable control flow for agents working in [disposable Postgres sandboxes](https://pgsandbox.lvtd.dev/blog/what-is-database-sandbox/).
+The information-gain point is the remediation envelope. A generic Postgres MCP server can return "tool failed" and leave the agent to guess. PGSandbox turns common database failures into reviewable control flow for agents working in [disposable Postgres sandboxes](https://pgsandbox-mcp.lvtd.dev/blog/what-is-database-sandbox/).
 
 ## Why Postgres MCP errors need structure
 
@@ -72,7 +72,7 @@ The first is a query repair problem. The agent can inspect schema and revise SQL
 
 Every public PGSandbox MCP tool returns JSON text in the same envelope. Success responses contain `ok: true`, `summary`, `warnings`, `errors`, `detailHandles`, and a tool-specific `result`. Failure responses keep the same shape with `ok: false`.
 
-The [MCP tool contract](https://pgsandbox.lvtd.dev/docs/mcp-tools/) documents the shared fields:
+The [MCP tool contract](https://pgsandbox-mcp.lvtd.dev/docs/mcp-tools/) documents the shared fields:
 
 | Field | How an agent should use it |
 | --- | --- |
@@ -126,10 +126,10 @@ Postgres error fields include severity, SQLSTATE, primary message, detail, hint,
 Use this loop:
 
 1. Read `errors[0].code`.
-2. If it is `undefined_column` or `undefined_table`, call [`describe_schema`](https://pgsandbox.lvtd.dev/docs/mcp-tools/).
+2. If it is `undefined_column` or `undefined_table`, call [`describe_schema`](https://pgsandbox-mcp.lvtd.dev/docs/mcp-tools/).
 3. Fix identifiers, schema qualification, or `search_path`.
-4. If the query is non-trivial, inspect the plan with [`explain_query`](https://pgsandbox.lvtd.dev/blog/postgres-explain-plan-agent-sql/).
-5. Run bounded proof with [`run_sql`](https://pgsandbox.lvtd.dev/blog/postgres-run-sql-bounded-results/).
+4. If the query is non-trivial, inspect the plan with [`explain_query`](https://pgsandbox-mcp.lvtd.dev/blog/postgres-explain-plan-agent-sql/).
+5. Run bounded proof with [`run_sql`](https://pgsandbox-mcp.lvtd.dev/blog/postgres-run-sql-bounded-results/).
 6. Summarize the fix and evidence in the PR.
 
 Do not treat `syntax_error` as an environment problem. A syntax error means the SQL needs revision. `doctor` is useful for profile and connectivity diagnostics, not for a misspelled keyword.
@@ -155,7 +155,7 @@ Profile and version errors should move the agent toward diagnostics, not toward 
 
 PGSandbox supports explicit profiles and managed local Postgres versions. If an agent requests `postgresVersion: "18"`, the managed local path can use a versioned profile such as `local-pg18`. If it supplies both `profile` and `postgresVersion`, the pair must match. A mismatch returns `version_mismatch`.
 
-For agents deciding which selector to use and when to pin a fixed profile, use [How to Use Local Postgres Versions with Coding Agents](https://pgsandbox.lvtd.dev/blog/how-to-use-local-postgres-versions-with-coding-agents/).
+For agents deciding which selector to use and when to pin a fixed profile, use [How to Use Local Postgres Versions with Coding Agents](https://pgsandbox-mcp.lvtd.dev/blog/how-to-use-local-postgres-versions-with-coding-agents/).
 
 Use this recovery flow:
 

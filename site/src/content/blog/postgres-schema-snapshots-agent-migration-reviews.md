@@ -9,7 +9,7 @@ tags: ["Postgres", "schema diff", "database migrations", "AI agents", "MCP"]
 category: "Engineering"
 metaTitle: "Postgres Schema Snapshots for Agent Reviews"
 metaDescription: "Use Postgres schema snapshots and diffs to review agent migrations with before/after evidence, bounded output, scoped roles, and cleanup."
-canonicalUrl: "https://pgsandbox.lvtd.dev/blog/postgres-schema-snapshots-agent-migration-reviews/"
+canonicalUrl: "https://pgsandbox-mcp.lvtd.dev/blog/postgres-schema-snapshots-agent-migration-reviews/"
 heroImageUrl: ""
 featured: false
 sortOrder: 100
@@ -30,7 +30,7 @@ The shortest safe loop is:
 
 The information-gain point is the review contract. A schema diff is not enough by itself. For agent work, a review-grade schema snapshot ties the diff to a specific sandbox id, scoped role, command array, object counts, bounded output, and cleanup path. That is what lets a human reviewer distinguish "the agent says it ran the migration" from "the agent produced database evidence worth reviewing."
 
-PGSandbox exposes that contract directly. The [MCP tool contract](https://pgsandbox.lvtd.dev/docs/mcp-tools/) includes `create_schema_snapshot`, `list_schema_snapshots`, `diff_schema_snapshot`, `schema_digest`, `schema_diff`, and `validate_schema_change`. The [architecture notes](https://pgsandbox.lvtd.dev/docs/architecture/) describe the resource model behind those tools: one sandbox database, one scoped role, TTL metadata, and cleanup tied to tracked resources.
+PGSandbox exposes that contract directly. The [MCP tool contract](https://pgsandbox-mcp.lvtd.dev/docs/mcp-tools/) includes `create_schema_snapshot`, `list_schema_snapshots`, `diff_schema_snapshot`, `schema_digest`, `schema_diff`, and `validate_schema_change`. The [architecture notes](https://pgsandbox-mcp.lvtd.dev/docs/architecture/) describe the resource model behind those tools: one sandbox database, one scoped role, TTL metadata, and cleanup tied to tracked resources.
 
 ## What is a Postgres schema snapshot?
 
@@ -57,7 +57,7 @@ Good fits include:
 
 Do not use snapshots as a way to avoid data checks. A schema snapshot can show that a `NOT NULL` constraint appeared. It cannot prove existing rows satisfy the constraint unless the agent also seeds or checks the relevant data cases.
 
-That is why this topic sits next to the broader [database migration testing workflow](https://pgsandbox.lvtd.dev/blog/database-migration-testing-agent-pr/). Migration testing proves the command, schema change, data edge cases, and cleanup. Schema snapshots make the schema-change part precise enough to review.
+That is why this topic sits next to the broader [database migration testing workflow](https://pgsandbox-mcp.lvtd.dev/blog/database-migration-testing-agent-pr/). Migration testing proves the command, schema change, data edge cases, and cleanup. Schema snapshots make the schema-change part precise enough to review.
 
 ## Schema snapshot vs schema diff vs migration lint
 
@@ -76,7 +76,7 @@ Those are strong schema-management tools. PGSandbox has a narrower job: give the
 
 ## Step 1: create the sandbox that owns the proof
 
-Start with a [database sandbox](https://pgsandbox.lvtd.dev/blog/what-is-database-sandbox/) rather than the shared development database.
+Start with a [database sandbox](https://pgsandbox-mcp.lvtd.dev/blog/what-is-database-sandbox/) rather than the shared development database.
 
 The sandbox should have:
 
@@ -86,7 +86,7 @@ The sandbox should have:
 4. A scoped role for task SQL.
 5. No production connection string in chat, logs, PR notes, or tracked files.
 
-With PGSandbox, `create_database` creates an isolated database and login role. If the migration needs an existing shape, use a schema-only `clone_database` from an approved source or restore a local template into a fresh sandbox. The [Postgres clone database sandbox guide](https://pgsandbox.lvtd.dev/blog/how-to-clone-postgres-database-sandbox/) explains the clone boundary and why schema-only is often the safer default.
+With PGSandbox, `create_database` creates an isolated database and login role. If the migration needs an existing shape, use a schema-only `clone_database` from an approved source or restore a local template into a fresh sandbox. The [Postgres clone database sandbox guide](https://pgsandbox-mcp.lvtd.dev/blog/how-to-clone-postgres-database-sandbox/) explains the clone boundary and why schema-only is often the safer default.
 
 The important rule is authority separation. The tool may need lifecycle authority to create the database. The migration command should run against the sandbox connection, not against a general admin URL.
 
@@ -103,7 +103,7 @@ before_pr_1842
 before_payment_status_constraint
 ```
 
-The name matters because agents lose context. A named checkpoint is easier to inspect than "the schema from earlier." The [MCP tool docs](https://pgsandbox.lvtd.dev/docs/mcp-tools/) show the same pattern: create a schema snapshot before the change, then diff that snapshot after the migration command runs.
+The name matters because agents lose context. A named checkpoint is easier to inspect than "the schema from earlier." The [MCP tool docs](https://pgsandbox-mcp.lvtd.dev/docs/mcp-tools/) show the same pattern: create a schema snapshot before the change, then diff that snapshot after the migration command runs.
 
 A good snapshot response should give the reviewer enough shape without dumping raw catalog output:
 
@@ -213,7 +213,7 @@ where payment_status is null;
 
 PGSandbox's `run_sql` returns bounded rows and supports row limits. That is the right shape for PR evidence. The reviewer needs counts, representative failures, and SQLSTATE details, not sensitive rows or a huge transcript.
 
-If a schema change is meant to alter a query path, add a [Postgres EXPLAIN plan review](https://pgsandbox.lvtd.dev/blog/postgres-explain-plan-agent-sql/) beside the bounded row checks. The plan shows whether Postgres expects to touch the intended relations before the agent treats execution output as proof.
+If a schema change is meant to alter a query path, add a [Postgres EXPLAIN plan review](https://pgsandbox-mcp.lvtd.dev/blog/postgres-explain-plan-agent-sql/) beside the bounded row checks. The plan shows whether Postgres expects to touch the intended relations before the agent treats execution output as proof.
 
 If the task needs realistic source shape, start with schema-only, synthetic, masked, or reduced data. A disposable sandbox limits where writes land. It does not make sensitive data safe to expose.
 

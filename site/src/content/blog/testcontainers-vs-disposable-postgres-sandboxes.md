@@ -9,7 +9,7 @@ tags: ["Postgres", "Testcontainers", "database sandbox", "AI agents", "MCP"]
 category: "Engineering"
 metaTitle: "Testcontainers vs Postgres Sandboxes"
 metaDescription: "Compare Testcontainers Postgres with disposable Postgres sandboxes for agent SQL, migrations, scoped roles, proof records, and cleanup."
-canonicalUrl: "https://pgsandbox.lvtd.dev/blog/testcontainers-vs-disposable-postgres-sandboxes/"
+canonicalUrl: "https://pgsandbox-mcp.lvtd.dev/blog/testcontainers-vs-disposable-postgres-sandboxes/"
 heroImageUrl: ""
 featured: false
 sortOrder: 70
@@ -68,7 +68,7 @@ PostgreSQL already has the primitives. `CREATE DATABASE` creates a database, and
 
 Those are powerful operations. An agent should not improvise them with a shared admin URL.
 
-PGSandbox wraps that lifecycle in a narrow MCP tool surface. The [MCP tool contract](https://pgsandbox.lvtd.dev/docs/mcp-tools/) exposes database lifecycle actions such as creating, cloning, listing, deleting, cleaning up, running bounded SQL, and describing schema. The [architecture docs](https://pgsandbox.lvtd.dev/docs/architecture/) describe the local-first resource model: one sandbox database, one scoped login role, TTL metadata, and cleanup tied to resources PGSandbox created.
+PGSandbox wraps that lifecycle in a narrow MCP tool surface. The [MCP tool contract](https://pgsandbox-mcp.lvtd.dev/docs/mcp-tools/) exposes database lifecycle actions such as creating, cloning, listing, deleting, cleaning up, running bounded SQL, and describing schema. The [architecture docs](https://pgsandbox-mcp.lvtd.dev/docs/architecture/) describe the local-first resource model: one sandbox database, one scoped login role, TTL metadata, and cleanup tied to resources PGSandbox created.
 
 That is the product-led difference. PGSandbox does not try to replace Testcontainers as a test framework dependency tool. It gives a coding agent a safer database workbench through MCP.
 
@@ -115,11 +115,11 @@ Good examples:
 4. The reviewer needs a compact record of what database state changed.
 5. Cleanup should be tied to sandbox metadata, not to a test class lifecycle.
 
-For migration-heavy agent work, the [database migration testing workflow](https://pgsandbox.lvtd.dev/blog/database-migration-testing-agent-pr/) is the more specific version of this pattern: create a sandbox, run the repo migration command, capture the schema diff, test risky data rows, and put the proof in the PR.
+For migration-heavy agent work, the [database migration testing workflow](https://pgsandbox-mcp.lvtd.dev/blog/database-migration-testing-agent-pr/) is the more specific version of this pattern: create a sandbox, run the repo migration command, capture the schema diff, test risky data rows, and put the proof in the PR.
 
-That is the workflow behind the [Postgres test database guide](https://pgsandbox.lvtd.dev/blog/how-to-create-postgres-test-database-agent-sql/). Create a task database, apply the needed schema, seed or clone the smallest useful state, run generated SQL with bounded output, record the result, and delete the database and role.
+That is the workflow behind the [Postgres test database guide](https://pgsandbox-mcp.lvtd.dev/blog/how-to-create-postgres-test-database-agent-sql/). Create a task database, apply the needed schema, seed or clone the smallest useful state, run generated SQL with bounded output, record the result, and delete the database and role.
 
-PGSandbox makes that loop available to MCP clients without requiring the agent to start Docker, bind `localhost:5432`, or handle raw admin credentials. The [install guide](https://pgsandbox.lvtd.dev/docs/install/) covers the local-first setup and explicitly keeps existing Docker or developer Postgres services on port `5432` out of the way.
+PGSandbox makes that loop available to MCP clients without requiring the agent to start Docker, bind `localhost:5432`, or handle raw admin credentials. The [install guide](https://pgsandbox-mcp.lvtd.dev/docs/install/) covers the local-first setup and explicitly keeps existing Docker or developer Postgres services on port `5432` out of the way.
 
 ## Can you use both?
 

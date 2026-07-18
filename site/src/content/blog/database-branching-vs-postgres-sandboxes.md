@@ -86,9 +86,9 @@ That is not a replacement for branching. It is a narrower control plane for agen
 
 A disposable Postgres sandbox is a temporary database created for a specific piece of work.
 
-In PGSandbox, that means a local MCP server creates a real Postgres database and a scoped login role against Postgres you already control. The [architecture docs](https://pgsandbox.lvtd.dev/docs/architecture/) describe the resource model as one database, one login role, scoped credentials, a TTL, and optional labels for task, repo, branch, or agent.
+In PGSandbox, that means a local MCP server creates a real Postgres database and a scoped login role against Postgres you already control. The [architecture docs](https://pgsandbox-mcp.lvtd.dev/docs/architecture/) describe the resource model as one database, one login role, scoped credentials, a TTL, and optional labels for task, repo, branch, or agent.
 
-The [MCP tool contract](https://pgsandbox.lvtd.dev/docs/mcp-tools/) is intentionally narrow. It includes tools such as `create_database`, `clone_database`, `run_sql`, `describe_schema`, `delete_database`, and `cleanup_expired`. The point is not to turn an agent into a database administrator. The point is to give it enough database lifecycle to prove work safely.
+The [MCP tool contract](https://pgsandbox-mcp.lvtd.dev/docs/mcp-tools/) is intentionally narrow. It includes tools such as `create_database`, `clone_database`, `run_sql`, `describe_schema`, `delete_database`, and `cleanup_expired`. The point is not to turn an agent into a database administrator. The point is to give it enough database lifecycle to prove work safely.
 
 That gives you a different default from a shared development database:
 
@@ -128,7 +128,7 @@ If the branch is going to be shared by people, CI, or app infrastructure, it sho
 
 ### Choose Disposable Sandboxes When The Database Belongs To One Agent Task
 
-A disposable sandbox fits when the [database sandbox](https://pgsandbox.lvtd.dev/blog/what-is-database-sandbox/) exists only so an agent can prove one unit of work:
+A disposable sandbox fits when the [database sandbox](https://pgsandbox-mcp.lvtd.dev/blog/what-is-database-sandbox/) exists only so an agent can prove one unit of work:
 
 - Apply a migration and inspect the final schema.
 - Reproduce a bug with a small seed state.
@@ -139,7 +139,7 @@ A disposable sandbox fits when the [database sandbox](https://pgsandbox.lvtd.dev
 
 This is where PGSandbox is deliberately small. It gives the agent a database lifecycle, not a full hosted platform. The admin connection creates and tracks resources. The sandbox role runs task SQL. Cleanup deletes tracked resources with the configured prefix.
 
-If you want the task-database version as an implementation checklist, see [how to create a Postgres test database for agent SQL](https://pgsandbox.lvtd.dev/blog/how-to-create-postgres-test-database-agent-sql/). It turns the sandbox idea into a repeatable proof loop for migrations, seed data, generated queries, bounded output, and cleanup.
+If you want the task-database version as an implementation checklist, see [how to create a Postgres test database for agent SQL](https://pgsandbox-mcp.lvtd.dev/blog/how-to-create-postgres-test-database-agent-sql/). It turns the sandbox idea into a repeatable proof loop for migrations, seed data, generated queries, bounded output, and cleanup.
 
 That shape is boring in the right way. For many backend tasks, you do not need a new platform branch. You need a place where the agent can be wrong without making shared state confusing.
 
@@ -157,7 +157,7 @@ That clone path is useful when an agent needs realistic database shape. It is no
 
 The safe rule is simple: choose the smallest data shape that proves the task.
 
-If the task does need realistic source state, use a clone workflow that keeps the source read-only and restores into a disposable destination. The [Postgres clone database sandbox guide](https://pgsandbox.lvtd.dev/blog/how-to-clone-postgres-database-sandbox/) walks through that safer path for agent workflows.
+If the task does need realistic source state, use a clone workflow that keeps the source read-only and restores into a disposable destination. The [Postgres clone database sandbox guide](https://pgsandbox-mcp.lvtd.dev/blog/how-to-clone-postgres-database-sandbox/) walks through that safer path for agent workflows.
 
 ## A Decision Checklist
 
@@ -176,7 +176,7 @@ If the database maps to a PR, QA environment, or developer workspace, database b
 
 If the database maps to one agent run, a disposable sandbox is usually easier to reason about.
 
-The same rule shows up in the [Postgres MCP server safety checklist](https://pgsandbox.lvtd.dev/blog/postgres-mcp-server-safety-checklist/): a database tool becomes much easier to review when the server exposes a narrow tool surface, the Postgres credentials have a small blast radius, and every task database has a cleanup path.
+The same rule shows up in the [Postgres MCP server safety checklist](https://pgsandbox-mcp.lvtd.dev/blog/postgres-mcp-server-safety-checklist/): a database tool becomes much easier to review when the server exposes a narrow tool surface, the Postgres credentials have a small blast radius, and every task database has a cleanup path.
 
 ## How PGSandbox Fits Alongside Branching Platforms
 
@@ -202,4 +202,4 @@ Database branching is valuable infrastructure. It is the right abstraction when 
 
 Disposable Postgres sandboxes are a better abstraction when a coding agent needs to prove one task against real Postgres without inheriting a long-lived environment.
 
-The practical architecture is not either/or. Use branching for environments. Use task sandboxes for agent work. When you want the agent path, the [PGSandbox install guide](https://pgsandbox.lvtd.dev/docs/install/) shows how to connect a local MCP client to Postgres you already control.
+The practical architecture is not either/or. Use branching for environments. Use task sandboxes for agent work. When you want the agent path, the [PGSandbox install guide](https://pgsandbox-mcp.lvtd.dev/docs/install/) shows how to connect a local MCP client to Postgres you already control.

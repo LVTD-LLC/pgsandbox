@@ -9,7 +9,7 @@ tags: ["Postgres", "database cloning", "AI agents", "MCP", "sandboxes"]
 category: "Engineering"
 metaTitle: "Postgres Clone Database Into a Safe Sandbox"
 metaDescription: "Clone a Postgres database into a disposable sandbox with pg_dump, pg_restore, scoped credentials, cleanup, and agent-safe data boundaries."
-canonicalUrl: "https://pgsandbox.lvtd.dev/blog/how-to-clone-postgres-database-sandbox/"
+canonicalUrl: "https://pgsandbox-mcp.lvtd.dev/blog/how-to-clone-postgres-database-sandbox/"
 heroImageUrl: ""
 featured: false
 sortOrder: 40
@@ -28,7 +28,7 @@ PGSandbox's clone model is deliberately narrow:
 6. Clean up the destination sandbox if restore fails.
 7. Let the agent run validation SQL only against the destination.
 
-The result is not a database branch. It is a [database sandbox](https://pgsandbox.lvtd.dev/blog/what-is-database-sandbox/) with a copy of the source shape the agent can safely inspect, mutate, and throw away.
+The result is not a database branch. It is a [database sandbox](https://pgsandbox-mcp.lvtd.dev/blog/what-is-database-sandbox/) with a copy of the source shape the agent can safely inspect, mutate, and throw away.
 
 ## When to clone a Postgres database
 
@@ -59,7 +59,7 @@ For agent workflows, the clone should move in one direction:
 
 That is the important operational boundary. The agent does not need write access to the source database to test most backend work. It needs a destination that behaves enough like the source to prove the task.
 
-PGSandbox implements that boundary through the [`clone_database` MCP tool](https://pgsandbox.lvtd.dev/docs/mcp-tools/). The tool creates an isolated sandbox first, then restores the source into that sandbox with PostgreSQL client tools. The destination still follows the normal [PGSandbox resource model](https://pgsandbox.lvtd.dev/docs/architecture/): one database, one login role, scoped credentials, TTL metadata, and cleanup tied to resources PGSandbox created.
+PGSandbox implements that boundary through the [`clone_database` MCP tool](https://pgsandbox-mcp.lvtd.dev/docs/mcp-tools/). The tool creates an isolated sandbox first, then restores the source into that sandbox with PostgreSQL client tools. The destination still follows the normal [PGSandbox resource model](https://pgsandbox-mcp.lvtd.dev/docs/architecture/): one database, one login role, scoped credentials, TTL metadata, and cleanup tied to resources PGSandbox created.
 
 That gives the agent a real Postgres target without turning the source database into the agent's workspace.
 
@@ -76,7 +76,7 @@ Use this order:
 
 This is not caution for its own sake. Agents copy context into prompts, logs, transcripts, and PR notes. A clone can turn private rows into ordinary task context if the workflow is loose.
 
-PGSandbox's docs warn not to paste production URLs into prompts when a secret input or local environment variable can provide them (https://pgsandbox.lvtd.dev/docs/mcp-tools/). Keep that rule. A source connection string is a credential, not documentation.
+PGSandbox's docs warn not to paste production URLs into prompts when a secret input or local environment variable can provide them (https://pgsandbox-mcp.lvtd.dev/docs/mcp-tools/). Keep that rule. A source connection string is a credential, not documentation.
 
 ## Step 2: create a destination before restoring
 
@@ -126,7 +126,7 @@ If the restore runs as a broad admin user and the agent later runs SQL as that s
 
 That is the part many clone tutorials skip because they are written for humans moving databases between environments. Agent workflows need a tighter default. The task role should be powerful enough to run the migration or validation work inside the sandbox, but not powerful enough to create and drop unrelated databases.
 
-In PGSandbox, the admin connection performs lifecycle work. Tool calls that run user SQL connect with the generated sandbox role. The [architecture notes](https://pgsandbox.lvtd.dev/docs/architecture/) call this out directly because it is the safety boundary: lifecycle authority and task SQL are different jobs.
+In PGSandbox, the admin connection performs lifecycle work. Tool calls that run user SQL connect with the generated sandbox role. The [architecture notes](https://pgsandbox-mcp.lvtd.dev/docs/architecture/) call this out directly because it is the safety boundary: lifecycle authority and task SQL are different jobs.
 
 ## Step 5: verify the clone before using it
 
@@ -141,7 +141,7 @@ At minimum, check:
 5. The agent can connect with the sandbox credential.
 6. The agent cannot mutate the source database.
 
-PGSandbox exposes `describe_schema` for structured table, column, index, and extension summaries, plus `run_sql` with a capped `rowLimit` for validation queries (https://pgsandbox.lvtd.dev/docs/mcp-tools/). That is usually enough for an agent to confirm it has the right shape without dumping full tables into context.
+PGSandbox exposes `describe_schema` for structured table, column, index, and extension summaries, plus `run_sql` with a capped `rowLimit` for validation queries (https://pgsandbox-mcp.lvtd.dev/docs/mcp-tools/). That is usually enough for an agent to confirm it has the right shape without dumping full tables into context.
 
 A simple verification prompt can be enough:
 
@@ -159,7 +159,7 @@ Cleanup is part of cloning, not an afterthought.
 
 A clone created for an agent task should have an owner, a purpose, a TTL, and a deletion path. If restore fails, the destination should be deleted or reported clearly. If the agent finishes, the sandbox should be deleted explicitly or by expiry.
 
-PGSandbox's `clone_database` notes say that if restore fails, PGSandbox attempts to delete the newly created sandbox (https://pgsandbox.lvtd.dev/docs/mcp-tools/). The broader cleanup model is metadata-backed: `delete_database` deletes a database and role created by PGSandbox, while `cleanup_expired` deletes expired resources with dry-run support.
+PGSandbox's `clone_database` notes say that if restore fails, PGSandbox attempts to delete the newly created sandbox (https://pgsandbox-mcp.lvtd.dev/docs/mcp-tools/). The broader cleanup model is metadata-backed: `delete_database` deletes a database and role created by PGSandbox, while `cleanup_expired` deletes expired resources with dry-run support.
 
 That scoping matters. A generic `DROP DATABASE` tool is too broad for day-to-day agent access. Cleanup should target tracked sandbox resources, not anything whose name happens to match a guess.
 
@@ -223,7 +223,7 @@ The safest way to clone a Postgres database for agent work is to treat the clone
 
 Use `pg_dump` to read the source, `pg_restore` to rebuild the destination, a scoped sandbox role for task SQL, and metadata-backed cleanup when the task is done. PGSandbox packages that pattern into a local MCP workflow so agents can prove database work against real Postgres without turning a shared database into their scratchpad.
 
-If you are setting this up for the first time, start with the [PGSandbox install guide](https://pgsandbox.lvtd.dev/docs/install/) and the [Postgres MCP server safety checklist](https://pgsandbox.lvtd.dev/blog/postgres-mcp-server-safety-checklist/). The clone workflow is strongest when it sits inside the broader safety model: narrow tools, scoped credentials, bounded query output, and cleanup you can audit.
+If you are setting this up for the first time, start with the [PGSandbox install guide](https://pgsandbox-mcp.lvtd.dev/docs/install/) and the [Postgres MCP server safety checklist](https://pgsandbox-mcp.lvtd.dev/blog/postgres-mcp-server-safety-checklist/). The clone workflow is strongest when it sits inside the broader safety model: narrow tools, scoped credentials, bounded query output, and cleanup you can audit.
 
 ## FAQ
 

@@ -49,7 +49,7 @@ function escapeXml(value: string) {
 }
 
 export const GET: APIRoute = async ({ site }) => {
-  const baseUrl = site ?? new URL('https://pgsandbox.cap.gregagi.com');
+  const baseUrl = site ?? new URL('https://pgsandbox-mcp.lvtd.dev');
   const posts = await getSitemapBlogPosts();
   const latestPost = posts[0];
   const latestLastmod = sitemapLastmod(latestPost?.data.updatedAt, latestPost?.data.publishedAt);

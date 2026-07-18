@@ -9,7 +9,7 @@ tags: ["Postgres", "MCP", "cleanup", "database sandbox", "agent safety"]
 category: "Engineering"
 metaTitle: "cleanup_expired vs Manual Postgres Cleanup"
 metaDescription: "Compare cleanup_expired with manual Postgres cleanup for stale agent sandboxes, scoped roles, TTL metadata, dry runs, and recovery workflows."
-canonicalUrl: "https://pgsandbox.lvtd.dev/blog/cleanup-expired-vs-manual-postgres-cleanup/"
+canonicalUrl: "https://pgsandbox-mcp.lvtd.dev/blog/cleanup-expired-vs-manual-postgres-cleanup/"
 heroImageUrl: ""
 featured: false
 sortOrder: 132

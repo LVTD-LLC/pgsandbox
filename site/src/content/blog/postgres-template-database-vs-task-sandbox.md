@@ -9,7 +9,7 @@ tags: ["Postgres", "template database", "database sandbox", "AI agents", "MCP"]
 category: "Engineering"
 metaTitle: "Postgres Template Database vs Sandbox"
 metaDescription: "Compare Postgres template databases with task sandboxes for agent QA, seeded test states, clone workflows, scoped roles, and cleanup."
-canonicalUrl: "https://pgsandbox.lvtd.dev/blog/postgres-template-database-vs-task-sandbox/"
+canonicalUrl: "https://pgsandbox-mcp.lvtd.dev/blog/postgres-template-database-vs-task-sandbox/"
 heroImageUrl: ""
 featured: false
 sortOrder: 90
@@ -20,7 +20,7 @@ The distinction matters because "template" can mean two different things in agen
 
 PostgreSQL has a native template mechanism. The `CREATE DATABASE` docs say a new database can be created by copying an existing template database, and the default template is `template1` (https://www.postgresql.org/docs/current/sql-createdatabase.html). PostgreSQL also ships `template0`, a clean template intended for restoring dumps or creating databases with different locale and encoding settings (https://www.postgresql.org/docs/current/manage-ag-templatedbs.html).
 
-PGSandbox has a different template layer. Its template tools create local `pg_dump` artifacts from PGSandbox-owned sandboxes, store JSON metadata, and restore those artifacts into fresh tracked sandboxes. The [MCP tool docs](https://pgsandbox.lvtd.dev/docs/mcp-tools/) describe `create_template_from_sandbox`, `create_sandbox_from_template`, `list_templates`, and `delete_template` as local artifact workflows, not native Postgres copy-on-write forks.
+PGSandbox has a different template layer. Its template tools create local `pg_dump` artifacts from PGSandbox-owned sandboxes, store JSON metadata, and restore those artifacts into fresh tracked sandboxes. The [MCP tool docs](https://pgsandbox-mcp.lvtd.dev/docs/mcp-tools/) describe `create_template_from_sandbox`, `create_sandbox_from_template`, `list_templates`, and `delete_template` as local artifact workflows, not native Postgres copy-on-write forks.
 
 The information-gain point is this: for coding agents, the useful unit is not "a copyable database." It is "a reusable starting state that still restores into a new database, new role, TTL, proof record, and cleanup path."
 
@@ -75,7 +75,7 @@ For human DBAs, those are normal operational concerns. For coding agents, they a
 
 A task sandbox adds a workflow boundary around the database primitive.
 
-PGSandbox creates one database and one scoped login role for a task. The [architecture docs](https://pgsandbox.lvtd.dev/docs/architecture/) describe the resource model: database id, profile name, database name, role name, encrypted role password, owner, purpose, labels, created timestamp, expiry timestamp, and deleted timestamp.
+PGSandbox creates one database and one scoped login role for a task. The [architecture docs](https://pgsandbox-mcp.lvtd.dev/docs/architecture/) describe the resource model: database id, profile name, database name, role name, encrypted role password, owner, purpose, labels, created timestamp, expiry timestamp, and deleted timestamp.
 
 That metadata matters because agent work gets interrupted. A human can close a terminal and remember what happened. An MCP client may crash, lose context, or open a PR before cleanup. A sandbox with TTL metadata is easier to inspect and clean up later than a manually named database.
 
@@ -90,13 +90,13 @@ For a coding agent, the useful proof record is:
 5. What schema changed.
 6. Whether cleanup succeeded or TTL cleanup remains.
 
-That is the same proof loop described in the [Postgres test database guide](https://pgsandbox.lvtd.dev/blog/how-to-create-postgres-test-database-agent-sql/) and the [database migration testing workflow](https://pgsandbox.lvtd.dev/blog/database-migration-testing-agent-pr/). The task sandbox is not just a database. It is a database plus enough metadata for a reviewer to trust the work.
+That is the same proof loop described in the [Postgres test database guide](https://pgsandbox-mcp.lvtd.dev/blog/how-to-create-postgres-test-database-agent-sql/) and the [database migration testing workflow](https://pgsandbox-mcp.lvtd.dev/blog/database-migration-testing-agent-pr/). The task sandbox is not just a database. It is a database plus enough metadata for a reviewer to trust the work.
 
 ## How PGSandbox local templates differ from native templates
 
 PGSandbox local templates are deliberately not native Postgres template databases.
 
-The [architecture notes](https://pgsandbox.lvtd.dev/docs/architecture/) define local templates as `pg_dump` artifacts plus JSON metadata under PGSandbox's managed state directory. A template can only be created from a live PGSandbox-owned sandbox found in metadata. Restoring a template creates a fresh tracked sandbox with its own role, TTL, owner, and labels.
+The [architecture notes](https://pgsandbox-mcp.lvtd.dev/docs/architecture/) define local templates as `pg_dump` artifacts plus JSON metadata under PGSandbox's managed state directory. A template can only be created from a live PGSandbox-owned sandbox found in metadata. Restoring a template creates a fresh tracked sandbox with its own role, TTL, owner, and labels.
 
 That shape is slower than a direct native template copy in some cases, but it gives the agent workflow a cleaner boundary:
 
@@ -154,11 +154,11 @@ Here is the practical pattern for repeatable agent QA:
 6. Run the agent's migration, SQL, or bug reproduction against the new sandbox.
 7. Capture proof and delete the sandbox.
 
-The [MCP tool contract](https://pgsandbox.lvtd.dev/docs/mcp-tools/) supports that loop directly. Its template-tool section documents the JSON inputs for `create_template_from_sandbox` and `create_sandbox_from_template`, including `templateName`, `nameHint`, `ttlMinutes`, and `owner` fields.
+The [MCP tool contract](https://pgsandbox-mcp.lvtd.dev/docs/mcp-tools/) supports that loop directly. Its template-tool section documents the JSON inputs for `create_template_from_sandbox` and `create_sandbox_from_template`, including `templateName`, `nameHint`, `ttlMinutes`, and `owner` fields.
 
 This works best for small to medium local states: a baseline schema, a few fixture accounts, a reproduced bug shape, or a post-migration known-good state. It is not a production-data import workflow. PGSandbox's template warning is explicit: do not create templates from production or sensitive data unless you have sanitized it.
 
-When the reusable state becomes the baseline for a migration task, pair it with a named schema checkpoint. The [Postgres schema snapshots for agent migration reviews](https://pgsandbox.lvtd.dev/blog/postgres-schema-snapshots-agent-migration-reviews/) guide shows how to restore a known state into a fresh sandbox, capture the before snapshot, run the migration command, and turn the schema diff into review evidence.
+When the reusable state becomes the baseline for a migration task, pair it with a named schema checkpoint. The [Postgres schema snapshots for agent migration reviews](https://pgsandbox-mcp.lvtd.dev/blog/postgres-schema-snapshots-agent-migration-reviews/) guide shows how to restore a known state into a fresh sandbox, capture the before snapshot, run the migration command, and turn the schema diff into review evidence.
 
 ## Common mistakes
 
@@ -184,7 +184,7 @@ Usually not as their primary interface. Native templates are useful for trusted 
 
 ### Are PGSandbox templates copy-on-write branches?
 
-No. PGSandbox local templates are `pg_dump` artifacts plus metadata. Restoring one creates a fresh tracked sandbox. The [database branching comparison](https://pgsandbox.lvtd.dev/blog/database-branching-vs-postgres-sandboxes/) covers the difference between environment-oriented branching and task-oriented sandboxes.
+No. PGSandbox local templates are `pg_dump` artifacts plus metadata. Restoring one creates a fresh tracked sandbox. The [database branching comparison](https://pgsandbox-mcp.lvtd.dev/blog/database-branching-vs-postgres-sandboxes/) covers the difference between environment-oriented branching and task-oriented sandboxes.
 
 ### Can I use both native templates and PGSandbox?
 

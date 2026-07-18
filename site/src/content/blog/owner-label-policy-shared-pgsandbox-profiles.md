@@ -9,7 +9,7 @@ tags: ["Postgres", "MCP", "cleanup", "database sandbox", "agent safety"]
 category: "Engineering"
 metaTitle: "PGSandbox Owner and Label Policy"
 metaDescription: "Design owner and label policy for shared PGSandbox profiles: cleanup scopes, TTL hygiene, audit fields, label taxonomy, and PR proof notes."
-canonicalUrl: "https://pgsandbox.lvtd.dev/blog/owner-label-policy-shared-pgsandbox-profiles/"
+canonicalUrl: "https://pgsandbox-mcp.lvtd.dev/blog/owner-label-policy-shared-pgsandbox-profiles/"
 heroImageUrl: ""
 featured: false
 sortOrder: 133

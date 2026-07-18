@@ -45,7 +45,7 @@ The first mistake is treating a Postgres MCP server like documentation. It is cl
 
 MCP has passive resources and active tools. The specification lists tools as functions the AI model can execute (https://modelcontextprotocol.io/specification/2025-06-18). A Postgres MCP server that exposes `run_sql`, `create_database`, or `delete_database` is therefore giving the agent an operational handle, not merely a reference page.
 
-That does not make it bad. It means the review should look more like reviewing a CLI or internal admin endpoint. If you want a concrete example of a deliberately narrow tool surface, the [PGSandbox tool contract](https://pgsandbox.lvtd.dev/docs/mcp-tools/) is intentionally small enough to audit before you hand it to an agent.
+That does not make it bad. It means the review should look more like reviewing a CLI or internal admin endpoint. If you want a concrete example of a deliberately narrow tool surface, the [PGSandbox tool contract](https://pgsandbox-mcp.lvtd.dev/docs/mcp-tools/) is intentionally small enough to audit before you hand it to an agent.
 
 - Where did this server come from?
 - What exact tools does it expose?
@@ -81,7 +81,7 @@ So the admin URL should be a lifecycle credential, not the credential the agent 
 3. The agent receives or uses the sandbox connection for task SQL.
 4. Cleanup deletes only the tracked database and role created by the server.
 
-This is the core reason [PGSandbox](https://pgsandbox.lvtd.dev/) exists. It does not try to make an agent incapable of bad SQL. It gives the agent a smaller place to be wrong.
+This is the core reason [PGSandbox](https://pgsandbox-mcp.lvtd.dev/) exists. It does not try to make an agent incapable of bad SQL. It gives the agent a smaller place to be wrong.
 
 ## 3. Prefer disposable databases over shared development databases
 
@@ -89,7 +89,7 @@ Read-only access is useful, but most coding-agent database work is not purely re
 
 The unsafe default is to point the agent at a shared development database because it already exists. That is convenient until a migration leaves it half-changed, a test seed collides with another developer, or an interrupted session leaves stale state behind.
 
-A [database sandbox](https://pgsandbox.lvtd.dev/blog/what-is-database-sandbox/) is the better default for agent work:
+A [database sandbox](https://pgsandbox-mcp.lvtd.dev/blog/what-is-database-sandbox/) is the better default for agent work:
 
 - The agent can run real migrations.
 - The agent can insert bad seed data without polluting shared state.
@@ -97,7 +97,7 @@ A [database sandbox](https://pgsandbox.lvtd.dev/blog/what-is-database-sandbox/) 
 - The task state can be deleted when the work is done.
 - The cleanup command can be scoped to resources the tool created.
 
-In PGSandbox, each experiment gets one database, one login role, credentials scoped to that database, TTL metadata, and cleanup tied to tracked resources. The [architecture notes](https://pgsandbox.lvtd.dev/docs/architecture/) show that resource model in more detail. That is the difference between "the agent can use Postgres" and "the agent can use this Postgres sandbox for this task."
+In PGSandbox, each experiment gets one database, one login role, credentials scoped to that database, TTL metadata, and cleanup tied to tracked resources. The [architecture notes](https://pgsandbox-mcp.lvtd.dev/docs/architecture/) show that resource model in more detail. That is the difference between "the agent can use Postgres" and "the agent can use this Postgres sandbox for this task."
 
 ## 4. Make read-only guarantees real
 
@@ -119,7 +119,7 @@ PostgreSQL `GRANT` controls privileges on database objects and role membership (
 
 Agents do not need unbounded data dumps to do most backend work.
 
-For migration validation, they usually need schema inspection, row counts, sample rows, and structured error messages. For bug reproduction, they need the failing shape, not every customer record. For generated SQL review, they need the query result and the plan, not a full table export. If the tool fails, the agent should follow a [Postgres MCP server error handling runbook](https://pgsandbox.lvtd.dev/blog/postgres-mcp-server-error-handling-coding-agents/) that branches on stable codes, categories, SQLSTATE, and hints.
+For migration validation, they usually need schema inspection, row counts, sample rows, and structured error messages. For bug reproduction, they need the failing shape, not every customer record. For generated SQL review, they need the query result and the plan, not a full table export. If the tool fails, the agent should follow a [Postgres MCP server error handling runbook](https://pgsandbox-mcp.lvtd.dev/blog/postgres-mcp-server-error-handling-coding-agents/) that branches on stable codes, categories, SQLSTATE, and hints.
 
 A good Postgres MCP server should make bounded results the default:
 
@@ -168,7 +168,7 @@ Do not let a coding agent mutate the source database as part of "cloning." If th
 
 PGSandbox's clone direction follows that mental model: the source is read, the destination is a tracked PGSandbox-owned database, and restore failure should clean up the destination rather than leaving a broken half-sandbox behind.
 
-For a step-by-step version of that workflow, see [how to clone a Postgres database into a safe sandbox](https://pgsandbox.lvtd.dev/blog/how-to-clone-postgres-database-sandbox/). It covers the dump/restore flags, schema-only option, source-data boundary, and cleanup rule in one agent-focused flow.
+For a step-by-step version of that workflow, see [how to clone a Postgres database into a safe sandbox](https://pgsandbox-mcp.lvtd.dev/blog/how-to-clone-postgres-database-sandbox/). It covers the dump/restore flags, schema-only option, source-data boundary, and cleanup rule in one agent-focused flow.
 
 ## 8. A practical approval rule
 
@@ -178,7 +178,7 @@ For routine coding tasks, approve a Postgres MCP server only when the agent can 
 
 That rule keeps the normal path simple. The agent can still get real Postgres behavior. It can still validate migrations and generated SQL. It can still reproduce bugs. But it does not need shared development credentials for every task.
 
-For a step-by-step version of the execution loop, see [how to create a Postgres test database for agent-generated SQL](https://pgsandbox.lvtd.dev/blog/how-to-create-postgres-test-database-agent-sql/). It covers database creation, scoped roles, migrations, seed data, bounded query results, and cleanup as one proof workflow.
+For a step-by-step version of the execution loop, see [how to create a Postgres test database for agent-generated SQL](https://pgsandbox-mcp.lvtd.dev/blog/how-to-create-postgres-test-database-agent-sql/). It covers database creation, scoped roles, migrations, seed data, bounded query results, and cleanup as one proof workflow.
 
 Exceptions should be visible:
 
@@ -209,7 +209,7 @@ The safest default is a task-scoped Postgres database with a task-scoped role, b
 
 ## Where PGSandbox fits
 
-PGSandbox is built for the narrow case this checklist points to: coding agents that need real Postgres proof without being handed a shared database as their workspace. The [install and setup guide](https://pgsandbox.lvtd.dev/docs/install/) shows the local setup path when you are ready to wire it into Codex, Cursor, VS Code, or Claude Desktop.
+PGSandbox is built for the narrow case this checklist points to: coding agents that need real Postgres proof without being handed a shared database as their workspace. The [install and setup guide](https://pgsandbox-mcp.lvtd.dev/docs/install/) shows the local setup path when you are ready to wire it into Codex, Cursor, VS Code, or Claude Desktop.
 
 It is local-first, private by default, and designed around existing Postgres. The agent gets a tracked disposable database and scoped role for the task. The admin connection is used for lifecycle work. Cleanup targets only resources PGSandbox created.
 

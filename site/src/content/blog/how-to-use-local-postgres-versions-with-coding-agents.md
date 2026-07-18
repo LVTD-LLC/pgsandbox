@@ -9,7 +9,7 @@ tags: ["Postgres", "MCP", "local Postgres", "versions", "AI agents"]
 category: "Engineering"
 metaTitle: "Use Local Postgres Versions with Coding Agents"
 metaDescription: "A practical guide for selecting Postgres versions in PGSandbox, from profile selection and ensure_postgres to version mismatch recovery and safe rollback-proof agent SQL workflows."
-canonicalUrl: "https://pgsandbox.lvtd.dev/blog/how-to-use-local-postgres-versions-with-coding-agents/"
+canonicalUrl: "https://pgsandbox-mcp.lvtd.dev/blog/how-to-use-local-postgres-versions-with-coding-agents/"
 heroImageUrl: ""
 featured: false
 sortOrder: 130
@@ -115,6 +115,8 @@ pgsandbox run-sql --database-id "$DATABASE_ID" --readonly --row-limit 20 --sql "
 
 The CLI and MCP tool flow is the same envelope shape. The difference is only the input shape and caller.
 
+When the application command runs in a Docker container but the selected PostgreSQL profile runs on the host, the database URL needs a separate network decision. The [Docker container to host PostgreSQL guide](/blog/docker-connect-host-postgres/) explains `direct` versus `localContainer`, Docker Desktop and native Linux behavior, and the listener/HBA checks that still apply after the hostname resolves.
+
 ## Error codes that should shape your agent branching
 
 Version and discovery errors are stable and should be treated as control-flow signals:
@@ -192,9 +194,9 @@ For agent cloning workflows, verify version compatibility up front and handle `r
 
 ## Related pages you should read first
 
-- [Postgres MCP Server Error Handling for Coding Agents](https://pgsandbox.lvtd.dev/blog/postgres-mcp-server-error-handling-coding-agents/) for the full error-code branching map.
-- [Postgres MCP Tool Contract](https://pgsandbox.lvtd.dev/docs/mcp-tools/) for version and profile input rules.
-- [How to Use Postgres EXPLAIN Plans for Agent SQL Review](https://pgsandbox.lvtd.dev/blog/postgres-explain-plan-agent-sql/) to separate planning failures from execution failures.
+- [Postgres MCP Server Error Handling for Coding Agents](https://pgsandbox-mcp.lvtd.dev/blog/postgres-mcp-server-error-handling-coding-agents/) for the full error-code branching map.
+- [Postgres MCP Tool Contract](https://pgsandbox-mcp.lvtd.dev/docs/mcp-tools/) for version and profile input rules.
+- [How to Use Postgres EXPLAIN Plans for Agent SQL Review](https://pgsandbox-mcp.lvtd.dev/blog/postgres-explain-plan-agent-sql/) to separate planning failures from execution failures.
 
 ## FAQ
 

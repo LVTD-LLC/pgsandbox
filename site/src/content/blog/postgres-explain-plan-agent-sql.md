@@ -9,7 +9,7 @@ tags: ["Postgres", "EXPLAIN", "query plans", "AI agents", "MCP"]
 category: "Engineering"
 metaTitle: "Postgres EXPLAIN Plans for Agent SQL Review"
 metaDescription: "Review agent-generated SQL with Postgres EXPLAIN plans, JSON output, scoped sandboxes, row estimates, bounded proof, and cleanup."
-canonicalUrl: "https://pgsandbox.lvtd.dev/blog/postgres-explain-plan-agent-sql/"
+canonicalUrl: "https://pgsandbox-mcp.lvtd.dev/blog/postgres-explain-plan-agent-sql/"
 heroImageUrl: ""
 featured: false
 sortOrder: 100
@@ -25,7 +25,7 @@ The agent-safe sequence is:
 3. Ask Postgres for a JSON EXPLAIN plan.
 4. Review relation names, node types, estimated rows, and total cost.
 5. Fix the query or schema if the plan contradicts the task.
-6. Run [`run_sql` with bounded Postgres results](https://pgsandbox.lvtd.dev/blog/postgres-run-sql-bounded-results/) using `readonly: true` and a small `rowLimit` for read proof.
+6. Run [`run_sql` with bounded Postgres results](https://pgsandbox-mcp.lvtd.dev/blog/postgres-run-sql-bounded-results/) using `readonly: true` and a small `rowLimit` for read proof.
 7. Use an intentional mutation path only after review.
 8. Delete the sandbox or let TTL cleanup handle it.
 
@@ -45,7 +45,7 @@ For human review, that plan answers practical questions:
 
 Postgres also documents that machine-readable EXPLAIN output formats such as JSON, XML, and YAML are better when another program needs to inspect the plan (https://www.postgresql.org/docs/current/using-explain.html). That is the right default for coding agents. Text plans are readable, but JSON plans can be summarized, stored in a PR note, compared, and passed between tools without asking the model to parse indentation.
 
-PGSandbox's `explain_query` tool uses that shape directly. The [MCP tool contract](https://pgsandbox.lvtd.dev/docs/mcp-tools/) documents `explain_query` as returning `EXPLAIN (FORMAT JSON)` for one safe plannable statement, plus a compact summary of node types, relations, cost, and estimated rows. It does not use `ANALYZE`, rejects multi-statement SQL, and rejects transaction or session controls.
+PGSandbox's `explain_query` tool uses that shape directly. The [MCP tool contract](https://pgsandbox-mcp.lvtd.dev/docs/mcp-tools/) documents `explain_query` as returning `EXPLAIN (FORMAT JSON)` for one safe plannable statement, plus a compact summary of node types, relations, cost, and estimated rows. It does not use `ANALYZE`, rejects multi-statement SQL, and rejects transaction or session controls.
 
 That is deliberately narrower than a general SQL shell.
 
@@ -77,15 +77,15 @@ Then decide whether to run a bounded proof query:
 
 That split keeps the review clean. The EXPLAIN plan says what Postgres intends to do. The bounded read proof says what rows came back. A mutation should have a separate, explicit reason and a task database where the damage is contained.
 
-The [Postgres test database guide](https://pgsandbox.lvtd.dev/blog/how-to-create-postgres-test-database-agent-sql/) covers the broader proof loop for generated SQL. EXPLAIN belongs near the front of that loop, before the agent treats execution output as validation.
+The [Postgres test database guide](https://pgsandbox-mcp.lvtd.dev/blog/how-to-create-postgres-test-database-agent-sql/) covers the broader proof loop for generated SQL. EXPLAIN belongs near the front of that loop, before the agent treats execution output as validation.
 
 ## Step 1: create a sandbox before planning agent SQL
 
 Do not ask an agent to inspect a risky query against production or a shared development database.
 
-Create a [database sandbox](https://pgsandbox.lvtd.dev/blog/what-is-database-sandbox/) first. The sandbox should have the schema shape the query needs, the smallest useful fixture data, a scoped role, a TTL, and a cleanup path. If realistic schema or approved sample data matters, clone or seed it into the sandbox instead of pointing the agent at the source database.
+Create a [database sandbox](https://pgsandbox-mcp.lvtd.dev/blog/what-is-database-sandbox/) first. The sandbox should have the schema shape the query needs, the smallest useful fixture data, a scoped role, a TTL, and a cleanup path. If realistic schema or approved sample data matters, clone or seed it into the sandbox instead of pointing the agent at the source database.
 
-PGSandbox's current resource model is one database, one scoped login role, TTL metadata, and cleanup tied to tracked resources. The [architecture docs](https://pgsandbox.lvtd.dev/docs/architecture/) describe that model, and the [MCP tool docs](https://pgsandbox.lvtd.dev/docs/mcp-tools/) document the lifecycle tools around it.
+PGSandbox's current resource model is one database, one scoped login role, TTL metadata, and cleanup tied to tracked resources. The [architecture docs](https://pgsandbox-mcp.lvtd.dev/docs/architecture/) describe that model, and the [MCP tool docs](https://pgsandbox-mcp.lvtd.dev/docs/mcp-tools/) document the lifecycle tools around it.
 
 This is the first review checkpoint:
 
@@ -165,9 +165,9 @@ Do not treat every sequential scan as a bug. A sequential scan over a tiny fixtu
 
 ## Step 4: use bounded SQL proof after the plan passes
 
-After the plan passes review, run a [bounded proof query](https://pgsandbox.lvtd.dev/blog/postgres-run-sql-bounded-results/).
+After the plan passes review, run a [bounded proof query](https://pgsandbox-mcp.lvtd.dev/blog/postgres-run-sql-bounded-results/).
 
-PGSandbox's `run_sql` executes through sandbox role credentials, not the admin connection. Its docs define a default `rowLimit` of 100, allow `rowLimit: 0` for a zero-row preview, cap returned rows at 1000, and return ordered per-statement result sets for multi-statement SQL (https://pgsandbox.lvtd.dev/docs/mcp-tools/).
+PGSandbox's `run_sql` executes through sandbox role credentials, not the admin connection. Its docs define a default `rowLimit` of 100, allow `rowLimit: 0` for a zero-row preview, cap returned rows at 1000, and return ordered per-statement result sets for multi-statement SQL (https://pgsandbox-mcp.lvtd.dev/docs/mcp-tools/).
 
 For read proof, use `readonly: true`:
 
@@ -210,7 +210,7 @@ Use the migration workflow first:
 7. Run bounded data checks.
 8. Clean up.
 
-The [database migration testing workflow](https://pgsandbox.lvtd.dev/blog/database-migration-testing-agent-pr/) covers that PR gate. The [schema snapshot guide](https://pgsandbox.lvtd.dev/blog/postgres-schema-snapshots-agent-migration-reviews/) goes deeper on named before/after checkpoints and compact diffs.
+The [database migration testing workflow](https://pgsandbox-mcp.lvtd.dev/blog/database-migration-testing-agent-pr/) covers that PR gate. The [schema snapshot guide](https://pgsandbox-mcp.lvtd.dev/blog/postgres-schema-snapshots-agent-migration-reviews/) goes deeper on named before/after checkpoints and compact diffs.
 
 EXPLAIN fits inside that workflow when the review question is performance or access path:
 
@@ -231,7 +231,7 @@ The mistakes are predictable.
 
 ### Mistake 2: planning against the wrong data shape
 
-A plan from an empty sandbox can be misleading. If the query is about a production-shaped join, seed the minimum rows that make the join meaningful or clone an approved source into a [safe sandbox](https://pgsandbox.lvtd.dev/blog/how-to-clone-postgres-database-sandbox/). Keep the source read-only and run the query only against the destination.
+A plan from an empty sandbox can be misleading. If the query is about a production-shaped join, seed the minimum rows that make the join meaningful or clone an approved source into a [safe sandbox](https://pgsandbox-mcp.lvtd.dev/blog/how-to-clone-postgres-database-sandbox/). Keep the source read-only and run the query only against the destination.
 
 ### Mistake 3: pasting a huge text plan into the PR
 

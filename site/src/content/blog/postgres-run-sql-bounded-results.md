@@ -9,7 +9,7 @@ tags: ["Postgres", "SQL", "AI agents", "MCP", "query results"]
 category: "Engineering"
 metaTitle: "Run Agent SQL with Bounded Postgres Results"
 metaDescription: "Run agent SQL safely with PGSandbox: scoped sandbox roles, readonly mode, row limits, typed result sets, and cleanup proof."
-canonicalUrl: "https://pgsandbox.lvtd.dev/blog/postgres-run-sql-bounded-results/"
+canonicalUrl: "https://pgsandbox-mcp.lvtd.dev/blog/postgres-run-sql-bounded-results/"
 heroImageUrl: ""
 featured: false
 sortOrder: 110
@@ -20,7 +20,7 @@ That gives the agent real database feedback without turning the database into an
 
 A useful agent SQL proof loop looks like this:
 
-1. Create a task-scoped [database sandbox](https://pgsandbox.lvtd.dev/blog/what-is-database-sandbox/).
+1. Create a task-scoped [database sandbox](https://pgsandbox-mcp.lvtd.dev/blog/what-is-database-sandbox/).
 2. Load the schema or safe source state the task needs.
 3. Review the query shape with `explain_query` when the SQL is non-trivial.
 4. Run `run_sql` with `readonly: true` for read proof.
@@ -64,7 +64,7 @@ The SQL `LIMIT` expresses task intent. The MCP `rowLimit` is the output budget. 
 
 Do not point a coding agent at the same Postgres database a human developer uses all week.
 
-Create or clone a task database first. In PGSandbox, that means a tracked sandbox with one database, one scoped login role, TTL metadata, and cleanup tied to resources PGSandbox created. The [architecture docs](https://pgsandbox.lvtd.dev/docs/architecture/) describe that resource model, and the [MCP tool contract](https://pgsandbox.lvtd.dev/docs/mcp-tools/) lists the lifecycle tools around it.
+Create or clone a task database first. In PGSandbox, that means a tracked sandbox with one database, one scoped login role, TTL metadata, and cleanup tied to resources PGSandbox created. The [architecture docs](https://pgsandbox-mcp.lvtd.dev/docs/architecture/) describe that resource model, and the [MCP tool contract](https://pgsandbox-mcp.lvtd.dev/docs/mcp-tools/) lists the lifecycle tools around it.
 
 The target should be specific:
 
@@ -84,7 +84,7 @@ Before running SQL, classify the task.
 
 Most agent SQL checks are read proof. The agent is trying to answer a question such as "does this query return the expected row?" or "does the migration leave the expected data shape?" For those, use `readonly: true`.
 
-PGSandbox's docs define `run_sql` as executing through the sandbox role with optional readonly mode and capped row limits (https://pgsandbox.lvtd.dev/docs/mcp-tools/). With `readonly: true`, PGSandbox starts a read-only transaction, rejects transaction-control escape hatches, rolls back after execution, and returns `readonly_violation` for mutating statements such as `INSERT` or `CREATE TEMP TABLE`. The companion [Postgres MCP server error handling guide](https://pgsandbox.lvtd.dev/blog/postgres-mcp-server-error-handling-coding-agents/) shows how to branch on that code instead of turning every failure into another SQL retry.
+PGSandbox's docs define `run_sql` as executing through the sandbox role with optional readonly mode and capped row limits (https://pgsandbox-mcp.lvtd.dev/docs/mcp-tools/). With `readonly: true`, PGSandbox starts a read-only transaction, rejects transaction-control escape hatches, rolls back after execution, and returns `readonly_violation` for mutating statements such as `INSERT` or `CREATE TEMP TABLE`. The companion [Postgres MCP server error handling guide](https://pgsandbox-mcp.lvtd.dev/blog/postgres-mcp-server-error-handling-coding-agents/) shows how to branch on that code instead of turning every failure into another SQL retry.
 
 That maps to Postgres itself. PostgreSQL documents `BEGIN` with `READ ONLY` as a transaction mode (https://www.postgresql.org/docs/current/sql-begin.html). Its `SET TRANSACTION` docs explain that a read-only transaction disallows commands such as `INSERT`, `UPDATE`, `DELETE`, `MERGE`, `CREATE`, `ALTER`, `DROP`, `TRUNCATE`, and write-capable `COPY FROM` (https://www.postgresql.org/docs/current/sql-set-transaction.html).
 
@@ -209,7 +209,7 @@ That script may be fine inside a sandbox when mutation is the task. It is not re
 
 If the SQL is non-trivial, inspect the plan before execution.
 
-The [Postgres EXPLAIN plan guide](https://pgsandbox.lvtd.dev/blog/postgres-explain-plan-agent-sql/) covers the review step in detail. The short version: use `explain_query` to check relation names, node types, row estimates, and whether the query shape matches the task before running a bounded proof query.
+The [Postgres EXPLAIN plan guide](https://pgsandbox-mcp.lvtd.dev/blog/postgres-explain-plan-agent-sql/) covers the review step in detail. The short version: use `explain_query` to check relation names, node types, row estimates, and whether the query shape matches the task before running a bounded proof query.
 
 That sequence keeps evidence separate:
 
@@ -221,7 +221,7 @@ That sequence keeps evidence separate:
 | Schema result | `schema_digest`, `schema_diff`, snapshots | What database objects changed? |
 | Cleanup | `delete_database` or `cleanup_expired` | Did the task resource disappear? |
 
-For migration work, combine this with the [database migration testing workflow](https://pgsandbox.lvtd.dev/blog/database-migration-testing-agent-pr/). A query result is not a migration proof by itself.
+For migration work, combine this with the [database migration testing workflow](https://pgsandbox-mcp.lvtd.dev/blog/database-migration-testing-agent-pr/). A query result is not a migration proof by itself.
 
 ## Common mistakes when agents run SQL
 

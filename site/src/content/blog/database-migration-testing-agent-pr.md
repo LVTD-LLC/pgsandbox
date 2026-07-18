@@ -9,7 +9,7 @@ tags: ["Postgres", "database migrations", "AI agents", "MCP", "schema validation
 category: "Engineering"
 metaTitle: "Database Migration Testing for Agent PRs"
 metaDescription: "Validate Postgres migrations before agent PRs with disposable databases, scoped roles, schema diffs, seed data, bounded output, and cleanup."
-canonicalUrl: "https://pgsandbox.lvtd.dev/blog/database-migration-testing-agent-pr/"
+canonicalUrl: "https://pgsandbox-mcp.lvtd.dev/blog/database-migration-testing-agent-pr/"
 featured: false
 sortOrder: 80
 ---
@@ -31,7 +31,7 @@ The useful workflow is:
 
 PGSandbox turns that into an MCP workflow instead of a pile of shell commands. The information-gain point is the PR gate: a migration is not "tested" because the agent ran something. It is tested when the reviewer can see what changed in a real Postgres database, under a task-scoped role, with cleanup accounted for.
 
-When the same seed state is needed across several migration tasks, use a local template deliberately rather than keeping a long-lived test database around. The [Postgres template database vs task sandbox](https://pgsandbox.lvtd.dev/blog/postgres-template-database-vs-task-sandbox/) comparison explains when a reusable template state should restore into a fresh sandbox with its own role and TTL.
+When the same seed state is needed across several migration tasks, use a local template deliberately rather than keeping a long-lived test database around. The [Postgres template database vs task sandbox](https://pgsandbox-mcp.lvtd.dev/blog/postgres-template-database-vs-task-sandbox/) comparison explains when a reusable template state should restore into a fresh sandbox with its own role and TTL.
 
 ## What should database migration testing prove?
 
@@ -57,9 +57,9 @@ Generic "migration succeeded" output is too thin. A good proof needs enough data
 
 Start with a database that exists only for the agent task.
 
-The target should not be production, staging, or the shared development database. It should be a [database sandbox](https://pgsandbox.lvtd.dev/blog/what-is-database-sandbox/) with its own authority, state, data boundary, time limit, and cleanup path. If migration reliability depends on a specific major version, start with the [Local Postgres versioning guide](https://pgsandbox.lvtd.dev/blog/how-to-use-local-postgres-versions-with-coding-agents/) and pin that selector before running the migration command.
+The target should not be production, staging, or the shared development database. It should be a [database sandbox](https://pgsandbox-mcp.lvtd.dev/blog/what-is-database-sandbox/) with its own authority, state, data boundary, time limit, and cleanup path. If migration reliability depends on a specific major version, start with the [Local Postgres versioning guide](https://pgsandbox-mcp.lvtd.dev/blog/how-to-use-local-postgres-versions-with-coding-agents/) and pin that selector before running the migration command.
 
-With PGSandbox, the first move is to create a sandbox database with a short name hint, owner, labels, and TTL. The [PGSandbox tool contract](https://pgsandbox.lvtd.dev/docs/mcp-tools/) documents `create_database` as the lifecycle tool that creates an isolated database and login role. The [architecture docs](https://pgsandbox.lvtd.dev/docs/architecture/) describe the resource model: one database, one scoped role, TTL metadata, and cleanup tied to tracked resources.
+With PGSandbox, the first move is to create a sandbox database with a short name hint, owner, labels, and TTL. The [PGSandbox tool contract](https://pgsandbox-mcp.lvtd.dev/docs/mcp-tools/) documents `create_database` as the lifecycle tool that creates an isolated database and login role. The [architecture docs](https://pgsandbox-mcp.lvtd.dev/docs/architecture/) describe the resource model: one database, one scoped role, TTL metadata, and cleanup tied to tracked resources.
 
 That separation is the point. The server may need lifecycle authority to create the database, but the migration command should run against the sandbox connection, not a long-lived admin credential. If the agent makes a bad migration, the damage lands in the task database.
 
@@ -74,6 +74,8 @@ For Prisma, that might be `npx prisma migrate deploy` in CI-like mode or `npx pr
 For Rails, Django, Ecto, Flyway, Atlas, Knex, Drizzle, or a custom SQL runner, the same rule holds: do not invent a one-off command just because the agent can run SQL. Use the repository's migration path so the proof exercises the code that will run later.
 
 PGSandbox's repo workflow tools are built for this. `prepare_for_repo` writes a secret-free `.pgsandbox/project.json` with explicit command arrays. `validate_schema_change` runs an explicit or configured schema-change command against a fresh or selected sandbox, captures a before schema digest, captures an after digest, and returns a compact schema diff with bounded command output.
+
+If the repository's migration command runs inside Docker Compose while PostgreSQL stays on the host, use the [Docker-to-host PostgreSQL connection guide](/blog/docker-connect-host-postgres/) to choose the container URL, verify the listener and HBA path, and keep the sandbox credential out of tracked Compose files.
 
 The command should be an argv array, not a shell string. That keeps the proof boring in the best way: the agent cannot smuggle extra shell behavior into the validation command, and the reviewer can see the exact program and arguments.
 
@@ -90,7 +92,7 @@ Before the command runs, capture the current schema shape. After it runs, captur
 - Views and materialized views if the repo uses them.
 - Any failed command output or SQLSTATE details.
 
-PGSandbox's schema workflow gives agents a compact result instead of asking them to paste pages of `\d` output. The [MCP tool docs](https://pgsandbox.lvtd.dev/docs/mcp-tools/) document `validate_schema_change`, schema snapshots, and schema diff tools for before and after migration review.
+PGSandbox's schema workflow gives agents a compact result instead of asking them to paste pages of `\d` output. The [MCP tool docs](https://pgsandbox-mcp.lvtd.dev/docs/mcp-tools/) document `validate_schema_change`, schema snapshots, and schema diff tools for before and after migration review.
 
 That diff is the proof artifact the PR needs. A human reviewer can compare it against the migration file and ask better questions:
 
@@ -101,9 +103,9 @@ That diff is the proof artifact the PR needs. A human reviewer can compare it ag
 
 If the schema diff surprises the agent, the agent should fix the migration before opening the PR.
 
-For a deeper version of this review artifact, use the [Postgres schema snapshots for agent migration reviews](https://pgsandbox.lvtd.dev/blog/postgres-schema-snapshots-agent-migration-reviews/) workflow. It focuses on named before/after checkpoints, compact object diffs, invalid-index checks, bounded data checks, and the exact PR evidence block a reviewer can trust.
+For a deeper version of this review artifact, use the [Postgres schema snapshots for agent migration reviews](https://pgsandbox-mcp.lvtd.dev/blog/postgres-schema-snapshots-agent-migration-reviews/) workflow. It focuses on named before/after checkpoints, compact object diffs, invalid-index checks, bounded data checks, and the exact PR evidence block a reviewer can trust.
 
-When the migration changes a query path or adds an index, pair the schema diff with a [Postgres EXPLAIN plan review](https://pgsandbox.lvtd.dev/blog/postgres-explain-plan-agent-sql/). A plan does not prove the migration succeeded, but it can show whether the affected query still touches the intended relations and whether Postgres estimates the access path the patch expects.
+When the migration changes a query path or adds an index, pair the schema diff with a [Postgres EXPLAIN plan review](https://pgsandbox-mcp.lvtd.dev/blog/postgres-explain-plan-agent-sql/). A plan does not prove the migration succeeded, but it can show whether the affected query still touches the intended relations and whether Postgres estimates the access path the patch expects.
 
 ## Step 4: seed the data cases that make the migration risky
 
@@ -122,7 +124,7 @@ Seed the smallest set of rows that can break the migration:
 
 This is where an agent can do useful work before review. It can read the migration, infer the risky cases, create a seed command, run the migration, and query the result. But the output must be bounded. A proof needs row counts, representative rows, and failing cases, not a transcript-sized table dump.
 
-If the migration depends on production-shaped data, do not copy production rows casually. Use a schema-only clone, masked data, or a reduced approved source. The [Postgres clone database sandbox guide](https://pgsandbox.lvtd.dev/blog/how-to-clone-postgres-database-sandbox/) covers the safer clone path: read from the source, restore into a tracked destination sandbox, run task SQL only against that destination, and clean up when finished.
+If the migration depends on production-shaped data, do not copy production rows casually. Use a schema-only clone, masked data, or a reduced approved source. The [Postgres clone database sandbox guide](https://pgsandbox-mcp.lvtd.dev/blog/how-to-clone-postgres-database-sandbox/) covers the safer clone path: read from the source, restore into a tracked destination sandbox, run task SQL only against that destination, and clean up when finished.
 
 ## Step 5: check rollback or forward-fix behavior deliberately
 
@@ -196,7 +198,7 @@ Both can help. The pre-PR sandbox gives the agent fast feedback while it is stil
 
 ### Can I use Testcontainers for migration testing?
 
-Yes, especially when the repo already has a Testcontainers-based integration test harness. Use the test harness when it answers the database question. Use a task-scoped Postgres sandbox when the agent needs a database-level proof loop before a test exists or when the reviewer needs a schema diff and cleanup record. The [Testcontainers comparison](https://pgsandbox.lvtd.dev/blog/testcontainers-vs-disposable-postgres-sandboxes/) covers that boundary.
+Yes, especially when the repo already has a Testcontainers-based integration test harness. Use the test harness when it answers the database question. Use a task-scoped Postgres sandbox when the agent needs a database-level proof loop before a test exists or when the reviewer needs a schema diff and cleanup record. The [Testcontainers comparison](https://pgsandbox-mcp.lvtd.dev/blog/testcontainers-vs-disposable-postgres-sandboxes/) covers that boundary.
 
 ### Does PGSandbox run my migrations automatically?
 
