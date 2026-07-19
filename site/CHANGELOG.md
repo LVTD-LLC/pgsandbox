@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-07-19
+
+- Added the Astro Markdown blog post "How to Test PostgreSQL Extensions in Disposable Sandboxes" with SEO ledger, link inventory, primary-source citations, and inbound blog links.
+
 ## 2026-07-18
 
 - Added the Astro Markdown blog post "Connect a Docker Container to Host PostgreSQL Safely" with SEO ledger, link inventory, inbound blog links, and a complete migration of repo-authored site URLs to the production domain.

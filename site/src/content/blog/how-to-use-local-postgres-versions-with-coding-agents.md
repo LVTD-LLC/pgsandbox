@@ -147,6 +147,8 @@ Then request extension-specific operations only after you can see what the selec
 
 For local profile selection, remember that extension scripts can require server-level setup. PGSandbox returns `extension_setup_required` when the server package or preload path does not match the requested extension flow.
 
+The [PostgreSQL extension sandbox testing guide](/blog/test-postgres-extensions-locally/) turns that preflight into a complete proof: confirm profile availability, install through the sandbox role, exercise the required function or index, test the migration or restore path, record the installed version, and clean up the task database.
+
 ## A practical versioning decision matrix for agents
 
 Before any major change, use this matrix:

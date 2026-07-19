@@ -94,6 +94,8 @@ Before the command runs, capture the current schema shape. After it runs, captur
 
 PGSandbox's schema workflow gives agents a compact result instead of asking them to paste pages of `\d` output. The [MCP tool docs](https://pgsandbox-mcp.lvtd.dev/docs/mcp-tools/) document `validate_schema_change`, schema snapshots, and schema diff tools for before and after migration review.
 
+If the migration depends on a PostgreSQL extension, verify more than the added catalog entry. The [disposable extension testing workflow](/blog/test-postgres-extensions-locally/) checks profile availability, installed version, application behavior, restore ordering, and cleanup as separate gates before the migration proof is accepted.
+
 That diff is the proof artifact the PR needs. A human reviewer can compare it against the migration file and ask better questions:
 
 - Did the agent create an index but forget the constraint?
