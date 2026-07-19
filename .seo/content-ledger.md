@@ -25,6 +25,7 @@
 | 2026-07-16 | Guide / checklist | Per-Sandbox Postgres Roles for Coding Agents | per-sandbox-postgres-roles-coding-agents | postgres role per database | /docs/architecture/, /docs/mcp-tools/, /blog/postgres-mcp-server-safety-checklist/, /blog/postgres-run-sql-bounded-results/, /blog/postgres-sandbox-quotas-coding-agents/ | Astro Markdown source of truth; uses the lifecycle authority vs task authority vs cluster access matrix as the information-gain framework. |
 | 2026-07-17 | Definition / comparison | PostgreSQL ROLE vs USER for Agent Database Access | postgres-role-vs-user-agent-access | postgres role vs user | /docs/architecture/, /docs/mcp-tools/, /blog/per-sandbox-postgres-roles-coding-agents/, /blog/postgres-mcp-server-safety-checklist/, /blog/postgres-run-sql-bounded-results/ | Astro Markdown source of truth; uses authentication identity vs privilege carrier vs object owner as the information-gain framework. |
 | 2026-07-18 | How-to / tutorial | Connect a Docker Container to Host PostgreSQL Safely | docker-connect-host-postgres | docker connect to host postgres | /docs/mcp-tools/, /docs/architecture/, /blog/postgres-schema-snapshots-agent-migration-reviews/, /blog/postgres-run-sql-bounded-results/, /blog/database-migration-testing-agent-pr/ | Astro Markdown source of truth; uses the Runner-Network-Secret-Evidence framework and an explicit Docker Desktop/native Linux listener boundary as the information gain. |
+| 2026-07-19 | How-to / tutorial | How to Test PostgreSQL Extensions in Disposable Sandboxes | test-postgres-extensions-locally | test postgres extensions locally | /docs/mcp-tools/, /docs/architecture/, /blog/how-to-use-local-postgres-versions-with-coding-agents/, /blog/database-migration-testing-agent-pr/, /blog/postgres-schema-snapshots-agent-migration-reviews/ | Astro Markdown source of truth; uses the five-gate Extension Proof Contract for availability, installation, behavior, migration compatibility, and cleanup. |
 
 ## Removed
 
@@ -34,12 +35,12 @@
 
 ## Candidate Backlog
 
-Last researched: 2026-07-18
+Last researched: 2026-07-19
 
 | Rank | Score | Proposed Type | Title | Target Keyword | Volume | KD | Intent | SERP Read | Why It Fits |
 | --- | ---: | --- | --- | --- | ---: | ---: | --- | --- | --- |
-| 1 | 19 | How-to / tutorial | How to Test PostgreSQL Extensions in Disposable Sandboxes | test postgres extensions locally | TBD | TBD | Informational | Mixed extension-listing pages, tutorials, and primary PostgreSQL docs; few task-sandbox workflows | Strong product fit around `list_extensions`, requested extensions, version selection, rollback, and clone exclusions. |
-| 2 | 18 | How-to / tutorial | Run Database Migrations with Coding Agents Against Real PostgreSQL | database migrations coding agents | TBD | TBD | Informational / commercial investigation | Emerging agent-migration results mixed with generic migration advice | High conversion fit and product moat, but overlaps the shipped migration-testing guide and needs a narrower non-cannibalizing angle. |
+| 1 | 18 | How-to / tutorial | Test PostgreSQL Extension Upgrades Before Application Migrations | postgres extension upgrade | TBD | TBD | Informational | Official update-path documentation and extension-author material dominate; little application-team migration proof | Adjacent to the extension sandbox guide but distinct: focuses on `ALTER EXTENSION UPDATE`, version paths, rollback limits, and application compatibility. |
+| 2 | 17 | Guide / troubleshooting | Test pg_stat_statements in Disposable Agent Sandboxes | pg_stat_statements shared_preload_libraries | TBD | TBD | Informational | Official setup docs and provider-specific tutorials dominate; few sources explain task-role, preload, clone-exclusion, and cleanup boundaries together | Strong product fit around `extension_setup_required`, explicit profiles, default clone exclusion, and the difference between server preload setup and database-local registration. |
 
 ## Notes
 
@@ -66,3 +67,4 @@ Last researched: 2026-07-18
 - 2026-07-16 cron selected the top remaining backlog candidate automatically per cron instruction. DataForSEO credentials and the helper script were unavailable, so live research used the PGSandbox source/docs, PostgreSQL role/privilege/authentication docs, MCP security guidance, and SERP/web fallback. Keyword volume/KD remained `TBD`. New source-of-truth content file: `site/src/content/blog/per-sandbox-postgres-roles-coding-agents.md`.
 - 2026-07-17 cron selected the top backlog candidate automatically per cron instruction. DataForSEO credentials were unavailable and Firecrawl search returned no usable output, so live research used current PostgreSQL 18 role, membership, catalog, privilege, and session-identity docs, MCP security guidance, the PGSandbox source/docs, and web SERP fallback. Keyword volume/KD remained `TBD`. New source-of-truth content file: `site/src/content/blog/postgres-role-vs-user-agent-access.md`.
 - 2026-07-18 cron refreshed an empty backlog and selected the top recommendation automatically. DataForSEO credentials/helper were unavailable, so live research used Firecrawl's US-English top-10 SERP, current Docker and PostgreSQL primary docs, and the PGSandbox source/docs. Keyword volume/KD remained `TBD`. New source-of-truth content file: `site/src/content/blog/docker-connect-host-postgres.md`.
+- 2026-07-19 cron selected the top backlog candidate automatically. DataForSEO credentials were unavailable, so live research used Firecrawl's US-English SERPs, current PostgreSQL extension/catalog/module docs, and the PGSandbox source/docs/tests. Keyword volume/KD remained `TBD`. New source-of-truth content file: `site/src/content/blog/test-postgres-extensions-locally.md`.
