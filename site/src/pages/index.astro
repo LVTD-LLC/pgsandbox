@@ -4,186 +4,175 @@ import { agentSetupPrompt } from '../lib/agentSetupPrompt';
 
 const useCases = [
   {
-    title: 'Validate migrations',
-    body: 'Give an agent a fresh database before it edits schema files, then let it apply migrations and inspect the result.'
+    title: 'Test database migrations',
+    body: 'Apply schema changes to a real Postgres test database before they reach shared development or staging.'
+  },
+  {
+    title: 'Validate SQL and query plans',
+    body: 'Run generated SQL, inspect schemas, and check query plans against the database engine that will execute them.'
   },
   {
     title: 'Reproduce backend bugs',
-    body: 'Create a disposable Postgres target, load the failing state, run the repro query, and delete the database after the task.'
+    body: 'Build the failing state in isolation, test the fix, and delete the database when the investigation ends.'
   },
   {
-    title: 'Clone realistic state',
-    body: 'Restore an existing Postgres source into a tracked sandbox when migrations or bug repros need production-shaped data.'
+    title: 'Seed product demos',
+    body: 'Give screenshots, local demos, and acceptance tests realistic data without polluting a shared environment.'
   },
   {
-    title: 'Review generated SQL',
-    body: 'Let an agent run bounded queries against real Postgres behavior instead of guessing from ORM code or static types.'
-  },
-  {
-    title: 'Prepare demo data',
-    body: 'Seed temporary product states for screenshots, tests, or local demos without polluting a shared development database.'
+    title: 'Clone realistic test data',
+    body: 'Restore an existing Postgres source into a tracked, disposable database for higher-confidence validation.'
   }
 ];
 
-const testimonials = [
-  {
-    quote:
-      'PGSandbox gives our agents a place to prove database work before a human reviews it. The important part is that cleanup is tracked.',
-    name: 'Maya, staff engineer'
-  },
-  {
-    quote:
-      'The setup prompt is exactly the kind of handoff I want. It tells the agent how to install, configure, verify, and avoid leaking credentials.',
-    name: 'Omar, platform lead'
-  },
-  {
-    quote:
-      'We stopped asking agents to use the shared dev database for migration checks. A short-lived sandbox is easier to reason about.',
-    name: 'Lena, founding engineer'
-  },
-  {
-    quote:
-      'The tool surface is small enough that I can audit it quickly: create, run SQL, inspect schema, list, delete, clean up.',
-    name: 'Theo, backend engineer'
-  },
-  {
-    quote:
-      'It fits how we want agents to work. Start the managed local runtime, register the MCP server, and let the agent create isolated task state.',
-    name: 'Priya, engineering manager'
-  },
-  {
-    quote:
-      'The value is not another hosted database. It is giving local agents a safe default when a task needs real Postgres.',
-    name: 'Sam, AI enablement lead'
-  }
-];
+const structuredData = {
+  '@context': 'https://schema.org',
+  '@type': 'SoftwareApplication',
+  name: 'PGSandbox',
+  applicationCategory: 'DeveloperApplication',
+  description: 'A local Postgres MCP server for disposable database sandboxes used by coding agents.',
+  url: 'https://pgsandbox.lvtd.dev/',
+  codeRepository: 'https://github.com/LVTD-LLC/pgsandbox',
+  license: 'https://github.com/LVTD-LLC/pgsandbox/blob/main/LICENSE',
+  softwareRequirements: 'PostgreSQL server binaries'
+};
 ---
 <BaseLayout
-  title="PGSandbox - disposable Postgres for coding agents"
-  description="PGSandbox is a local MCP server that gives coding agents tracked, private Postgres databases for migrations, bug repros, seeded demos, and SQL validation."
+  title="PGSandbox — Postgres MCP Server for Coding Agents"
+  description="PGSandbox is a local Postgres MCP server that gives coding agents isolated database sandboxes for migrations, SQL testing, and backend bug reproduction."
+  structuredData={structuredData}
 >
-  <main id="content">
-    <section class="hero container">
-      <div class="hero-copy">
-        <p class="product-label">PGSandbox</p>
-        <h1>Disposable Postgres for coding agents.</h1>
-        <p class="lede">
-          A local MCP server that lets agents create, query, inspect, and delete isolated Postgres databases without touching shared development state.
+  <main id="content" class="landing-page">
+    <section class="hero-section">
+      <div class="container hero-inner">
+        <p class="hero-kicker"><span>Open source</span><i aria-hidden="true"></i>Local-first Postgres MCP server</p>
+        <h1>Safe Postgres for coding agents.</h1>
+        <p class="hero-summary">
+          PGSandbox gives each agent task an isolated database, then cleans it up when the work is done.
         </p>
-        <div class="actions" role="group" aria-label="Primary actions">
+        <div class="hero-action">
           <button class="button primary copy-prompt-button" type="button" data-copy-setup-prompt>
-            Copy agent setup prompt
+            Copy the agent setup prompt
           </button>
-          <a class="button subtle" href="/docs/">Read docs</a>
-          <a class="button subtle" href="https://github.com/LVTD-LLC/pgsandbox">View GitHub</a>
-        </div>
-        <p class="copy-status" data-copy-setup-status aria-live="polite">
-          Paste the prompt into Codex, Cursor, VS Code, or Claude Desktop.
-        </p>
-      </div>
-
-      <aside class="prompt-preview" aria-label="Agent setup prompt preview">
-        <div class="preview-head">
-          <span class="status-dot" aria-hidden="true"></span>
-          <span>agent setup prompt</span>
-        </div>
-        <ol>
-          <li><span>Install <code>pgsandbox</code></span></li>
-          <li><span>Register your MCP client</span></li>
-          <li><span>Run <code>doctor</code> and <code>smoke-test</code></span></li>
-        </ol>
-        <div class="prompt-note">
-          Uses a managed local Postgres cluster by default and leaves existing services on 5432 alone.
-        </div>
-      </aside>
-    </section>
-
-    <section class="examples-section">
-      <div class="container examples-grid">
-        <div class="section-copy">
-          <h2>Use it when an agent needs database proof.</h2>
-          <p>
-            PGSandbox turns real Postgres into a disposable task resource: one database, one scoped role, one TTL, and metadata-backed cleanup.
+          <p class="copy-status" data-copy-setup-status aria-live="polite">
+            Paste it into Codex, Cursor, VS Code, or Claude Desktop. Your agent handles setup and verification.
           </p>
         </div>
-        <div class="use-case-list">
-          {useCases.map((item) => (
-            <article class="use-case">
-              <h3>{item.title}</h3>
-              <p>{item.body}</p>
-            </article>
-          ))}
-        </div>
+        <a class="install-link" href="/docs/install/">Prefer to install it yourself? Read the installation guide →</a>
       </div>
     </section>
 
-    <section class="section container testimonials-section">
-      <div class="section-copy">
-        <h2>Testimonials</h2>
-        <p>Engineers want agents to prove database work without shared credentials, stale task state, or cleanup guesswork.</p>
-      </div>
-      <div class="testimonial-grid">
-        {testimonials.map((item) => (
-          <figure class="testimonial">
-            <blockquote>{item.quote}</blockquote>
-            <figcaption>{item.name}</figcaption>
-          </figure>
-        ))}
-      </div>
-    </section>
-
-    <section class="closing-band">
-      <div class="container closing-inner">
+    <section class="trust-section" aria-label="PGSandbox at a glance">
+      <dl class="container trust-list">
         <div>
-          <h2>Start with the prompt, then inspect the details.</h2>
+          <dt>Local-first</dt>
+          <dd>Runs on your machine. No hosted account required.</dd>
+        </div>
+        <div>
+          <dt>Isolated per task</dt>
+          <dd>One database and one scoped login for each agent job.</dd>
+        </div>
+        <div>
+          <dt>Tracked cleanup</dt>
+          <dd>TTL limits and metadata keep deletion bounded to owned resources.</dd>
+        </div>
+      </dl>
+    </section>
+
+    <section class="workflow-section">
+      <div class="container workflow-grid">
+        <div class="section-heading">
+          <p class="eyebrow">What it does</p>
+          <h2>A database sandbox for work that needs proof.</h2>
           <p>
-            Copy the setup instructions for your agent, or read the docs if you want the MCP tool contract and install paths first.
+            Your agent gets real Postgres behavior without access to a shared developer database or long-lived task state.
           </p>
         </div>
-        <div class="closing-actions">
-          <div class="actions">
-            <button class="button primary copy-prompt-button" type="button" data-copy-setup-prompt>
-              Copy agent setup prompt
-            </button>
-            <a class="button" href="/docs/">Read docs</a>
-            <a class="button" href="https://github.com/LVTD-LLC/pgsandbox">View GitHub</a>
+        <dl class="workflow-list">
+          <div>
+            <dt><span>01</span>Create</dt>
+            <dd>PGSandbox creates a temporary database, a restricted login role, and an expiry time.</dd>
           </div>
-          <p class="copy-status closing-copy-status" data-copy-setup-status aria-live="polite">
-            Paste the prompt into your agent.
+          <div>
+            <dt><span>02</span>Prove</dt>
+            <dd>Your agent runs migrations, SQL, seed commands, schema checks, or a backend reproduction.</dd>
+          </div>
+          <div>
+            <dt><span>03</span>Delete</dt>
+            <dd>PGSandbox removes the tracked database and role after the task, or when the TTL expires.</dd>
+          </div>
+        </dl>
+      </div>
+    </section>
+
+    <section class="use-cases-section">
+      <div class="container">
+        <div class="section-heading use-cases-heading">
+          <p class="eyebrow">What it’s for</p>
+          <h2>Use real Postgres without risking shared state.</h2>
+          <p>
+            PGSandbox is for engineering tasks where static analysis is not enough and the agent needs a database to verify its work.
           </p>
+        </div>
+        <dl class="use-case-list">
+          {useCases.map((item, index) => (
+            <div>
+              <dt><span>0{index + 1}</span>{item.title}</dt>
+              <dd>{item.body}</dd>
+            </div>
+          ))}
+        </dl>
+      </div>
+    </section>
+
+    <section class="safety-section">
+      <div class="container safety-grid">
+        <div class="section-heading">
+          <p class="eyebrow">Designed for local agent work</p>
+          <h2>Small enough to understand. Strict where it matters.</h2>
+        </div>
+        <dl class="safety-list">
+          <div>
+            <dt>Leaves your existing Postgres alone</dt>
+            <dd>The managed local runtime uses its own data directory and a separate high port instead of taking over port 5432.</dd>
+          </div>
+          <div>
+            <dt>Separates lifecycle access from query access</dt>
+            <dd>Admin connections manage databases. Agent SQL runs through the sandbox’s restricted role.</dd>
+          </div>
+          <div>
+            <dt>Bounds agent output and lifetime</dt>
+            <dd>Row limits, result truncation, positive TTLs, and ownership metadata keep experiments contained.</dd>
+          </div>
+        </dl>
+      </div>
+    </section>
+
+    <section class="closing-section">
+      <div class="container closing-inner">
+        <div class="section-heading">
+          <p class="eyebrow">Agent-assisted setup</p>
+          <h2>Let your agent handle the setup.</h2>
+          <p>
+            One prompt tells your agent how to install PGSandbox, configure its MCP client, and verify the complete create-query-delete workflow.
+          </p>
+        </div>
+        <div class="closing-action">
+          <button class="closing-copy-button" type="button" data-copy-setup-prompt>
+            Copy the setup prompt →
+          </button>
+          <p class="copy-status" data-copy-setup-status aria-live="polite">Ready for your coding agent.</p>
         </div>
       </div>
     </section>
   </main>
+
   <template id="agent-setup-prompt-data">{agentSetupPrompt}</template>
   <script>
     const copyButtons = document.querySelectorAll('[data-copy-setup-prompt]');
     const copyStatuses = document.querySelectorAll('[data-copy-setup-status]');
     const promptData = document.getElementById('agent-setup-prompt-data');
-    const defaultLabel = 'Copy agent setup prompt';
-    const defaultStatus = 'Paste the prompt into Codex, Cursor, VS Code, or Claude Desktop.';
-    const closingDefaultStatus = 'Paste the prompt into your agent.';
-    let copyResetTimer: number | undefined;
-
-    function setStatusText(heroStatus: string, closingStatus = heroStatus) {
-      copyStatuses.forEach((status) => {
-        status.textContent = status.classList.contains('closing-copy-status') ? closingStatus : heroStatus;
-      });
-    }
-
-    function setCopyState(label: string, status: string) {
-      copyButtons.forEach((button) => {
-        button.textContent = label;
-      });
-      setStatusText(status);
-      window.clearTimeout(copyResetTimer);
-      copyResetTimer = window.setTimeout(() => {
-        copyButtons.forEach((button) => {
-          button.textContent = defaultLabel;
-        });
-        setStatusText(defaultStatus, closingDefaultStatus);
-      }, 2800);
-    }
+    const resetTimers = new WeakMap<Element, number>();
 
     async function copyText(value: string) {
       if (navigator.clipboard?.writeText && window.isSecureContext) {
@@ -191,7 +180,7 @@ const testimonials = [
           await navigator.clipboard.writeText(value);
           return true;
         } catch {
-          // Fall through to the textarea copy path below.
+          // Fall through to the browser-compatible copy path.
         }
       }
 
@@ -201,7 +190,6 @@ const testimonials = [
       textarea.style.position = 'fixed';
       textarea.style.inset = '0 auto auto -9999px';
       document.body.appendChild(textarea);
-      textarea.focus();
       textarea.select();
 
       try {
@@ -213,376 +201,458 @@ const testimonials = [
     }
 
     copyButtons.forEach((button) => {
+      const defaultLabel = button.textContent || 'Copy the setup prompt';
+
       button.addEventListener('click', async () => {
         const value = promptData instanceof HTMLTemplateElement ? promptData.content.textContent || '' : '';
+        const existingTimer = resetTimers.get(button);
+        if (existingTimer) window.clearTimeout(existingTimer);
 
         try {
-          if (!value || !(await copyText(value))) {
-            throw new Error('copy failed');
-          }
-          setCopyState('Copied', 'Ready to paste into your AI agent.');
+          if (!value || !(await copyText(value))) throw new Error('copy failed');
+          button.textContent = 'Prompt copied';
+          copyStatuses.forEach((status) => status.textContent = 'Ready to paste into your coding agent.');
         } catch {
-          setCopyState('Copy failed', 'Open the docs to copy the setup prompt.');
+          button.textContent = 'Copy failed';
+          copyStatuses.forEach((status) => status.textContent = 'Open the installation guide to copy the setup prompt.');
         }
+
+        const timer = window.setTimeout(() => {
+          button.textContent = defaultLabel;
+        }, 2800);
+        resetTimers.set(button, timer);
       });
     });
   </script>
 </BaseLayout>
 
 <style>
-  .hero {
-    display: grid;
-    grid-template-columns: minmax(0, 1.08fr) minmax(320px, 0.72fr);
-    gap: clamp(2rem, 5vw, 4.25rem);
-    align-items: center;
-    padding: clamp(4rem, 7vw, 6.5rem) 0 4.25rem;
+  .landing-page {
+    isolation: isolate;
+    background: #fffdf8;
+    color: #272520;
   }
 
-  .product-label {
-    margin: 0 0 1rem;
-    color: var(--primary);
+  .hero-section {
+    padding: clamp(4.5rem, 10vw, 8.5rem) 0 clamp(4rem, 8vw, 7rem);
+  }
+
+  .hero-inner {
+    display: grid;
+    justify-items: center;
+    text-align: center;
+  }
+
+  .hero-kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.65rem;
+    margin: 0 0 1.35rem;
+    color: #68635a;
     font-family: var(--font-mono);
-    font-size: 0.95rem;
-    font-weight: 760;
+    font-size: 0.82rem;
+    font-weight: 750;
+  }
+
+  .hero-kicker span {
+    color: #8d6214;
+  }
+
+  .hero-kicker i {
+    width: 0.25rem;
+    height: 0.25rem;
+    flex: 0 0 auto;
+    border-radius: 50%;
+    background: #b8ad9b;
+  }
+
+  h1,
+  h2 {
+    color: #1e1c18;
+    text-wrap: balance;
   }
 
   h1 {
-    max-width: 780px;
+    max-width: 14ch;
     margin: 0;
-    font-size: clamp(2.75rem, 7vw, 5.6rem);
-    line-height: 0.98;
-    letter-spacing: -0.035em;
+    font-size: clamp(3.4rem, 8.5vw, 7.2rem);
+    font-weight: 760;
+    line-height: 0.95;
+    letter-spacing: -0.055em;
   }
 
-  .lede {
-    max-width: 690px;
-    margin: 1.25rem 0 0;
-    color: var(--muted);
-    font-size: clamp(1.08rem, 2vw, 1.24rem);
-    line-height: 1.68;
+  h2 {
+    max-width: 21ch;
+    margin: 0;
+    font-size: clamp(2.35rem, 5vw, 4rem);
+    font-weight: 720;
+    line-height: 1.02;
+    letter-spacing: -0.04em;
   }
 
-  .actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.75rem;
-    margin-top: 2rem;
+  .hero-summary {
+    max-width: 48ch;
+    margin: 1.5rem 0 0;
+    color: #5f5a52;
+    font-size: clamp(1.12rem, 2vw, 1.28rem);
+    line-height: 1.65;
+    text-wrap: pretty;
+  }
+
+  .hero-action {
+    display: grid;
+    justify-items: center;
+    gap: 0.85rem;
+    margin-top: 2.1rem;
   }
 
   .copy-prompt-button {
-    min-width: 13.8rem;
+    min-width: 17.5rem;
+    min-height: 3.25rem;
+    padding: 0.82rem 1.15rem;
+    border-radius: 10px;
   }
 
   .copy-status {
+    max-width: 64ch;
     min-height: 1.35rem;
-    margin: 0.85rem 0 0;
-    color: var(--muted);
-    font-size: 0.96rem;
-    line-height: 1.45;
-  }
-
-  .prompt-preview {
-    min-width: 0;
-    padding: 1.15rem;
-    border: 1px solid var(--line);
-    border-radius: var(--radius-lg);
-    background: var(--surface);
-  }
-
-  .preview-head {
-    display: flex;
-    align-items: center;
-    gap: 0.58rem;
-    padding-bottom: 1rem;
-    border-bottom: 1px solid var(--line);
-    color: var(--ink);
+    margin: 0;
+    color: #716b61;
     font-size: 0.94rem;
-    font-weight: 800;
+    line-height: 1.5;
+    text-wrap: pretty;
   }
 
-  .status-dot {
-    width: 0.58rem;
-    height: 0.58rem;
-    border-radius: 999px;
-    background: var(--success);
-  }
-
-  .prompt-preview ol {
-    display: grid;
-    gap: 0.7rem;
-    margin: 1.15rem 0;
-    padding: 0;
-    list-style: none;
-    counter-reset: prompt-step;
-  }
-
-  .prompt-preview li {
-    display: grid;
-    grid-template-columns: 2rem minmax(0, 1fr);
-    gap: 0.8rem;
+  .install-link {
+    display: inline-flex;
     align-items: center;
-    color: var(--text);
-    font-weight: 720;
-    line-height: 1.45;
-    counter-increment: prompt-step;
-  }
-
-  .prompt-preview li::before {
-    content: counter(prompt-step);
-    display: grid;
-    place-items: center;
-    width: 2rem;
-    height: 2rem;
-    border-radius: 999px;
-    background: var(--primary-soft);
-    color: var(--primary);
-    font-family: var(--font-mono);
-    font-size: 0.86rem;
-    font-weight: 850;
-  }
-
-  .prompt-preview li span {
-    min-width: 0;
-  }
-
-  .prompt-preview code {
-    white-space: nowrap;
-  }
-
-  .prompt-note {
-    padding: 0.95rem;
-    border-radius: var(--radius-md);
-    background: var(--surface-muted);
-    color: var(--muted);
+    min-height: 44px;
+    margin-top: 0.65rem;
+    color: #5f5a52;
     font-size: 0.95rem;
+    font-weight: 700;
+    text-decoration: underline;
+    text-decoration-color: #c8beb0;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 4px;
+  }
+
+  .install-link:hover {
+    color: var(--primary);
+  }
+
+  .trust-section {
+    border-block: 1px solid rgba(39, 37, 32, 0.12);
+    background: #ffffff;
+  }
+
+  .trust-list {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .trust-list > div {
+    min-width: 0;
+    padding: 1.6rem 2rem;
+  }
+
+  .trust-list > div:first-child {
+    padding-left: 0;
+  }
+
+  .trust-list > div:last-child {
+    padding-right: 0;
+  }
+
+  .trust-list > div + div {
+    border-left: 1px solid rgba(39, 37, 32, 0.1);
+  }
+
+  .trust-list dt {
+    color: #272520;
+    font-weight: 780;
+  }
+
+  .trust-list dd {
+    margin: 0.4rem 0 0;
+    color: #716b61;
+    font-size: 0.94rem;
     line-height: 1.55;
   }
 
-  .examples-section {
-    border-block: 1px solid var(--line);
-    background: var(--canvas);
+  .workflow-section {
+    padding: clamp(5rem, 9vw, 7.5rem) 0;
+    background: #18231e;
+    color: #c7d0ca;
   }
 
-  .examples-grid {
+  .workflow-grid,
+  .safety-grid,
+  .closing-inner {
     display: grid;
-    grid-template-columns: minmax(0, 0.78fr) minmax(0, 1.22fr);
-    gap: clamp(2rem, 5vw, 4rem);
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    gap: clamp(3rem, 7vw, 6rem);
     align-items: start;
-    padding: 5rem 0;
   }
 
-  .section-copy h2 {
+  .eyebrow {
     margin: 0 0 1rem;
-    max-width: 780px;
-    font-size: clamp(2.2rem, 4.5vw, 3.35rem);
-    line-height: 1.02;
-    letter-spacing: -0.025em;
+    color: #2d6b50;
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
   }
 
-  .section-copy p {
+  .section-heading > p:last-child {
+    max-width: 58ch;
+    margin: 1.15rem 0 0;
+    color: #716b61;
+    font-size: 1.04rem;
+    line-height: 1.7;
+    text-wrap: pretty;
+  }
+
+  .workflow-section .eyebrow,
+  .closing-section .eyebrow {
+    color: #86c89e;
+  }
+
+  .workflow-section h2,
+  .closing-section h2 {
+    color: #f7faf8;
+  }
+
+  .workflow-section .section-heading > p:last-child,
+  .closing-section .section-heading > p:last-child {
+    color: #aab7af;
+  }
+
+  .workflow-list {
     margin: 0;
-    max-width: 66ch;
-    color: var(--muted);
-    font-size: 1.06rem;
-    line-height: 1.72;
+    border-top: 1px solid rgba(255, 255, 255, 0.18);
   }
 
-  .use-case-list {
-    border-top: 1px solid var(--line-strong);
-  }
-
-  .use-case {
+  .workflow-list > div {
     display: grid;
-    grid-template-columns: minmax(9rem, 0.5fr) minmax(0, 1fr);
+    grid-template-columns: minmax(9rem, 4fr) minmax(0, 7fr);
     gap: 1.5rem;
-    padding: 1.15rem 0;
-    border-bottom: 1px solid var(--line);
+    padding: 1.45rem 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.14);
   }
 
-  .use-case h3 {
+  .workflow-list dt {
+    display: flex;
+    align-items: baseline;
+    gap: 0.9rem;
+    color: #ffffff;
+    font-size: 1.1rem;
+    font-weight: 750;
+  }
+
+  .workflow-list dt span {
+    color: #86c89e;
+    font-family: var(--font-mono);
+    font-size: 0.76rem;
+  }
+
+  .workflow-list dd {
     margin: 0;
-    font-size: 1.2rem;
-    letter-spacing: -0.01em;
-  }
-
-  .use-case p {
-    margin: 0;
-    color: var(--muted);
-    line-height: 1.62;
-  }
-
-  .testimonials-section {
-    display: grid;
-    gap: 2rem;
-  }
-
-  .testimonial-grid {
-    column-count: 3;
-    column-gap: 1rem;
-  }
-
-  .testimonial {
-    display: inline-block;
-    width: 100%;
-    margin: 0 0 1rem;
-    padding: 1.1rem;
-    border: 1px solid var(--line);
-    border-radius: var(--radius-lg);
-    background: var(--surface);
-    break-inside: avoid;
-  }
-
-  .testimonial blockquote {
-    margin: 0;
-    color: var(--text);
+    color: #aab7af;
     line-height: 1.65;
   }
 
-  .testimonial figcaption {
-    margin-top: 1rem;
-    color: var(--primary);
-    font-size: 0.94rem;
-    font-weight: 800;
+  .use-cases-section {
+    padding: clamp(5rem, 9vw, 7.5rem) 0;
+    background: #fffdf8;
   }
 
-  .closing-band {
-    padding: 4.4rem 0;
-    background: var(--primary);
-    color: var(--bg);
+  .use-cases-heading {
+    display: grid;
+    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+    column-gap: clamp(3rem, 7vw, 6rem);
+    align-items: end;
   }
 
-  .closing-inner {
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 2rem;
+  .use-cases-heading .eyebrow {
+    grid-column: 1 / -1;
   }
 
-  .closing-band h2 {
-    max-width: 720px;
-    margin: 0 0 1rem;
-    color: var(--bg);
-    font-size: clamp(2rem, 4vw, 3rem);
-    line-height: 1.04;
-    letter-spacing: -0.02em;
-  }
-
-  .closing-band p {
-    margin: 0;
-    max-width: 680px;
-    color: var(--on-primary-muted);
-    line-height: 1.66;
-  }
-
-  .closing-band .actions {
-    justify-content: flex-end;
+  .use-cases-heading > p:last-child {
     margin-top: 0;
   }
 
-  .closing-actions {
+  .use-case-list {
     display: grid;
-    justify-items: end;
-    gap: 0.85rem;
-    min-width: 300px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: clamp(3rem, 7vw, 6rem);
+    margin: 3.5rem 0 0;
+    border-top: 1px solid rgba(39, 37, 32, 0.18);
   }
 
-  .closing-copy-status {
-    min-height: 1.35rem;
+  .use-case-list > div {
+    display: grid;
+    grid-template-columns: minmax(10rem, 4fr) minmax(0, 7fr);
+    gap: 1.25rem;
+    padding: 1.5rem 0;
+    border-bottom: 1px solid rgba(39, 37, 32, 0.12);
+  }
+
+  .use-case-list dt {
+    display: grid;
+    gap: 0.55rem;
+    color: #272520;
+    font-size: 1.04rem;
+    font-weight: 760;
+  }
+
+  .use-case-list dt span {
+    color: #9b6c17;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+  }
+
+  .use-case-list dd {
     margin: 0;
-    color: var(--on-primary-muted);
-    font-size: 0.94rem;
-    text-align: right;
+    color: #716b61;
+    line-height: 1.62;
   }
 
-  .closing-band .button {
-    border-color: var(--on-primary-line);
-    background: var(--on-primary-surface);
-    color: var(--bg);
+  .safety-section {
+    padding: clamp(5rem, 9vw, 7.5rem) 0;
+    border-block: 1px solid rgba(39, 37, 32, 0.12);
+    background: #f2eee5;
   }
 
-  .closing-band .button:hover {
-    border-color: var(--bg);
-    color: var(--bg);
+  .safety-list {
+    margin: 0;
+    border-top: 1px solid rgba(39, 37, 32, 0.18);
   }
 
-  .closing-band .button.primary {
-    border-color: var(--bg);
-    background: var(--bg);
-    color: var(--primary);
+  .safety-list > div {
+    padding: 1.4rem 0;
+    border-bottom: 1px solid rgba(39, 37, 32, 0.13);
   }
 
-  @media (max-width: 1040px) {
-    .hero,
-    .examples-grid {
+  .safety-list dt {
+    color: #272520;
+    font-size: 1.08rem;
+    font-weight: 760;
+  }
+
+  .safety-list dd {
+    margin: 0.55rem 0 0;
+    color: #68635a;
+    line-height: 1.65;
+  }
+
+  .closing-section {
+    padding: clamp(4.5rem, 8vw, 6.5rem) 0;
+    background: #18231e;
+  }
+
+  .closing-inner {
+    align-items: end;
+  }
+
+  .closing-action {
+    display: grid;
+    justify-items: start;
+    gap: 0.8rem;
+  }
+
+  .closing-copy-button {
+    min-height: 48px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #bce8cb;
+    font: inherit;
+    font-size: 1.08rem;
+    font-weight: 800;
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 5px;
+    cursor: pointer;
+  }
+
+  .closing-copy-button:hover {
+    color: #ffffff;
+  }
+
+  .closing-section .copy-status {
+    color: #91a097;
+  }
+
+  @media (max-width: 960px) {
+    .workflow-grid,
+    .safety-grid,
+    .closing-inner,
+    .use-cases-heading {
       grid-template-columns: 1fr;
     }
 
-    .hero {
-      padding-top: 4.5rem;
+    .use-cases-heading > p:last-child {
+      margin-top: 1.15rem;
     }
 
-    .prompt-preview {
-      max-width: 680px;
-    }
-
-    .testimonial-grid {
-      column-count: 2;
-    }
-
-    .closing-inner {
-      align-items: flex-start;
-      flex-direction: column;
-    }
-
-    .closing-actions {
-      justify-items: start;
-      min-width: 0;
-    }
-
-    .closing-band .actions {
-      justify-content: flex-start;
-    }
-
-    .closing-copy-status {
-      text-align: left;
+    .use-case-list {
+      grid-template-columns: 1fr;
     }
   }
 
-  @media (max-width: 640px) {
-    .hero {
-      padding: 3.2rem 0 3.6rem;
+  @media (max-width: 700px) {
+    .hero-section {
+      padding: 3.5rem 0 4rem;
+    }
+
+    .hero-kicker {
+      flex-wrap: wrap;
+      justify-content: center;
+      font-size: 0.76rem;
     }
 
     h1 {
-      font-size: 2.55rem;
-      line-height: 1.04;
-      letter-spacing: -0.025em;
+      font-size: clamp(3rem, 15vw, 4.5rem);
+      line-height: 0.98;
     }
 
-    .lede {
-      font-size: 1.04rem;
+    .hero-summary,
+    .section-heading > p:last-child {
+      font-size: 1.05rem;
     }
 
-    .actions,
-    .actions .button {
+    .hero-action,
+    .copy-prompt-button {
       width: 100%;
     }
 
-    .copy-prompt-button {
-      min-width: 0;
-    }
-
-    .examples-grid {
-      padding: 4rem 0;
-    }
-
-    .use-case {
+    .trust-list {
       grid-template-columns: 1fr;
-      gap: 0.45rem;
     }
 
-    .testimonial-grid {
-      column-count: 1;
+    .trust-list > div,
+    .trust-list > div:first-child,
+    .trust-list > div:last-child {
+      padding: 1.25rem 0;
+    }
+
+    .trust-list > div + div {
+      border-top: 1px solid rgba(39, 37, 32, 0.1);
+      border-left: 0;
+    }
+
+    .workflow-list > div,
+    .use-case-list > div {
+      grid-template-columns: 1fr;
+      gap: 0.65rem;
+    }
+
+    .workflow-list dt,
+    .use-case-list dt {
+      display: flex;
+      align-items: baseline;
     }
   }
 </style>
