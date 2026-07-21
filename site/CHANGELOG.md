@@ -2,6 +2,9 @@
 
 ## 2026-07-21
 
+- Released `pgsandbox` v0.5.0 with one-shot agent test sessions, explicit
+  cleanup policies, versioned credential-free results, recoverable extension
+  lifecycle audits, and measured guidance for templates and large suites.
 - Added `pgsandbox with-database` for one-shot agent test sessions with PostgreSQL
   version and extension selection, explicit cleanup policies, signal/timeout exit
   translation, bounded credential-redacted child output, and versioned JSON results.
