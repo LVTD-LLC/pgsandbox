@@ -27,6 +27,32 @@ retention, and cleanup outcomes. It includes safe sandbox identity, selected
 Postgres version, requested extensions, elapsed time, bounded redacted output,
 expiry, and cleanup state. It never includes a connection string or password.
 
+### Version 1 JSON contract
+
+`with-database` is CLI-only. Its JSON is a session result, not the shared MCP
+tool envelope.
+
+| Field | Shape | Meaning |
+| --- | --- | --- |
+| `schemaVersion` | integer | Always `1` for this contract. |
+| `status` | string | `provision-failed`, `child-spawn-failed`, `child-failed`, `timed-out`, `interrupted`, `cleanup-failed`, `retained`, or `succeeded`. |
+| `sandbox` | object or null | Safe `databaseId`, `databaseName`, `profile`, `postgresVersion`, and `expiresAt`; null when provisioning never produced a sandbox. |
+| `requestedExtensions` | string array | Normalized extensions requested for the session. |
+| `command` | object or null | `exitCode`, `signal`, `timedOut`, `elapsedMs`, redacted `stdout`/`stderr`, and their truncation flags; null when the child never started. |
+| `cleanup` | object | `policy`, `attempted`, `deleted`, `retained`, `alreadyAbsent`, and nullable `errorCode`. Policies are `always`, `on-success`, and `keep`. |
+| `provisionErrorCode` | string, omitted on success | Stable provisioning category without raw driver text. |
+| `commandErrorCode` | string, omitted when command execution produced a result | `repo_not_found`, `unclear_command`, `invalid_env_alias`, `too_many_env_aliases`, `invalid_connection_mode`, or `child_spawn_failed`. |
+
+Optional error-code fields are omitted rather than serialized as null. Nullable
+fields inside `sandbox`, `command`, and `cleanup` remain present so consumers
+can distinguish an absent value from an omitted phase.
+
+The command accepts `--profile`, `--postgres-version`, `--name-hint`,
+`--ttl-minutes`, `--owner`, repeated `--extension`, `--cleanup`,
+`--timeout-seconds`, repeated `--database-url-env`, `--connection-mode`,
+`--result-format`, and `--repo-path`. Run `pgsandbox --help` for defaults and
+the accepted values.
+
 ## Extensions and cleanup
 
 Request each required extension explicitly:

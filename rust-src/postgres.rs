@@ -2075,6 +2075,8 @@ impl PostgresSandboxManager {
         let extension_database_url =
             build_admin_database_url(&profile.admin_url, &names.database_name)
                 .with_context(|| target_context.clone())?;
+        let labels = serde_json::to_value(labels.unwrap_or_default())?;
+        let stored_role_password = protect_role_password(&role_password, &profile)?;
 
         let (client, connection_task) = connect_admin(&profile)
             .await
@@ -2112,10 +2114,8 @@ impl PostgresSandboxManager {
                 .await?;
             created_database = true;
 
-            install_extensions(&extension_database_url, &profile.name, &extensions).await?;
-
-            let labels = serde_json::to_value(labels.unwrap_or_default())?;
-            let stored_role_password = protect_role_password(&role_password, &profile)?;
+            // Register the sandbox before extension setup so TTL cleanup can recover
+            // resources if both setup and the immediate rollback fail.
             client
                 .execute(
                     &format!(
@@ -2139,6 +2139,9 @@ impl PostgresSandboxManager {
                     ],
                 )
                 .await?;
+
+            install_extensions(&extension_database_url, &profile.name, &extensions).await?;
+
             let _ = record_audit_event(
                 &client,
                 operation.as_str(),
@@ -2154,22 +2157,24 @@ impl PostgresSandboxManager {
                 }),
             )
             .await;
-            let _ = record_extension_audit_events(
-                &client,
-                ExtensionAuditContext {
-                    profile_name: &profile.name,
-                    database_id: &names.database_id,
-                    database_name: &names.database_name,
-                    role_name: &names.role_name,
-                    operation,
-                    actor: owner.as_deref(),
-                },
-                &extensions,
-                ExtensionAuditOutcome::Installed,
-                None,
-                None,
-            )
-            .await;
+            if operation == LifecycleOperation::CreateDatabase {
+                let _ = record_extension_audit_events(
+                    &client,
+                    ExtensionAuditContext {
+                        profile_name: &profile.name,
+                        database_id: &names.database_id,
+                        database_name: &names.database_name,
+                        role_name: &names.role_name,
+                        operation,
+                        actor: owner.as_deref(),
+                    },
+                    &extensions,
+                    ExtensionAuditOutcome::Installed,
+                    None,
+                    None,
+                )
+                .await;
+            }
             anyhow::Ok(())
         }
         .await;
@@ -2196,15 +2201,18 @@ impl PostgresSandboxManager {
                     .await
                     .is_ok();
             }
-            let _ = client
-                .execute(
-                    &format!(
-                        "UPDATE {} SET deleted_at = now() WHERE database_id = $1",
-                        quote_ident(METADATA_TABLE)?
-                    ),
-                    &[&names.database_id],
-                )
-                .await;
+            let cleanup_succeeded = database_cleanup_succeeded && role_cleanup_succeeded;
+            if cleanup_succeeded {
+                let _ = client
+                    .execute(
+                        &format!(
+                            "UPDATE {} SET deleted_at = now() WHERE database_id = $1",
+                            quote_ident(METADATA_TABLE)?
+                        ),
+                        &[&names.database_id],
+                    )
+                    .await;
+            }
             let _ = record_audit_event(
                 &client,
                 "create_database_rolled_back",
@@ -2231,9 +2239,9 @@ impl PostgresSandboxManager {
                     actor: owner.as_deref(),
                 },
                 &extensions,
-                ExtensionAuditOutcome::RolledBack,
+                extension_rollback_outcome(cleanup_succeeded),
                 Some(lifecycle_error_code(&error)),
-                Some(database_cleanup_succeeded && role_cleanup_succeeded),
+                Some(cleanup_succeeded),
             )
             .await;
             drop(client);
@@ -2304,7 +2312,7 @@ impl PostgresSandboxManager {
                     postgres_version: None,
                     name_hint,
                     ttl_minutes,
-                    owner,
+                    owner: owner.clone(),
                     labels,
                     extensions: Some(extensions),
                 },
@@ -2335,6 +2343,16 @@ impl PostgresSandboxManager {
                     })
                     .await;
                 let cleanup_succeeded = cleanup_result.is_ok();
+                let _ = self
+                    .record_created_extension_outcome(
+                        &created,
+                        LifecycleOperation::CloneDatabase,
+                        owner.as_deref(),
+                        extension_rollback_outcome(cleanup_succeeded),
+                        Some("command_timeout"),
+                        Some(cleanup_succeeded),
+                    )
+                    .await;
                 let timeout_error = CloneTimeoutError {
                     timeout_seconds: timeout.as_secs(),
                     source_size_bytes: source_preflight.size_bytes,
@@ -2356,6 +2374,17 @@ impl PostgresSandboxManager {
                         database_name: None,
                     })
                     .await;
+                let cleanup_succeeded = cleanup_result.is_ok();
+                let _ = self
+                    .record_created_extension_outcome(
+                        &created,
+                        LifecycleOperation::CloneDatabase,
+                        owner.as_deref(),
+                        extension_rollback_outcome(cleanup_succeeded),
+                        Some("clone_failed"),
+                        Some(cleanup_succeeded),
+                    )
+                    .await;
                 let clone_error = match cleanup_result {
                     Ok(_) => anyhow::anyhow!(
                         "database clone failed; created sandbox was deleted: {error}"
@@ -2368,6 +2397,17 @@ impl PostgresSandboxManager {
                 return Err(clone_error).with_context(|| target_context.clone());
             }
         }
+
+        let _ = self
+            .record_created_extension_outcome(
+                &created,
+                LifecycleOperation::CloneDatabase,
+                owner.as_deref(),
+                ExtensionAuditOutcome::Installed,
+                None,
+                None,
+            )
+            .await;
 
         Ok(CloneDatabaseOutput {
             database_id: created.database_id,
@@ -2389,6 +2429,42 @@ impl PostgresSandboxManager {
             installed_extensions: created.installed_extensions,
             excluded_source_extensions,
         })
+    }
+
+    async fn record_created_extension_outcome(
+        &self,
+        created: &CreateDatabaseOutput,
+        operation: LifecycleOperation,
+        actor: Option<&str>,
+        outcome: ExtensionAuditOutcome,
+        error_code: Option<&str>,
+        cleanup_succeeded: Option<bool>,
+    ) -> anyhow::Result<()> {
+        if created.installed_extensions.is_empty() {
+            return Ok(());
+        }
+        let profile = self.resolve_profile(Some(&created.profile), None)?;
+        let (client, connection_task) = connect_admin(&profile).await?;
+        ensure_metadata_table(&client, &profile).await?;
+        let result = record_extension_audit_events(
+            &client,
+            ExtensionAuditContext {
+                profile_name: &created.profile,
+                database_id: &created.database_id,
+                database_name: &created.database_name,
+                role_name: &created.role_name,
+                operation,
+                actor,
+            },
+            &created.installed_extensions,
+            outcome,
+            error_code,
+            cleanup_succeeded,
+        )
+        .await;
+        drop(client);
+        let _ = connection_task.await;
+        result
     }
 
     pub async fn delete_database(
@@ -3253,11 +3329,7 @@ impl PostgresSandboxManager {
             result.exit_code == Some(0) && !result.timed_out && result.signal.is_none()
         });
         let command_error_code = command_result.as_ref().err().copied();
-        let should_cleanup = match input.cleanup {
-            SessionCleanupPolicy::Always => true,
-            SessionCleanupPolicy::OnSuccess => command_succeeded,
-            SessionCleanupPolicy::Keep => false,
-        };
+        let should_cleanup = session_should_cleanup(input.cleanup, command_succeeded);
         let mut cleanup = SessionCleanupOutput {
             policy: input.cleanup,
             attempted: should_cleanup,
@@ -6573,7 +6645,7 @@ async fn record_audit_event(
     Ok(())
 }
 
-#[derive(Debug, Clone, Copy, Serialize)]
+#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 enum LifecycleOperation {
     CreateDatabase,
@@ -6589,11 +6661,20 @@ impl LifecycleOperation {
     }
 }
 
-#[derive(Debug, Clone, Copy, Serialize)]
+#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 enum ExtensionAuditOutcome {
     Installed,
     RolledBack,
+    RollbackFailed,
+}
+
+fn extension_rollback_outcome(cleanup_succeeded: bool) -> ExtensionAuditOutcome {
+    if cleanup_succeeded {
+        ExtensionAuditOutcome::RolledBack
+    } else {
+        ExtensionAuditOutcome::RollbackFailed
+    }
 }
 
 #[derive(Serialize)]
@@ -6691,6 +6772,14 @@ fn database_already_absent(error: &anyhow::Error) -> bool {
             .to_string()
             .contains("Database was not found in PGSandbox metadata")
     })
+}
+
+fn session_should_cleanup(policy: SessionCleanupPolicy, command_succeeded: bool) -> bool {
+    match policy {
+        SessionCleanupPolicy::Always => true,
+        SessionCleanupPolicy::OnSuccess => command_succeeded,
+        SessionCleanupPolicy::Keep => false,
+    }
 }
 
 fn session_preflight_error(
@@ -10786,6 +10875,22 @@ mod tests {
     }
 
     #[test]
+    fn extension_audit_distinguishes_complete_and_failed_rollback() {
+        assert_eq!(
+            extension_rollback_outcome(true),
+            ExtensionAuditOutcome::RolledBack
+        );
+        assert_eq!(
+            extension_rollback_outcome(false),
+            ExtensionAuditOutcome::RollbackFailed
+        );
+        assert_eq!(
+            serde_json::to_value(extension_rollback_outcome(false)).unwrap(),
+            json!("rollback_failed")
+        );
+    }
+
+    #[test]
     fn lifecycle_error_codes_never_persist_raw_errors() {
         let error = anyhow::anyhow!(
             "invalid_extensions: failed using postgres://admin:super-secret@localhost/postgres"
@@ -10824,6 +10929,22 @@ mod tests {
         assert!(!database_already_absent(&anyhow::anyhow!(
             "permission denied"
         )));
+    }
+
+    #[test]
+    fn session_cleanup_policy_covers_success_and_failure() {
+        assert!(session_should_cleanup(SessionCleanupPolicy::Always, true));
+        assert!(session_should_cleanup(SessionCleanupPolicy::Always, false));
+        assert!(session_should_cleanup(
+            SessionCleanupPolicy::OnSuccess,
+            true
+        ));
+        assert!(!session_should_cleanup(
+            SessionCleanupPolicy::OnSuccess,
+            false
+        ));
+        assert!(!session_should_cleanup(SessionCleanupPolicy::Keep, true));
+        assert!(!session_should_cleanup(SessionCleanupPolicy::Keep, false));
     }
 
     #[test]

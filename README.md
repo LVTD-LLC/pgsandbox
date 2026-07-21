@@ -1308,6 +1308,7 @@ Integration-style tests live under `tests/`:
 tests/dogfood_reliability.rs
 tests/extensions.rs
 tests/run_sql_serialization.rs
+tests/session_lifecycle.rs
 ```
 
 These tests are compiled by `cargo test`, but live database scenarios are
@@ -1357,6 +1358,14 @@ PGSANDBOX_EXTENSION_E2E=1 \
 
 PGSANDBOX_EXTENSION_E2E=1 PGSANDBOX_EXTENSION_E2E_NAME=citext \
   cargo test --test extensions -- --nocapture
+```
+
+Run the one-shot session cleanup matrix. It verifies a real query plus
+`always`, `on-success`, `keep`, timeout, and child-spawn failure behavior:
+
+```bash
+PGSANDBOX_SESSION_E2E=1 \
+  cargo test --test session_lifecycle -- --nocapture
 ```
 
 Each live test creates a sandbox and attempts cleanup at the end. If cleanup

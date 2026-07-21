@@ -2324,11 +2324,16 @@ Smoke-test options:
   --verbose                           Print full structured SQL result dictionaries
 
 With-database options:
+  --profile <profile>                 Target a configured profile
   --postgres-version <major>          Target a managed local Postgres version
+  --name-hint <text>                  Sandbox purpose; defaults to test session
+  --ttl-minutes <minutes>             Sandbox TTL backstop, capped by the profile
+  --owner <text>                      Session owner metadata; defaults to with-database
   --extension <name>                  Install an allowed extension; repeat as needed
   --cleanup <policy>                  always (default), on-success, or keep
   --timeout-seconds <seconds>         Stop the command and clean up after the timeout
   --database-url-env <name>           Inject the database URL into another environment variable
+  --connection-mode <mode>            direct (default) or local-container
   --result-format <human|json>        Print concise output or a versioned JSON result
   --repo-path <path>                  Child working directory; defaults to the current directory
 
@@ -2816,7 +2821,88 @@ mod tests {
         let help = help_text();
 
         assert!(help.contains("pgsandbox with-database"));
+        for option in [
+            "--profile <profile>",
+            "--name-hint <text>",
+            "--ttl-minutes <minutes>",
+            "--owner <text>",
+            "--connection-mode <mode>",
+        ] {
+            assert!(help.contains(option), "missing {option} from help");
+        }
         assert!(help.contains("always (default), on-success, or keep"));
         assert!(help.contains("--result-format <human|json>"));
+    }
+
+    #[test]
+    fn session_exit_code_preserves_child_and_lifecycle_contract() {
+        let output = |status: SessionStatus,
+                      exit_code: Option<i32>,
+                      signal: Option<i32>,
+                      timed_out: bool|
+         -> WithDatabaseOutput {
+            WithDatabaseOutput {
+                schema_version: 1,
+                status,
+                sandbox: None,
+                requested_extensions: Vec::new(),
+                command: exit_code
+                    .or(signal)
+                    .map(|_| crate::postgres::SessionCommandOutput {
+                        exit_code,
+                        signal,
+                        timed_out,
+                        elapsed_ms: 1,
+                        stdout: String::new(),
+                        stderr: String::new(),
+                        stdout_truncated: false,
+                        stderr_truncated: false,
+                    }),
+                cleanup: crate::postgres::SessionCleanupOutput {
+                    policy: SessionCleanupPolicy::Always,
+                    attempted: true,
+                    deleted: status == SessionStatus::Succeeded,
+                    retained: status == SessionStatus::Retained,
+                    already_absent: false,
+                    error_code: (status == SessionStatus::CleanupFailed)
+                        .then(|| "cleanup-failed".to_string()),
+                },
+                provision_error_code: None,
+                command_error_code: None,
+            }
+        };
+
+        assert_eq!(
+            session_exit_code(&output(SessionStatus::Succeeded, Some(0), None, false)),
+            0
+        );
+        assert_eq!(
+            session_exit_code(&output(SessionStatus::Retained, Some(0), None, false)),
+            0
+        );
+        assert_eq!(
+            session_exit_code(&output(SessionStatus::ChildFailed, Some(17), None, false)),
+            17
+        );
+        assert_eq!(
+            session_exit_code(&output(SessionStatus::TimedOut, Some(124), None, true)),
+            124
+        );
+        assert_eq!(
+            session_exit_code(&output(SessionStatus::Interrupted, None, Some(2), false)),
+            130
+        );
+        assert_eq!(
+            session_exit_code(&output(SessionStatus::Interrupted, None, Some(15), false)),
+            143
+        );
+        assert_eq!(
+            session_exit_code(&output(SessionStatus::CleanupFailed, Some(0), None, false)),
+            1
+        );
+        assert_eq!(
+            session_exit_code(&output(SessionStatus::ProvisionFailed, None, None, false)),
+            1
+        );
     }
 }

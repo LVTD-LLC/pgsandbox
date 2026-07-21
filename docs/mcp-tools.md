@@ -28,9 +28,9 @@ that envelope.
 - `detailHandles`: opaque pointers agents can use in follow-up calls
 - `result`: workflow-specific output when available
 
-The same contracts are available through the `pgsandbox` CLI. Use the
-hyphenated command form for shell usage or the exact MCP name through
-`pgsandbox tool`:
+The same contracts are available through the `pgsandbox` CLI for tool-backed
+commands. Use the hyphenated command form for shell usage or the exact MCP name
+through `pgsandbox tool`:
 
 ```bash
 pgsandbox create-database --name-hint "migration check" --ttl-minutes 30
@@ -38,8 +38,12 @@ pgsandbox run-sql --database-id "$DATABASE_ID" --sql "select 1" --readonly
 pgsandbox tool schema_digest --input "{\"databaseId\":\"$DATABASE_ID\"}"
 ```
 
-CLI commands return the same envelope shape. `--input` and `--input-file`
+Tool-backed CLI commands return the same envelope shape. `--input` and `--input-file`
 accept the camelCase JSON objects documented below.
+
+`pgsandbox with-database` is a CLI-only orchestration command. Its
+`--result-format json` output is the versioned session result documented in
+[`agent-testing.md`](agent-testing.md), not an MCP workflow envelope.
 
 Creation-style tools return `connectionStringRedacted` for safe summaries and
 task trackers. They also return `connectionStringsRedacted`, which always
