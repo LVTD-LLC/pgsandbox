@@ -1101,7 +1101,7 @@ Pin the current manifest version explicitly:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/LVTD-LLC/pgsandbox/main/scripts/install.sh \
-  | PGSANDBOX_VERSION=0.4.9 sh
+  | PGSANDBOX_VERSION=0.5.0 sh
 ```
 
 ### Site Variables
@@ -1451,7 +1451,7 @@ Install the current manifest version explicitly:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/LVTD-LLC/pgsandbox/main/scripts/install.sh \
-  | PGSANDBOX_VERSION=0.4.9 sh
+  | PGSANDBOX_VERSION=0.5.0 sh
 ```
 
 Install to a custom directory:
@@ -1479,7 +1479,7 @@ pgsandbox doctor
 From GitHub:
 
 ```bash
-cargo install --git https://github.com/LVTD-LLC/pgsandbox --tag v0.4.9 --force
+cargo install --git https://github.com/LVTD-LLC/pgsandbox --tag v0.5.0 --force
 pgsandbox setup --client codex
 pgsandbox doctor
 ```
@@ -1507,7 +1507,7 @@ installer release:
 pgsandbox upgrade --setup codex
 pgsandbox upgrade --no-setup
 pgsandbox upgrade --no-doctor
-pgsandbox upgrade --version 0.4.9
+pgsandbox upgrade --version 0.5.0
 ```
 
 Homebrew:
