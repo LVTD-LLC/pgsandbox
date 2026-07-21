@@ -576,6 +576,14 @@ fn parse_cli_tool_invocation(command: &str, args: &[String]) -> anyhow::Result<C
                 )?;
                 index += 2;
             }
+            "--postgres-version" => {
+                set_input_field(
+                    &mut input,
+                    "postgresVersion",
+                    Value::String(next_value(args, index + 1, arg)?.to_string()),
+                );
+                index += 2;
+            }
             "--exclude-source-extension" => {
                 push_array_field(
                     &mut input,
@@ -626,7 +634,11 @@ fn parse_cli_tool_invocation(command: &str, args: &[String]) -> anyhow::Result<C
                     set_input_field(
                         &mut input,
                         option_name_to_field(name),
-                        parse_scalar_value(value),
+                        if name == "postgres-version" {
+                            Value::String(value.to_string())
+                        } else {
+                            parse_scalar_value(value)
+                        },
                     );
                     index += 1;
                 } else {
@@ -2259,6 +2271,23 @@ mod tests {
         assert_eq!(invocation.input["sql"], "select 1");
         assert_eq!(invocation.input["readonly"], true);
         assert_eq!(invocation.input["rowLimit"], 5);
+    }
+
+    #[test]
+    fn cli_tool_invocation_keeps_postgres_version_as_a_string() {
+        let invocation = parse_cli_tool_invocation(
+            "create-database",
+            &args(&["--postgres-version", "18", "--name-hint", "versioned"]),
+        )
+        .unwrap();
+
+        assert_eq!(invocation.input["postgresVersion"], "18");
+
+        let equals_invocation =
+            parse_cli_tool_invocation("create-database", &args(&["--postgres-version=18"]))
+                .unwrap();
+
+        assert_eq!(equals_invocation.input["postgresVersion"], "18");
     }
 
     #[test]

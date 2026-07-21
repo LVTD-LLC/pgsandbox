@@ -99,6 +99,28 @@ async fn create_database_installs_requested_extensions_when_enabled() {
         if !installed.contains(&expected_extension.as_str()) {
             anyhow::bail!("expected extension {expected_extension} in {installed:?}");
         }
+
+        let privileges = manager
+            .run_sql(RunSqlInput {
+                profile: Some(created.profile.clone()),
+                postgres_version: None,
+                database_id: Some(created.database_id.clone()),
+                database_name: None,
+                sql: "SELECT rolsuper, rolcreatedb FROM pg_roles WHERE rolname = current_user"
+                    .to_string(),
+                readonly: Some(true),
+                row_limit: None,
+            })
+            .await?;
+        let role = privileges
+            .rows
+            .first()
+            .ok_or_else(|| anyhow::anyhow!("sandbox role privilege row was missing"))?;
+        if role.get("rolsuper") != Some(&json!(false))
+            || role.get("rolcreatedb") != Some(&json!(false))
+        {
+            anyhow::bail!("sandbox role gained elevated privileges: {role:?}");
+        }
         Ok::<(), anyhow::Error>(())
     }
     .await;
