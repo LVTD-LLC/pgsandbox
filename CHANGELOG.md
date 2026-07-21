@@ -7,6 +7,8 @@
   translation, bounded credential-redacted child output, and versioned JSON results.
 - Added credential-free per-extension lifecycle audit outcomes, including clone
   provenance and rollback cleanup status.
+- Documented measured template and large-suite tradeoffs, including the Rowset
+  frontend-build prerequisite and when fresh-sandbox partitioning is worthwhile.
 - Changed requested extension installation to run through PGSandbox's admin lifecycle while
   keeping returned sandbox roles non-superuser and without `CREATEDB`.
 - Added profile-level `allowedExtensions` authorization for privileged extension installation;

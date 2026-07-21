@@ -105,3 +105,7 @@ pgsandbox with-database --postgres-version 18 --cleanup always -- make test
 Do not print the injected connection variables from application code. PGSandbox
 redacts its generated values from captured output, but tests should still avoid
 logging credentials as a general practice.
+
+See [Session and template benchmarks](session-benchmarks.md) for measured
+guidance on fresh migrations, optional templates, monolithic suites, and
+fresh-sandbox partitions.
