@@ -67,9 +67,15 @@ pgsandbox_<slug>_<short_id>
 ```
 
 The admin connection is used only for lifecycle operations. Tool calls that run user SQL connect using the generated sandbox role.
-Requested extension installation also connects with the generated sandbox role
-after the database is created, so `CREATE EXTENSION` succeeds or fails under
-the same privileges the sandbox owner has.
+Requested extension installation is a lifecycle operation: PGSandbox validates
+each requested extension against the selected profile's `allowedExtensions`
+policy and `pg_available_extensions`, then installs it in the new database
+through the admin connection before returning the restricted sandbox
+credentials. Managed-local profiles carry a small built-in allowlist; explicit
+profiles require an operator-configured allowlist before privileged installation.
+The profile admin role must have the privileges required by each allowlisted
+extension and remains the owner of extensions it installs; restricted sandbox
+roles receive use, not lifecycle ownership.
 Extension discovery is read-only catalog inspection: profile-scoped discovery
 reports `pg_available_extensions` before creation, while sandbox-scoped
 discovery connects with the sandbox role and reports both available and

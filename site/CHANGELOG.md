@@ -2,6 +2,12 @@
 
 ## 2026-07-21
 
+- Changed requested extension installation to run through PGSandbox's admin lifecycle while
+  keeping returned sandbox roles non-superuser and without `CREATEDB`.
+- Added profile-level `allowedExtensions` authorization for privileged extension installation;
+  managed-local profiles include a small built-in allowlist and explicit profiles default to none.
+- Fixed `--postgres-version` for sandbox CLI tool commands so numeric major versions retain the
+  string type expected by the MCP contract.
 - Added the Astro Markdown blog post "How to Test pg_stat_statements in Agent Sandboxes" with PostgreSQL primary-source citations, an observability-boundary testing framework, SEO ledger and link inventory updates, and inbound blog links.
 
 ## 2026-07-20

@@ -1,4 +1,4 @@
-use std::{env, fs};
+use std::{collections::BTreeSet, env, fs};
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -9,6 +9,14 @@ use crate::local::{LocalClusterConfig, LocalPostgresCluster, LOCAL_PROFILE_NAME}
 const DEFAULT_DATABASE_PREFIX: &str = "pgsandbox";
 const DEFAULT_TTL_MINUTES: u32 = 240;
 const DEFAULT_MAX_TTL_MINUTES: u32 = 1440;
+const POSTGRES_IDENTIFIER_MAX_BYTES: usize = 63;
+const DEFAULT_MANAGED_LOCAL_ALLOWED_EXTENSIONS: &[&str] = &[
+    "pgcrypto",
+    "pg_stat_statements",
+    "pg_trgm",
+    "uuid-ossp",
+    "vector",
+];
 pub(crate) const DEFERRED_LOCAL_ADMIN_URL: &str =
     "postgres://pgsandbox_admin:deferred@127.0.0.1:0/postgres?sslmode=disable";
 
@@ -28,6 +36,10 @@ pub enum ConfigError {
     EmptyProfileName,
     #[error("profile adminUrl cannot be empty")]
     EmptyAdminUrl,
+    #[error(
+        "profile {profile} allowedExtensions contains invalid extension identifier: {extension}"
+    )]
+    InvalidAllowedExtension { profile: String, extension: String },
     #[error("{0}")]
     InvalidTtl(String),
     #[error("profile {profile} adminUrl is invalid: {source}")]
@@ -84,6 +96,8 @@ pub struct SandboxProfile {
     pub allow_external_admin_url: bool,
     #[serde(default)]
     pub allowed_admin_hosts: Vec<String>,
+    #[serde(default)]
+    pub allowed_extensions: Option<Vec<String>>,
     #[serde(default)]
     pub max_active_databases_per_owner: Option<u32>,
     #[serde(default)]
@@ -242,6 +256,17 @@ where
                     .get("PGSANDBOX_ALLOWED_ADMIN_HOSTS")
                     .map(|value| parse_csv_list(value))
                     .unwrap_or_default(),
+                allowed_extensions: Some(
+                    env.get("PGSANDBOX_ALLOWED_EXTENSIONS")
+                        .map(|value| parse_csv_list(value))
+                        .unwrap_or_else(|| {
+                            if managed_local_profile {
+                                default_managed_local_allowed_extensions()
+                            } else {
+                                Vec::new()
+                            }
+                        }),
+                ),
                 max_active_databases_per_owner: env
                     .get("PGSANDBOX_MAX_ACTIVE_DATABASES_PER_OWNER")
                     .and_then(|value| value.parse().ok()),
@@ -380,12 +405,12 @@ pub fn load_telemetry_config() -> TelemetryConfig {
     telemetry_config_from_env(env::vars())
 }
 
-fn normalize_config(raw: RawConfig) -> Result<SandboxConfig, ConfigError> {
+fn normalize_config(mut raw: RawConfig) -> Result<SandboxConfig, ConfigError> {
     if raw.profiles.is_empty() {
         return Err(ConfigError::MissingProfiles);
     }
 
-    for profile in &raw.profiles {
+    for profile in &mut raw.profiles {
         if profile.name.trim().is_empty() {
             return Err(ConfigError::EmptyProfileName);
         }
@@ -410,6 +435,7 @@ fn normalize_config(raw: RawConfig) -> Result<SandboxConfig, ConfigError> {
                 profile.name
             )));
         }
+        profile.allowed_extensions = Some(normalize_allowed_extensions(profile)?);
         validate_admin_url_policy(profile)?;
     }
 
@@ -432,6 +458,40 @@ fn normalize_config(raw: RawConfig) -> Result<SandboxConfig, ConfigError> {
         telemetry: raw.telemetry,
         managed_local: ManagedLocalConfig::default(),
     })
+}
+
+pub(crate) fn default_managed_local_allowed_extensions() -> Vec<String> {
+    DEFAULT_MANAGED_LOCAL_ALLOWED_EXTENSIONS
+        .iter()
+        .map(|extension| (*extension).to_string())
+        .collect()
+}
+
+fn normalize_allowed_extensions(profile: &SandboxProfile) -> Result<Vec<String>, ConfigError> {
+    let mut normalized = BTreeSet::new();
+    let configured = profile.allowed_extensions.clone().unwrap_or_else(|| {
+        if profile.managed_local {
+            default_managed_local_allowed_extensions()
+        } else {
+            Vec::new()
+        }
+    });
+    for extension in &configured {
+        let extension = extension.trim().to_ascii_lowercase();
+        if extension.is_empty()
+            || extension.len() > POSTGRES_IDENTIFIER_MAX_BYTES
+            || !extension
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-')
+        {
+            return Err(ConfigError::InvalidAllowedExtension {
+                profile: profile.name.clone(),
+                extension,
+            });
+        }
+        normalized.insert(extension);
+    }
+    Ok(normalized.into_iter().collect())
 }
 
 pub fn normalize_postgres_version(value: &str) -> String {
@@ -606,6 +666,11 @@ mod tests {
         assert_eq!(config.profiles[0].default_ttl_minutes, 240);
         assert!(!config.profiles[0].allow_external_admin_url);
         assert!(config.profiles[0].allowed_admin_hosts.is_empty());
+        assert!(config.profiles[0]
+            .allowed_extensions
+            .as_deref()
+            .unwrap_or_default()
+            .is_empty());
         assert_eq!(config.profiles[0].max_active_databases_per_owner, None);
         assert!(config.telemetry.enabled);
     }
@@ -647,7 +712,89 @@ mod tests {
         assert_eq!(config.profiles[0].max_ttl_minutes, 1440);
         assert_eq!(config.profiles[0].postgres_version.as_deref(), Some("16"));
         assert!(config.profiles[0].managed_local);
+        assert!(config.profiles[0]
+            .allowed_extensions
+            .as_deref()
+            .unwrap_or_default()
+            .contains(&"vector".to_string()));
+        assert!(config.profiles[0]
+            .allowed_extensions
+            .as_deref()
+            .unwrap_or_default()
+            .contains(&"pg_stat_statements".to_string()));
         assert!(config.managed_local.enabled);
+    }
+
+    #[test]
+    fn profile_extension_allowlists_are_normalized_and_validated() {
+        let config = parse_config_file(
+            r#"{
+              "defaultProfile": "local",
+              "profiles": [{
+                "name": "local",
+                "adminUrl": "postgres://postgres:postgres@localhost/postgres",
+                "allowedExtensions": [" Vector ", "pg_trgm", "vector"]
+              }]
+            }"#,
+        )
+        .unwrap();
+
+        assert_eq!(
+            config.profiles[0].allowed_extensions.as_deref(),
+            Some(["pg_trgm".to_string(), "vector".to_string()].as_slice())
+        );
+
+        let error = parse_config_file(
+            r#"{
+              "defaultProfile": "local",
+              "profiles": [{
+                "name": "local",
+                "adminUrl": "postgres://postgres:postgres@localhost/postgres",
+                "allowedExtensions": ["vector; drop schema public"]
+              }]
+            }"#,
+        )
+        .unwrap_err();
+
+        assert!(error.to_string().contains("allowedExtensions"));
+    }
+
+    #[test]
+    fn managed_local_profile_distinguishes_omitted_and_explicit_empty_allowlists() {
+        let defaults = parse_config_file(
+            r#"{
+              "defaultProfile": "local",
+              "profiles": [{
+                "name": "local",
+                "adminUrl": "postgres://postgres:postgres@localhost/postgres",
+                "managedLocal": true
+              }]
+            }"#,
+        )
+        .unwrap();
+        assert!(defaults.profiles[0]
+            .allowed_extensions
+            .as_deref()
+            .unwrap_or_default()
+            .contains(&"vector".to_string()));
+
+        let denied = parse_config_file(
+            r#"{
+              "defaultProfile": "local",
+              "profiles": [{
+                "name": "local",
+                "adminUrl": "postgres://postgres:postgres@localhost/postgres",
+                "managedLocal": true,
+                "allowedExtensions": []
+              }]
+            }"#,
+        )
+        .unwrap();
+        assert!(denied.profiles[0]
+            .allowed_extensions
+            .as_deref()
+            .unwrap_or_default()
+            .is_empty());
     }
 
     #[test]

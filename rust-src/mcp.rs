@@ -1040,6 +1040,24 @@ impl ToolErrorResponse {
                     "field": "rowLimit"
                 })),
             }
+        } else if lower.contains("extension_not_allowed") {
+            ToolErrorBody {
+                code: "extension_not_allowed",
+                category: "validation",
+                message: chain,
+                hint: "Request an extension listed in the target profile's allowedExtensions policy, or ask the profile operator to authorize the required extension before retrying.".to_string(),
+                sqlstate: None,
+                requested_version: None,
+                source_version: None,
+                target_version: None,
+                resolved_profile: None,
+                resolved_postgres_version: None,
+                detected_versions: Vec::new(),
+                detail_handle: Some(json!({
+                    "type": "tool-contract",
+                    "field": "extensions"
+                })),
+            }
         } else if lower.contains("extension_setup_required") {
             ToolErrorBody {
                 code: "extension_setup_required",
@@ -2003,6 +2021,11 @@ mod tests {
             (
                 "extension_setup_required: extension `pg_cron` requires server-level setup on target Postgres profile `local`",
                 "extension_setup_required",
+                "validation",
+            ),
+            (
+                "extension_not_allowed: extension `postgis` is not allowed for target Postgres profile `local`",
+                "extension_not_allowed",
                 "validation",
             ),
         ];

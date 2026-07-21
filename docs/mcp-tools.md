@@ -85,7 +85,7 @@ Typical codes include `undefined_column`, `undefined_table`, `syntax_error`,
 `command_timeout`, `postgres_auth_failed`, `postgres_connection_failed`,
 `unknown_profile`, `postgres_version_unavailable`,
 `local_postgres_unavailable`, `invalid_ttl`, `invalid_extensions`,
-`extension_setup_required`, and `invalid_row_limit`.
+`extension_not_allowed`, `extension_setup_required`, and `invalid_row_limit`.
 `explain_query` multi-statement input returns `single_statement_required` with
 category `validation` and a hint to pass exactly one SQL statement.
 
@@ -131,12 +131,18 @@ Returns:
 - `connectionUsage`: short guidance for the returned variants, including the
   Linux Docker `extra_hosts` mapping when `localContainer` is present
 
-Extension installation runs after database creation using the generated sandbox
-role connection, not the admin connection. PGSandbox checks
-`pg_available_extensions` in the target sandbox first, so availability depends
-on the selected profile's Postgres installation and extension packages. If any
-requested extension is invalid, unavailable, or fails to install, creation is
-rolled back by dropping the new database and role. Extensions that need
+Extension installation runs after database creation as a PGSandbox lifecycle
+operation. Before creating anything, PGSandbox rejects names not authorized by
+the selected profile's `allowedExtensions` policy with
+`code: "extension_not_allowed"`. Managed-local profiles allow `pgcrypto`,
+`pg_stat_statements`, `pg_trgm`, `uuid-ossp`, and `vector` by default;
+explicit profiles default to no privileged extension installation. PGSandbox
+then uses the profile's admin connection to validate each requested name against
+`pg_available_extensions` and install it in the new database; returned sandbox
+credentials remain restricted. The admin role must be sufficiently privileged
+and owns installed extensions; the sandbox role is not granted extension
+lifecycle control. Invalid, unavailable, or failed installations
+roll creation back by dropping the new database and role. Extensions that need
 server-level Postgres setup, such as package installation or preload
 configuration, return `code: "extension_setup_required"`.
 
@@ -158,7 +164,7 @@ Returns:
 - `availablePostgresVersions`
 - `hints`
 - `profiles`: profile summaries with `name`, `postgresVersion`, `managedLocal`,
-  `port`, masked `adminUrl`, and `source`. `port` is present when the profile
+  `allowedExtensions`, `port`, masked `adminUrl`, and `source`. `port` is present when the profile
   has a concrete admin URL; discoverable local versions that have not been
   started yet report `adminUrl: "(managed local; starts on demand)"`.
 

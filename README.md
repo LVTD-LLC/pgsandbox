@@ -553,13 +553,20 @@ Admin connections are used for:
 - role creation
 - database creation
 - database deletion
+- allowlisted extension installation
 - cleanup
 - audit events
 
 User SQL and repo commands use sandbox role credentials generated for the
-specific database. Requested sandbox extensions are installed through the same
-sandbox role connection after the database is created, not through the admin
-connection.
+specific database. Requested sandbox extensions are validated against the
+profile's `allowedExtensions` policy and installed as an admin lifecycle
+operation; admin credentials are never returned to the caller. Managed-local
+profiles allow `pgcrypto`, `pg_stat_statements`, `pg_trgm`, `uuid-ossp`,
+and `vector` by default. Explicit profiles deny privileged extension
+installation until the operator configures an allowlist. The profile admin
+role must be able to install every allowlisted extension. Installed extensions
+remain owned by that lifecycle role; sandbox roles can use them but cannot
+manage or drop them unless Postgres explicitly grants that ability.
 
 ### Resource Model
 
@@ -730,10 +737,11 @@ returned as `installedExtensions`.
 
 Extension availability depends on the selected target profile's Postgres
 installation. PGSandbox checks `pg_available_extensions` inside the target
-sandbox before running `CREATE EXTENSION IF NOT EXISTS`; unavailable or invalid
-names return `invalid_extensions` and the new sandbox is rolled back. For
-`clone_database`, requested extensions are installed in the empty target
-sandbox before `pg_restore` runs.
+sandbox before using the profile admin connection to run
+`CREATE EXTENSION IF NOT EXISTS`; the returned sandbox role remains restricted.
+Unavailable or invalid names return `invalid_extensions` and the new sandbox is
+rolled back. For `clone_database`, requested extensions are installed in the
+empty target sandbox before `pg_restore` runs.
 
 For clone sources that include observability or environment-specific extensions
 that the sandbox role should not create, `clone_database` skips
@@ -907,7 +915,8 @@ or a production-data import workflow.
 1. Preflight source and target Postgres major versions, and capture a
    best-effort source size estimate.
 2. Create an empty tracked target sandbox.
-3. Install any requested target extensions using the sandbox role.
+3. Install any requested and profile-allowed target extensions through the
+   admin lifecycle.
 4. Run `pg_dump` against the source database.
 5. Skip source extension archive entries from `pg_stat_statements` and any
    requested `excludeSourceExtensions`.
@@ -994,6 +1003,7 @@ Telemetry opt-out environment variables are applied after config loading.
 | `PGSANDBOX_DEFAULT_TTL_MINUTES` | No | Default sandbox TTL for the env profile. Must be positive. | `240` |
 | `PGSANDBOX_MAX_TTL_MINUTES` | No | Max allowed TTL for the env profile. Must be positive and >= default TTL. | `1440` |
 | `PGSANDBOX_MAX_ACTIVE_DATABASES_PER_OWNER` | No | Optional per-owner active sandbox quota for the env profile. | unlimited |
+| `PGSANDBOX_ALLOWED_EXTENSIONS` | No | Comma-separated extensions authorized for privileged installation. | built-in allowlist for managed local; none for explicit profiles |
 | `PGSANDBOX_POSTGRES_VERSION` | No | Default managed local Postgres major version to select. | discovered/default |
 
 ### Local Postgres Binary Discovery
@@ -1118,6 +1128,7 @@ profiles:
       "databasePrefix": "pgsandbox",
       "defaultTtlMinutes": 240,
       "maxTtlMinutes": 1440,
+      "allowedExtensions": ["pg_trgm", "vector"],
       "maxActiveDatabasesPerOwner": 3
     },
     {
@@ -1149,7 +1160,8 @@ For a private remote host, opt in explicitly:
       "name": "private-dev",
       "adminUrl": "postgres://postgres:postgres@db.internal.example/postgres?sslmode=require",
       "postgresVersion": "17",
-      "allowedAdminHosts": ["db.internal.example"]
+      "allowedAdminHosts": ["db.internal.example"],
+      "allowedExtensions": ["pgcrypto", "pg_trgm"]
     }
   ]
 }

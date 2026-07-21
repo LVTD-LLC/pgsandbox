@@ -35,8 +35,9 @@ use uuid::Uuid;
 
 use crate::{
     config::{
-        find_profile, find_profile_for_request, normalize_postgres_version, ConfigError,
-        SandboxConfig, SandboxProfile, DEFERRED_LOCAL_ADMIN_URL,
+        default_managed_local_allowed_extensions, find_profile, find_profile_for_request,
+        normalize_postgres_version, ConfigError, SandboxConfig, SandboxProfile,
+        DEFERRED_LOCAL_ADMIN_URL,
     },
     local::{discover_local_postgres_installations, LocalClusterConfig, LocalPostgresCluster},
     mcp::PUBLIC_MCP_TOOL_COUNT,
@@ -582,6 +583,7 @@ pub struct ProfileSummary {
     pub postgres_version: Option<String>,
     pub port: Option<u16>,
     pub managed_local: bool,
+    pub allowed_extensions: Vec<String>,
     pub admin_url: String,
     pub source: String,
 }
@@ -1633,6 +1635,9 @@ impl PostgresSandboxManager {
             max_ttl_minutes: base.map_or(1440, |profile| profile.max_ttl_minutes),
             allow_external_admin_url: false,
             allowed_admin_hosts: Vec::new(),
+            allowed_extensions: base
+                .and_then(|profile| profile.allowed_extensions.clone())
+                .or_else(|| Some(default_managed_local_allowed_extensions())),
             max_active_databases_per_owner: base
                 .and_then(|profile| profile.max_active_databases_per_owner),
             postgres_version: local_config.postgres_version,
@@ -1651,6 +1656,7 @@ impl PostgresSandboxManager {
                 postgres_version: profile.postgres_version.clone(),
                 port: profile_admin_url_port(profile),
                 managed_local: profile.managed_local,
+                allowed_extensions: profile.allowed_extensions.clone().unwrap_or_default(),
                 admin_url: profile_admin_url_summary(profile),
                 source: "configured".to_string(),
             })
@@ -1683,6 +1689,7 @@ impl PostgresSandboxManager {
                     postgres_version: Some(installation.postgres_version.clone()),
                     port: None,
                     managed_local: true,
+                    allowed_extensions: default_managed_local_allowed_extensions(),
                     admin_url: "(managed local; starts on demand)".to_string(),
                     source: installation.source,
                 });
@@ -1927,6 +1934,8 @@ impl PostgresSandboxManager {
             clamp_ttl(ttl_minutes, &profile).with_context(|| target_context.clone())?;
         let extensions =
             normalize_extension_names(extensions).with_context(|| target_context.clone())?;
+        validate_allowed_extensions(&profile, &extensions)
+            .with_context(|| target_context.clone())?;
         let names = make_sandbox_names(&profile.database_prefix, name_hint.as_deref());
         let role_password = format!("{}{}", Uuid::new_v4().simple(), Uuid::new_v4().simple());
         let expires_at = Utc::now() + Duration::minutes(ttl_minutes.into());
@@ -1937,6 +1946,9 @@ impl PostgresSandboxManager {
             &role_password,
         )
         .with_context(|| target_context.clone())?;
+        let extension_database_url =
+            build_admin_database_url(&profile.admin_url, &names.database_name)
+                .with_context(|| target_context.clone())?;
 
         let (client, connection_task) = connect_admin(&profile)
             .await
@@ -1974,7 +1986,7 @@ impl PostgresSandboxManager {
                 .await?;
             created_database = true;
 
-            install_extensions(&connection_string, &profile.name, &extensions).await?;
+            install_extensions(&extension_database_url, &profile.name, &extensions).await?;
 
             let labels = serde_json::to_value(labels.unwrap_or_default())?;
             let stored_role_password = protect_role_password(&role_password, &profile)?;
@@ -2105,6 +2117,10 @@ impl PostgresSandboxManager {
         let target_profile =
             self.resolve_profile(profile.as_deref(), postgres_version.as_deref())?;
         let target_context = ResolvedTargetContext::from_profile("clone_database", &target_profile);
+        let extensions =
+            normalize_extension_names(extensions).with_context(|| target_context.clone())?;
+        validate_allowed_extensions(&target_profile, &extensions)
+            .with_context(|| target_context.clone())?;
         let target_postgres_version = postgres_major_for_profile(&target_profile)
             .await
             .with_context(|| target_context.clone())?;
@@ -2122,7 +2138,7 @@ impl PostgresSandboxManager {
                 ttl_minutes,
                 owner,
                 labels,
-                extensions,
+                extensions: Some(extensions),
             })
             .await
             .with_context(|| target_context.clone())?;
@@ -6847,6 +6863,12 @@ fn build_connection_string(
     Ok(url.to_string())
 }
 
+fn build_admin_database_url(admin_url: &str, database_name: &str) -> anyhow::Result<String> {
+    let mut url = Url::parse(admin_url)?;
+    url.set_path(database_name);
+    Ok(url.to_string())
+}
+
 async fn list_available_extensions(
     client: &Client,
     include_installed_version: bool,
@@ -7432,6 +7454,29 @@ fn normalize_extension_names(extensions: Option<Vec<String>>) -> anyhow::Result<
     }
 
     Ok(normalized)
+}
+
+fn validate_allowed_extensions(
+    profile: &SandboxProfile,
+    extensions: &[String],
+) -> anyhow::Result<()> {
+    let allowed = profile
+        .allowed_extensions
+        .as_deref()
+        .unwrap_or_default()
+        .iter()
+        .map(String::as_str)
+        .collect::<BTreeSet<_>>();
+    if let Some(extension) = extensions
+        .iter()
+        .find(|extension| !allowed.contains(extension.as_str()))
+    {
+        anyhow::bail!(
+            "extension_not_allowed: extension `{extension}` is not allowed for target Postgres profile `{}`",
+            profile.name
+        );
+    }
+    Ok(())
 }
 
 fn clone_excluded_source_extensions(
@@ -8569,6 +8614,7 @@ mod tests {
                 max_ttl_minutes: 1440,
                 allow_external_admin_url: false,
                 allowed_admin_hosts: Vec::new(),
+                allowed_extensions: Some(Vec::new()),
                 max_active_databases_per_owner: None,
                 postgres_version: None,
                 managed_local: false,
@@ -9430,6 +9476,7 @@ mod tests {
             .any(|hint| hint.contains("without --admin-url")));
         let profile = serde_json::to_value(&output.profiles[0]).unwrap();
         assert!(profile.get("serverVersion").is_none());
+        assert_eq!(profile["allowedExtensions"], json!([]));
     }
 
     #[test]
@@ -9481,6 +9528,7 @@ mod tests {
             max_ttl_minutes: 1440,
             allow_external_admin_url: false,
             allowed_admin_hosts: Vec::new(),
+            allowed_extensions: Some(default_managed_local_allowed_extensions()),
             max_active_databases_per_owner: None,
             postgres_version: Some("123456".to_string()),
             managed_local: true,
@@ -9923,10 +9971,122 @@ mod tests {
     }
 
     #[test]
+    fn extension_requests_must_be_allowed_by_the_target_profile() {
+        let config = crate::config::parse_config_file(
+            r#"{
+              "defaultProfile": "local",
+              "profiles": [{
+                "name": "local",
+                "adminUrl": "postgres://postgres:postgres@localhost/postgres",
+                "allowedExtensions": ["vector"]
+              }]
+            }"#,
+        )
+        .unwrap();
+        let profile = &config.profiles[0];
+
+        validate_allowed_extensions(profile, &["vector".to_string()]).unwrap();
+
+        let error = validate_allowed_extensions(profile, &["postgis".to_string()]).unwrap_err();
+        assert!(error.to_string().contains("extension_not_allowed"));
+        assert!(error.to_string().contains("postgis"));
+        assert!(!error.to_string().contains(&profile.admin_url));
+    }
+
+    #[tokio::test]
+    async fn denied_extension_is_rejected_before_admin_connection_or_creation() {
+        let config = crate::config::parse_config_file(
+            r#"{
+              "defaultProfile": "unreachable",
+              "profiles": [{
+                "name": "unreachable",
+                "adminUrl": "postgres://postgres:secret@127.0.0.1:1/postgres",
+                "allowedExtensions": ["vector"]
+              }]
+            }"#,
+        )
+        .unwrap();
+        let manager = PostgresSandboxManager::new(config);
+
+        let error = manager
+            .create_database(CreateDatabaseInput {
+                profile: None,
+                postgres_version: None,
+                name_hint: Some("denied-extension".to_string()),
+                ttl_minutes: Some(15),
+                owner: None,
+                labels: None,
+                extensions: Some(vec!["postgis".to_string()]),
+            })
+            .await
+            .unwrap_err();
+
+        let message = format!("{error:#}");
+        assert!(message.contains("extension_not_allowed"));
+        assert!(!message.contains("connection"));
+        assert!(!message.contains("secret"));
+    }
+
+    #[tokio::test]
+    async fn clone_rejects_denied_extension_before_source_preflight() {
+        let config = crate::config::parse_config_file(
+            r#"{
+              "defaultProfile": "unreachable",
+              "profiles": [{
+                "name": "unreachable",
+                "adminUrl": "postgres://postgres:admin-secret@127.0.0.1:1/postgres",
+                "postgresVersion": "18",
+                "allowedExtensions": ["vector"]
+              }]
+            }"#,
+        )
+        .unwrap();
+        let manager = PostgresSandboxManager::new(config);
+
+        let error = manager
+            .clone_database(CloneDatabaseInput {
+                profile: None,
+                postgres_version: None,
+                source_database_url: "postgres://postgres:source-secret@127.0.0.1:1/source"
+                    .to_string(),
+                name_hint: Some("denied-clone-extension".to_string()),
+                ttl_minutes: Some(15),
+                timeout_seconds: Some(1),
+                owner: None,
+                labels: None,
+                schema_only: Some(false),
+                extensions: Some(vec!["postgis".to_string()]),
+                exclude_source_extensions: None,
+            })
+            .await
+            .unwrap_err();
+
+        let message = format!("{error:#}");
+        assert!(message.contains("extension_not_allowed"));
+        assert!(!message.contains("source preflight"));
+        assert!(!message.contains("admin-secret"));
+        assert!(!message.contains("source-secret"));
+    }
+
+    #[test]
     fn create_extension_statement_quotes_extension_identifier() {
         let sql = create_extension_statement("uuid-ossp").unwrap();
 
         assert_eq!(sql, "CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\"");
+    }
+
+    #[test]
+    fn extension_lifecycle_url_keeps_admin_credentials_for_the_sandbox_database() {
+        let url = build_admin_database_url(
+            "postgres://pgsandbox_admin:admin-secret@127.0.0.1:65432/postgres?sslmode=require",
+            "pgsandbox_extension_test",
+        )
+        .unwrap();
+
+        assert_eq!(
+            url,
+            "postgres://pgsandbox_admin:admin-secret@127.0.0.1:65432/pgsandbox_extension_test?sslmode=require"
+        );
     }
 
     #[test]
@@ -10162,6 +10322,7 @@ mod tests {
             max_ttl_minutes: 60,
             allow_external_admin_url: false,
             allowed_admin_hosts: Vec::new(),
+            allowed_extensions: Some(Vec::new()),
             max_active_databases_per_owner: None,
             postgres_version: None,
             managed_local: false,
