@@ -27,6 +27,7 @@
 | 2026-07-18 | How-to / tutorial | Connect a Docker Container to Host PostgreSQL Safely | docker-connect-host-postgres | docker connect to host postgres | /docs/mcp-tools/, /docs/architecture/, /blog/postgres-schema-snapshots-agent-migration-reviews/, /blog/postgres-run-sql-bounded-results/, /blog/database-migration-testing-agent-pr/ | Astro Markdown source of truth; uses the Runner-Network-Secret-Evidence framework and an explicit Docker Desktop/native Linux listener boundary as the information gain. |
 | 2026-07-19 | How-to / tutorial | How to Test PostgreSQL Extensions in Disposable Sandboxes | test-postgres-extensions-locally | test postgres extensions locally | /docs/mcp-tools/, /docs/architecture/, /blog/how-to-use-local-postgres-versions-with-coding-agents/, /blog/database-migration-testing-agent-pr/, /blog/postgres-schema-snapshots-agent-migration-reviews/ | Astro Markdown source of truth; uses the five-gate Extension Proof Contract for availability, installation, behavior, migration compatibility, and cleanup. |
 | 2026-07-20 | How-to / tutorial | How to Test PostgreSQL Extension Upgrades Safely | test-postgres-extension-upgrades | postgres extension upgrade | /docs/mcp-tools/, /docs/architecture/, /blog/test-postgres-extensions-locally/, /blog/database-migration-testing-agent-pr/, /blog/postgres-schema-snapshots-agent-migration-reviews/ | Astro Markdown source of truth; uses an upgrade-vs-new-database proof contract for path, transition, convergence, application, recovery, and cleanup evidence. |
+| 2026-07-21 | How-to / troubleshooting | How to Test pg_stat_statements in Agent Sandboxes | test-pg-stat-statements-agent-sandboxes | pg_stat_statements shared_preload_libraries | /docs/mcp-tools/, /docs/architecture/, /blog/postgres-mcp-server-error-handling-coding-agents/, /blog/postgres-explain-plan-agent-sql/, /blog/test-postgres-extensions-locally/, /blog/postgres-run-sql-bounded-results/ | Astro Markdown source of truth; uses the five-part Observability Boundary Contract for profile availability, cluster preload, database registration, task-role workload proof, and cleanup. |
 
 ## Removed
 
@@ -36,11 +37,9 @@
 
 ## Candidate Backlog
 
-Last researched: 2026-07-20
+Last researched: 2026-07-21
 
-| Rank | Score | Proposed Type | Title | Target Keyword | Volume | KD | Intent | SERP Read | Why It Fits |
-| --- | ---: | --- | --- | --- | ---: | ---: | --- | --- | --- |
-| 1 | 17 | Guide / troubleshooting | Test pg_stat_statements in Disposable Agent Sandboxes | pg_stat_statements shared_preload_libraries | TBD | TBD | Informational | Official setup docs and provider-specific tutorials dominate; few sources explain task-role, preload, clone-exclusion, and cleanup boundaries together | Strong product fit around `extension_setup_required`, explicit profiles, default clone exclusion, and the difference between server preload setup and database-local registration. |
+No unshipped candidates remain from the verified backlog. Refresh the opportunity pool on the next run.
 
 ## Notes
 
@@ -69,3 +68,4 @@ Last researched: 2026-07-20
 - 2026-07-18 cron refreshed an empty backlog and selected the top recommendation automatically. DataForSEO credentials/helper were unavailable, so live research used Firecrawl's US-English top-10 SERP, current Docker and PostgreSQL primary docs, and the PGSandbox source/docs. Keyword volume/KD remained `TBD`. New source-of-truth content file: `site/src/content/blog/docker-connect-host-postgres.md`.
 - 2026-07-19 cron selected the top backlog candidate automatically. DataForSEO credentials were unavailable, so live research used Firecrawl's US-English SERPs, current PostgreSQL extension/catalog/module docs, and the PGSandbox source/docs/tests. Keyword volume/KD remained `TBD`. New source-of-truth content file: `site/src/content/blog/test-postgres-extensions-locally.md`.
 - 2026-07-20 cron selected the top backlog candidate automatically. DataForSEO credentials were unavailable, so live research used Firecrawl's US-English SERP, current PostgreSQL extension/update/catalog docs, and the PGSandbox source/docs/tests. Keyword volume/KD remained `TBD`. New source-of-truth content file: `site/src/content/blog/test-postgres-extension-upgrades.md`.
+- 2026-07-21 cron selected the top backlog candidate automatically. DataForSEO credentials were unavailable, so live research used Firecrawl's US-English SERPs, PostgreSQL 18 primary documentation, and the PGSandbox source/docs/tests. Keyword volume/KD remained `TBD`. New source-of-truth content file: `site/src/content/blog/test-pg-stat-statements-agent-sandboxes.md`.

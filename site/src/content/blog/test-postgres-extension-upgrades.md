@@ -73,6 +73,8 @@ No. Update the extension first when the application migration depends on functio
 
 A PostgreSQL major-version upgrade is a separate layer. PostgreSQL's [`pg_upgrade` documentation](https://www.postgresql.org/docs/current/pgupgrade.html) says matching extension shared objects must be installed for the new server and notes that extension SQL updates may still be needed after the engine upgrade. More generally, compatible supporting files must exist, including matching shared libraries for extensions that contain compiled code. Do not collapse server package installation, an engine upgrade, an extension SQL update, and an application migration into one reversible step.
 
+Preloaded observability modules add another boundary. The guide to [testing `pg_stat_statements` in disposable agent sandboxes](/blog/test-pg-stat-statements-agent-sandboxes/) shows how to verify server preload state, database-local registration, task-role query visibility, and clone exclusion separately.
+
 ## Use a two-lane PostgreSQL extension upgrade test
 
 Treat the upgrade as six gates instead of one command:

@@ -218,6 +218,8 @@ This catches a common ownership ambiguity. If application migrations contain `CR
 
 PGSandbox skips the source `pg_stat_statements` extension entry by default because a sandbox role commonly cannot create that observability extension. Add other environment-specific source extensions to `excludeSourceExtensions` only after deciding that the application schema does not depend on them.
 
+If the task needs query collection rather than merely excluding source observability state, use the dedicated guide to [testing `pg_stat_statements` in an agent sandbox](/blog/test-pg-stat-statements-agent-sandboxes/). It separates server preload and restart state from database registration, task-role visibility, workload proof, and cleanup.
+
 Example schema-only clone shape:
 
 ```json

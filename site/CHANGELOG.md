@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-07-21
+
+- Added the Astro Markdown blog post "How to Test pg_stat_statements in Agent Sandboxes" with PostgreSQL primary-source citations, an observability-boundary testing framework, SEO ledger and link inventory updates, and inbound blog links.
+
 ## 2026-07-20
 
 - Added the Astro Markdown blog post "How to Test PostgreSQL Extension Upgrades Safely" with primary-source citations, a two-lane upgrade comparison, SEO ledger and link inventory updates, and inbound blog links.
