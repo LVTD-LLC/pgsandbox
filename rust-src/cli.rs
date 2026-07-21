@@ -26,8 +26,8 @@ use crate::{
         DiffSchemaSnapshotInput, ExplainQueryInput, ListDatabasesInput, ListExtensionsInput,
         ListProfilesInput, ListSchemaSnapshotsInput, ListTemplatesInput, PostgresSandboxManager,
         PrepareForRepoInput, RunRepoCommandInput, RunSqlInput, RunSqlOutput, SchemaDiffInput,
-        SeedDatabaseInput, SessionCleanupPolicy, ValidateSchemaChangeInput, WithDatabaseInput,
-        WithDatabaseOutput,
+        SeedDatabaseInput, SessionCleanupPolicy, SessionStatus, ValidateSchemaChangeInput,
+        WithDatabaseInput, WithDatabaseOutput,
     },
     setup::{
         build_launch_config, config_snippet, parse_client, parse_scope, resolve_targets,
@@ -268,10 +268,13 @@ fn print_session_result(output: &WithDatabaseOutput) {
     if let Some(sandbox) = &output.sandbox {
         eprintln!(
             "pgsandbox session {}: {} (cleanup: {:?}, expires: {})",
-            output.status, sandbox.database_id, output.cleanup.policy, sandbox.expires_at
+            output.status.as_str(),
+            sandbox.database_id,
+            output.cleanup.policy,
+            sandbox.expires_at
         );
     } else {
-        eprintln!("pgsandbox session {}", output.status);
+        eprintln!("pgsandbox session {}", output.status.as_str());
     }
 }
 
@@ -289,7 +292,10 @@ fn session_exit_code(output: &WithDatabaseOutput) -> u8 {
             }
         }
     }
-    if output.status == "succeeded" || output.status == "retained" {
+    if matches!(
+        output.status,
+        SessionStatus::Succeeded | SessionStatus::Retained
+    ) {
         0
     } else {
         1

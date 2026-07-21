@@ -1264,18 +1264,13 @@ pub struct CommandWorkflowOutput {
     pub stderr_truncated: bool,
 }
 
-#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub enum SessionCleanupPolicy {
+    #[default]
     Always,
     OnSuccess,
     Keep,
-}
-
-impl Default for SessionCleanupPolicy {
-    fn default() -> Self {
-        Self::Always
-    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -1300,7 +1295,7 @@ pub struct WithDatabaseInput {
 #[serde(rename_all = "camelCase")]
 pub struct WithDatabaseOutput {
     pub schema_version: u8,
-    pub status: String,
+    pub status: SessionStatus,
     pub sandbox: Option<SessionSandboxOutput>,
     pub requested_extensions: Vec<String>,
     pub command: Option<SessionCommandOutput>,
@@ -1308,7 +1303,46 @@ pub struct WithDatabaseOutput {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub provision_error_code: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub command_error_code: Option<String>,
+    pub command_error_code: Option<SessionCommandErrorCode>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum SessionStatus {
+    ProvisionFailed,
+    ChildSpawnFailed,
+    ChildFailed,
+    TimedOut,
+    Interrupted,
+    CleanupFailed,
+    Retained,
+    Succeeded,
+}
+
+impl SessionStatus {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::ProvisionFailed => "provision-failed",
+            Self::ChildSpawnFailed => "child-spawn-failed",
+            Self::ChildFailed => "child-failed",
+            Self::TimedOut => "timed-out",
+            Self::Interrupted => "interrupted",
+            Self::CleanupFailed => "cleanup-failed",
+            Self::Retained => "retained",
+            Self::Succeeded => "succeeded",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum SessionCommandErrorCode {
+    RepoNotFound,
+    UnclearCommand,
+    InvalidEnvAlias,
+    TooManyEnvAliases,
+    InvalidConnectionMode,
+    ChildSpawnFailed,
 }
 
 #[derive(Debug, Serialize)]
@@ -2002,14 +2036,14 @@ impl PostgresSandboxManager {
         &self,
         input: CreateDatabaseInput,
     ) -> anyhow::Result<CreateDatabaseOutput> {
-        self.create_database_for_operation(input, "create_database")
+        self.create_database_for_operation(input, LifecycleOperation::CreateDatabase)
             .await
     }
 
     async fn create_database_for_operation(
         &self,
         input: CreateDatabaseInput,
-        operation: &'static str,
+        operation: LifecycleOperation,
     ) -> anyhow::Result<CreateDatabaseOutput> {
         let CreateDatabaseInput {
             profile,
@@ -2021,7 +2055,7 @@ impl PostgresSandboxManager {
             extensions,
         } = input;
         let profile = self.resolve_profile(profile.as_deref(), postgres_version.as_deref())?;
-        let mut target_context = ResolvedTargetContext::from_profile("create_database", &profile);
+        let mut target_context = ResolvedTargetContext::from_profile(operation.as_str(), &profile);
         let ttl_minutes =
             clamp_ttl(ttl_minutes, &profile).with_context(|| target_context.clone())?;
         let extensions =
@@ -2107,7 +2141,7 @@ impl PostgresSandboxManager {
                 .await?;
             let _ = record_audit_event(
                 &client,
-                operation,
+                operation.as_str(),
                 &profile.name,
                 &names.database_id,
                 &names.database_name,
@@ -2120,25 +2154,22 @@ impl PostgresSandboxManager {
                 }),
             )
             .await;
-            for extension in &extensions {
-                let _ = record_audit_event(
-                    &client,
-                    "extension_install",
-                    &profile.name,
-                    &names.database_id,
-                    &names.database_name,
-                    Some(&names.role_name),
-                    extension_audit_details(
-                        operation,
-                        extension,
-                        owner.as_deref(),
-                        "installed",
-                        None,
-                        None,
-                    ),
-                )
-                .await;
-            }
+            let _ = record_extension_audit_events(
+                &client,
+                ExtensionAuditContext {
+                    profile_name: &profile.name,
+                    database_id: &names.database_id,
+                    database_name: &names.database_name,
+                    role_name: &names.role_name,
+                    operation,
+                    actor: owner.as_deref(),
+                },
+                &extensions,
+                ExtensionAuditOutcome::Installed,
+                None,
+                None,
+            )
+            .await;
             anyhow::Ok(())
         }
         .await;
@@ -2182,32 +2213,29 @@ impl PostgresSandboxManager {
                 &names.database_name,
                 Some(&names.role_name),
                 json!({
-                    "operation": operation,
+                    "operation": operation.as_str(),
                     "errorCode": lifecycle_error_code(&error),
                     "databaseCleanupSucceeded": database_cleanup_succeeded,
                     "roleCleanupSucceeded": role_cleanup_succeeded,
                 }),
             )
             .await;
-            for extension in &extensions {
-                let _ = record_audit_event(
-                    &client,
-                    "extension_install",
-                    &profile.name,
-                    &names.database_id,
-                    &names.database_name,
-                    Some(&names.role_name),
-                    extension_audit_details(
-                        operation,
-                        extension,
-                        owner.as_deref(),
-                        "rolled_back",
-                        Some(lifecycle_error_code(&error)),
-                        Some(database_cleanup_succeeded && role_cleanup_succeeded),
-                    ),
-                )
-                .await;
-            }
+            let _ = record_extension_audit_events(
+                &client,
+                ExtensionAuditContext {
+                    profile_name: &profile.name,
+                    database_id: &names.database_id,
+                    database_name: &names.database_name,
+                    role_name: &names.role_name,
+                    operation,
+                    actor: owner.as_deref(),
+                },
+                &extensions,
+                ExtensionAuditOutcome::RolledBack,
+                Some(lifecycle_error_code(&error)),
+                Some(database_cleanup_succeeded && role_cleanup_succeeded),
+            )
+            .await;
             drop(client);
             let _ = connection_task.await;
             return Err(error).with_context(|| target_context.clone());
@@ -2280,7 +2308,7 @@ impl PostgresSandboxManager {
                     labels,
                     extensions: Some(extensions),
                 },
-                "clone_database",
+                LifecycleOperation::CloneDatabase,
             )
             .await
             .with_context(|| target_context.clone())?;
@@ -3139,6 +3167,29 @@ impl PostgresSandboxManager {
         cancellation: Option<tokio::sync::watch::Receiver<Option<i32>>>,
     ) -> anyhow::Result<WithDatabaseOutput> {
         let requested_extensions = input.extensions.clone().unwrap_or_default();
+        let repo_path = PathBuf::from(&input.repo_path);
+        let database_url_env_names = input.database_url_env_names.clone().unwrap_or_default();
+        if let Some(command_error_code) =
+            session_preflight_error(&repo_path, &input.command, &database_url_env_names)
+        {
+            return Ok(WithDatabaseOutput {
+                schema_version: 1,
+                status: SessionStatus::ChildSpawnFailed,
+                sandbox: None,
+                requested_extensions,
+                command: None,
+                cleanup: SessionCleanupOutput {
+                    policy: input.cleanup,
+                    attempted: false,
+                    deleted: false,
+                    retained: false,
+                    already_absent: false,
+                    error_code: None,
+                },
+                provision_error_code: None,
+                command_error_code: Some(command_error_code),
+            });
+        }
         let created = match self
             .create_database(CreateDatabaseInput {
                 profile: input.profile.clone(),
@@ -3155,7 +3206,7 @@ impl PostgresSandboxManager {
             Err(error) => {
                 return Ok(WithDatabaseOutput {
                     schema_version: 1,
-                    status: "provision-failed".to_string(),
+                    status: SessionStatus::ProvisionFailed,
                     sandbox: None,
                     requested_extensions,
                     command: None,
@@ -3180,41 +3231,28 @@ impl PostgresSandboxManager {
             postgres_version: created.resolved_postgres_version.clone(),
             expires_at: created.expires_at,
         };
-        let repo_path = PathBuf::from(&input.repo_path);
-        let database_url_env_names = input.database_url_env_names.unwrap_or_default();
-        let command_result = if !repo_path.is_dir() {
-            Err(anyhow::anyhow!("repo_not_found"))
-        } else if !command_is_bounded(&input.command) {
-            Err(anyhow::anyhow!("unclear_command"))
-        } else if validate_database_url_env_names(&database_url_env_names).is_err() {
-            Err(anyhow::anyhow!("invalid_database_url_env_names"))
-        } else {
+        let command_result =
             match repo_command_database_url(&created.connection_string, input.connection_mode) {
-                Ok(database_url) => {
-                    execute_repo_command_until(
-                        &repo_path,
-                        &input.command,
-                        &database_url,
-                        workflow_timeout(input.timeout_seconds),
-                        RepoCommandExecutionOptions {
-                            database_url_env_names,
-                            ..RepoCommandExecutionOptions::default()
-                        },
-                        cancellation,
-                    )
-                    .await
-                }
-                Err(_) => Err(anyhow::anyhow!("invalid_connection_mode")),
-            }
-        };
+                Ok(database_url) => execute_repo_command_until(
+                    &repo_path,
+                    &input.command,
+                    &database_url,
+                    workflow_timeout(input.timeout_seconds),
+                    RepoCommandExecutionOptions {
+                        database_url_env_names,
+                        ..RepoCommandExecutionOptions::default()
+                    },
+                    cancellation,
+                )
+                .await
+                .map_err(|_| SessionCommandErrorCode::ChildSpawnFailed),
+                Err(_) => Err(SessionCommandErrorCode::InvalidConnectionMode),
+            };
 
         let command_succeeded = command_result.as_ref().is_ok_and(|result| {
             result.exit_code == Some(0) && !result.timed_out && result.signal.is_none()
         });
-        let command_error_code = command_result
-            .as_ref()
-            .err()
-            .map(|error| session_command_error_code(error).to_string());
+        let command_error_code = command_result.as_ref().err().copied();
         let should_cleanup = match input.cleanup {
             SessionCleanupPolicy::Always => true,
             SessionCleanupPolicy::OnSuccess => command_succeeded,
@@ -3253,22 +3291,22 @@ impl PostgresSandboxManager {
         let (status, command) = match command_result {
             Ok(result) => {
                 let status = if result.timed_out {
-                    "timed-out"
+                    SessionStatus::TimedOut
                 } else if result.signal.is_some() {
-                    "interrupted"
+                    SessionStatus::Interrupted
                 } else if result.exit_code == Some(0) {
                     if cleanup.error_code.is_some() {
-                        "cleanup-failed"
+                        SessionStatus::CleanupFailed
                     } else if cleanup.retained {
-                        "retained"
+                        SessionStatus::Retained
                     } else {
-                        "succeeded"
+                        SessionStatus::Succeeded
                     }
                 } else {
-                    "child-failed"
+                    SessionStatus::ChildFailed
                 };
                 (
-                    status.to_string(),
+                    status,
                     Some(SessionCommandOutput {
                         exit_code: result.exit_code,
                         signal: result.signal,
@@ -3281,7 +3319,7 @@ impl PostgresSandboxManager {
                     }),
                 )
             }
-            Err(_) => ("child-spawn-failed".to_string(), None),
+            Err(_) => (SessionStatus::ChildSpawnFailed, None),
         };
 
         Ok(WithDatabaseOutput {
@@ -5536,6 +5574,22 @@ async fn execute_repo_command_until(
     if !command_is_bounded(command) {
         anyhow::bail!("command is empty or too large");
     }
+    if let Some(signal) = cancellation
+        .as_ref()
+        .and_then(|receiver| *receiver.borrow())
+    {
+        return Ok(CommandRunResult {
+            command: command.to_vec(),
+            elapsed_ms: 0,
+            exit_code: None,
+            signal: Some(signal),
+            timed_out: false,
+            stdout: String::new(),
+            stderr: String::new(),
+            stdout_truncated: false,
+            stderr_truncated: false,
+        });
+    }
     let env = database_command_env(database_url, &options.database_url_env_names)?;
     let redaction_password = env.get("PGPASSWORD").cloned();
     let started = std::time::Instant::now();
@@ -6519,22 +6573,100 @@ async fn record_audit_event(
     Ok(())
 }
 
-fn extension_audit_details(
-    operation: &str,
-    extension: &str,
-    actor: Option<&str>,
-    outcome: &str,
+#[derive(Debug, Clone, Copy, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum LifecycleOperation {
+    CreateDatabase,
+    CloneDatabase,
+}
+
+impl LifecycleOperation {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::CreateDatabase => "create_database",
+            Self::CloneDatabase => "clone_database",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum ExtensionAuditOutcome {
+    Installed,
+    RolledBack,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ExtensionAuditDetails<'a> {
+    operation: LifecycleOperation,
+    extension: &'a str,
+    actor: Option<&'a str>,
+    outcome: ExtensionAuditOutcome,
+    error_code: Option<&'a str>,
+    cleanup_succeeded: Option<bool>,
+}
+
+#[derive(Clone, Copy)]
+struct ExtensionAuditContext<'a> {
+    profile_name: &'a str,
+    database_id: &'a str,
+    database_name: &'a str,
+    role_name: &'a str,
+    operation: LifecycleOperation,
+    actor: Option<&'a str>,
+}
+
+async fn record_extension_audit_events(
+    client: &Client,
+    context: ExtensionAuditContext<'_>,
+    extensions: &[String],
+    outcome: ExtensionAuditOutcome,
     error_code: Option<&str>,
     cleanup_succeeded: Option<bool>,
-) -> Value {
-    json!({
-        "operation": operation,
-        "extension": extension,
-        "actor": actor,
-        "outcome": outcome,
-        "errorCode": error_code,
-        "cleanupSucceeded": cleanup_succeeded,
-    })
+) -> anyhow::Result<()> {
+    if extensions.is_empty() {
+        return Ok(());
+    }
+    let events = Value::Array(
+        extensions
+            .iter()
+            .map(|extension| {
+                json!({
+                    "eventId": Uuid::new_v4(),
+                    "details": ExtensionAuditDetails {
+                        operation: context.operation,
+                        extension,
+                        actor: context.actor,
+                        outcome,
+                        error_code,
+                        cleanup_succeeded,
+                    },
+                })
+            })
+            .collect(),
+    );
+    client
+        .execute(
+            &format!(
+                r#"
+                  INSERT INTO {}
+                    (event_id, profile_name, database_id, database_name, role_name, event_type, details)
+                  SELECT event->>'eventId', $2, $3, $4, $5, 'extension_install', event->'details'
+                  FROM jsonb_array_elements($1::jsonb) AS event
+                "#,
+                quote_ident(AUDIT_TABLE)?
+            ),
+            &[
+                &events as &(dyn ToSql + Sync),
+                &context.profile_name,
+                &context.database_id,
+                &context.database_name,
+                &context.role_name,
+            ],
+        )
+        .await?;
+    Ok(())
 }
 
 fn lifecycle_error_code(error: &anyhow::Error) -> &'static str {
@@ -6544,7 +6676,6 @@ fn lifecycle_error_code(error: &anyhow::Error) -> &'static str {
             "extension_setup_required",
             "extension_not_allowed",
             "invalid_extensions",
-            "owner_quota_exceeded",
         ] {
             if message.contains(code) {
                 return code;
@@ -6562,19 +6693,23 @@ fn database_already_absent(error: &anyhow::Error) -> bool {
     })
 }
 
-fn session_command_error_code(error: &anyhow::Error) -> &'static str {
-    let message = error.to_string();
-    for code in [
-        "repo_not_found",
-        "unclear_command",
-        "invalid_database_url_env_names",
-        "invalid_connection_mode",
-    ] {
-        if message == code {
-            return code;
-        }
+fn session_preflight_error(
+    repo_path: &Path,
+    command: &[String],
+    database_url_env_names: &[String],
+) -> Option<SessionCommandErrorCode> {
+    if !repo_path.is_dir() {
+        return Some(SessionCommandErrorCode::RepoNotFound);
     }
-    "child_spawn_failed"
+    if !command_is_bounded(command) {
+        return Some(SessionCommandErrorCode::UnclearCommand);
+    }
+    validate_database_url_env_names(database_url_env_names)
+        .err()
+        .map(|error| match error.code.as_str() {
+            "too_many_env_aliases" => SessionCommandErrorCode::TooManyEnvAliases,
+            _ => SessionCommandErrorCode::InvalidEnvAlias,
+        })
 }
 
 async fn enforce_owner_quota(
@@ -9566,6 +9701,33 @@ mod tests {
         assert!(result.elapsed_ms < 3_000, "{result:?}");
     }
 
+    #[tokio::test]
+    async fn execute_repo_command_never_spawns_after_cancellation() {
+        let directory = tempfile::tempdir().unwrap();
+        let marker = directory.path().join("child-started");
+        let command = vec![
+            "sh".to_string(),
+            "-c".to_string(),
+            format!("touch {}", marker.display()),
+        ];
+        let (_sender, receiver) = tokio::sync::watch::channel(Some(2));
+
+        let result = execute_repo_command_until(
+            directory.path(),
+            &command,
+            test_database_url(),
+            StdDuration::from_secs(5),
+            RepoCommandExecutionOptions::default(),
+            Some(receiver),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(result.signal, Some(2));
+        assert_eq!(result.elapsed_ms, 0);
+        assert!(!marker.exists());
+    }
+
     #[test]
     fn readonly_guard_rejects_transaction_control() {
         assert!(assert_safe_readonly_sql("select * from users").is_ok());
@@ -10466,6 +10628,53 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn with_database_rejects_invalid_child_before_provisioning() {
+        let config = crate::config::parse_config_file(
+            r#"{
+              "defaultProfile": "unreachable",
+              "profiles": [{
+                "name": "unreachable",
+                "adminUrl": "postgres://postgres:admin-secret@127.0.0.1:1/postgres"
+              }]
+            }"#,
+        )
+        .unwrap();
+        let manager = PostgresSandboxManager::new(config);
+
+        let output = manager
+            .with_database(
+                WithDatabaseInput {
+                    repo_path: "/definitely/missing".to_string(),
+                    profile: None,
+                    postgres_version: None,
+                    name_hint: None,
+                    ttl_minutes: Some(15),
+                    owner: None,
+                    labels: None,
+                    extensions: None,
+                    command: vec!["cargo".to_string(), "test".to_string()],
+                    timeout_seconds: None,
+                    database_url_env_names: None,
+                    connection_mode: None,
+                    cleanup: SessionCleanupPolicy::Always,
+                },
+                None,
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(output.status, SessionStatus::ChildSpawnFailed);
+        assert_eq!(
+            output.command_error_code,
+            Some(SessionCommandErrorCode::RepoNotFound)
+        );
+        assert!(output.sandbox.is_none());
+        let serialized = serde_json::to_string(&output).unwrap();
+        assert!(!serialized.contains("admin-secret"));
+        assert!(!serialized.contains("postgres://"));
+    }
+
+    #[tokio::test]
     async fn clone_rejects_denied_extension_before_source_preflight() {
         let config = crate::config::parse_config_file(
             r#"{
@@ -10551,14 +10760,15 @@ mod tests {
 
     #[test]
     fn extension_audit_details_are_structured_and_secret_free() {
-        let details = extension_audit_details(
-            "clone_database",
-            "pg_trgm",
-            Some("test-agent"),
-            "rolled_back",
-            Some("invalid_extensions"),
-            Some(true),
-        );
+        let details = serde_json::to_value(ExtensionAuditDetails {
+            operation: LifecycleOperation::CloneDatabase,
+            extension: "pg_trgm",
+            actor: Some("test-agent"),
+            outcome: ExtensionAuditOutcome::RolledBack,
+            error_code: Some("invalid_extensions"),
+            cleanup_succeeded: Some(true),
+        })
+        .unwrap();
 
         assert_eq!(
             details,
@@ -10702,16 +10912,23 @@ mod tests {
     }
 
     #[test]
-    fn session_command_error_codes_do_not_echo_spawn_errors() {
+    fn session_preflight_uses_typed_error_codes() {
+        let directory = tempfile::tempdir().unwrap();
         assert_eq!(
-            session_command_error_code(&anyhow::anyhow!("repo_not_found")),
-            "repo_not_found"
+            session_preflight_error(
+                Path::new("/definitely/missing"),
+                &["cargo".to_string()],
+                &[]
+            ),
+            Some(SessionCommandErrorCode::RepoNotFound)
         );
         assert_eq!(
-            session_command_error_code(&anyhow::anyhow!(
-                "failed to spawn /tmp/postgres://user:secret@localhost/db"
-            )),
-            "child_spawn_failed"
+            session_preflight_error(
+                directory.path(),
+                &["cargo".to_string()],
+                &["PGPASSWORD".to_string()]
+            ),
+            Some(SessionCommandErrorCode::InvalidEnvAlias)
         );
     }
 
