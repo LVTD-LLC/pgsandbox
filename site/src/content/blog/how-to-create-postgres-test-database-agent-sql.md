@@ -14,6 +14,8 @@ heroImageUrl: ""
 featured: false
 sortOrder: 60
 ---
+When the database must wrap a repository test process rather than a sequence of MCP calls, use the [one-shot disposable Postgres integration-test workflow](/blog/run-integration-tests-disposable-postgres-database/). It covers injected connection variables, child exit semantics, cleanup policies, structured results, and suite partitioning.
+
 To create a Postgres test database for agent-generated SQL, create a fresh database for the task, run migrations or load a known source state, give the agent a scoped database role, execute generated SQL only inside that database, capture the result, and delete the database when the task is done.
 
 That is different from handing an agent the same `DATABASE_URL` a human developer uses all week.

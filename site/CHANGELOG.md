@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-07-22
+
+- Added the Astro Markdown guide "Run Integration Tests in a Disposable Postgres Database" with PostgreSQL primary-source citations, measured session-partition evidence, SEO ledger and link inventory updates, and inbound blog links.
+
 ## 2026-07-21
 
 - Released `pgsandbox` v0.5.0 with one-shot agent test sessions, explicit
