@@ -35,6 +35,8 @@ The information-gain point is the remediation envelope. A generic Postgres MCP s
 
 Postgres already has a mature error system. PostgreSQL's error-code appendix says server messages are assigned five-character SQLSTATE codes and that applications should usually test the code rather than the localized text (https://www.postgresql.org/docs/current/errcodes-appendix.html). That is exactly the right habit for agents.
 
+Concurrency errors make the distinction concrete. A real deadlock reports `40P01`, while a statement that exceeds `lock_timeout` reports `55P03`. The [Postgres deadlock testing workflow](/blog/test-postgres-deadlocks-lock-timeouts/) reproduces both conditions with separate topologies so an agent can prove the correct recovery branch instead of retrying any message that contains "lock."
+
 MCP adds another layer. The Model Context Protocol tools specification says servers must validate tool inputs, implement access controls, rate-limit tool calls, and sanitize tool outputs; clients should show tool inputs, validate results, implement timeouts, and log usage for audit (https://modelcontextprotocol.io/specification/2025-06-18/server/tools). Error handling is part of that safety boundary, not a cosmetic response format.
 
 For a coding agent, an error is useful only if it changes the next action. These two responses should not be treated the same:

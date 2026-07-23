@@ -67,6 +67,8 @@ The split matters because "tests failed" is not one condition. Provisioning can 
 
 The [PGSandbox MCP tool contract](/docs/mcp-tools/) covers the underlying database lifecycle operations. `with-database` is intentionally a CLI session wrapper because its job is to supervise a local child process and preserve process exit behavior.
 
+Concurrency failures need that child-process boundary too. The [Postgres deadlock testing guide](/blog/test-postgres-deadlocks-lock-timeouts/) shows how one repository test process can hold two independent connections, coordinate opposite lock order, assert `40P01` and `55P03` separately, and leave cleanup to the enclosing disposable session.
+
 ## 1. Run the basic one-shot test session
 
 Run a direct executable after `--`:
