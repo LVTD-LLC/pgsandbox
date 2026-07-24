@@ -71,6 +71,8 @@ The concurrency harness must keep two connections and two transactions open at t
 
 PGSandbox's [`run_sql` implementation](https://github.com/LVTD-LLC/pgsandbox-mcp/blob/2e709adbd78189ee561d5c394151d97e377f1f6b/rust-src/postgres.rs#L2640-L2672) opens a sandbox connection for one tool call and drops it before returning. Separate `run_sql` calls are therefore useful for bounded setup and proof queries, but they are not a multi-session transaction coordinator. Trying to alternate `BEGIN` and `UPDATE` across independent calls will not preserve the intended open transactions.
 
+If the failure occurs before a query gets a client, test that boundary separately. The [Postgres connection pool failure guide](/blog/test-postgres-connection-pool-failures/) uses pool counters and a bounded acquisition timeout to distinguish client-pool saturation from PostgreSQL lock waits and server connection limits.
+
 Use `pgsandbox with-database` instead. The command creates one disposable database and scoped role, injects `DATABASE_URL`, `PGSANDBOX_DATABASE_URL`, and standard libpq variables into one child process, then supervises its exit and cleanup. The [one-shot integration-test guide](/blog/run-integration-tests-disposable-postgres-database/) covers the full session result contract.
 
 This is a product-led boundary, not a workaround:

@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-07-24
+
+- Added the Astro Markdown guide "How to Test Postgres Connection Pool Failures Safely" with a deterministic node-postgres harness, PostgreSQL and driver primary-source citations, SEO ledger and link inventory updates, and inbound blog links.
+
 ## 2026-07-23
 
 - Added the Astro Markdown guide "How to Test Postgres Deadlocks and Lock Timeouts Safely" with a deterministic two-connection harness, PostgreSQL primary-source citations, SEO ledger and link inventory updates, and inbound blog links.

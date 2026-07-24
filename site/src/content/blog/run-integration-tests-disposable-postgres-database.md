@@ -69,6 +69,8 @@ The [PGSandbox MCP tool contract](/docs/mcp-tools/) covers the underlying databa
 
 Concurrency failures need that child-process boundary too. The [Postgres deadlock testing guide](/blog/test-postgres-deadlocks-lock-timeouts/) shows how one repository test process can hold two independent connections, coordinate opposite lock order, assert `40P01` and `55P03` separately, and leave cleanup to the enclosing disposable session.
 
+Connection lifecycle failures use the same boundary without exhausting a shared server. The [Postgres connection pool testing guide](/blog/test-postgres-connection-pool-failures/) shows how to saturate a tiny application pool, terminate one same-role idle backend, and prove the driver serves a replacement query before PGSandbox cleans up.
+
 ## 1. Run the basic one-shot test session
 
 Run a direct executable after `--`:
