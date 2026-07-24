@@ -105,7 +105,8 @@ async function proveAcquireTimeout() {
 
   const held = [];
   try {
-    held.push(await pool.connect(), await pool.connect());
+    held.push(await pool.connect());
+    held.push(await pool.connect());
     assert.deepEqual(snapshot(pool), { total: 2, idle: 0, waiting: 0 });
 
     const startedAt = Date.now();
@@ -168,11 +169,15 @@ async function proveIdleBackendRecovery() {
 
   try {
     const victim = await pool.connect();
-    const victimResult = await victim.query(
-      "SELECT pg_backend_pid() AS pid"
-    );
-    const victimPid = victimResult.rows[0].pid;
-    victim.release();
+    let victimPid;
+    try {
+      const victimResult = await victim.query(
+        "SELECT pg_backend_pid() AS pid"
+      );
+      victimPid = victimResult.rows[0].pid;
+    } finally {
+      victim.release();
+    }
 
     const killer = new Client({
       connectionString,
