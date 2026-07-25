@@ -325,6 +325,8 @@ For a disposable test, the diagnostic questions are narrow:
 
 PostgreSQL's deadlock guidance recommends consistent lock ordering as the primary prevention. If a cycle cannot be ruled out, retry the complete transaction, not the single failed statement.
 
+Serialization failures need a separate proof because `40001` protects an isolation invariant rather than reporting a lock-wait cycle. The [Postgres serialization failure retry guide](/blog/test-postgres-serialization-failure-retries/) forces overlapping Serializable snapshots, catches the failure around commit, and proves the losing operation recomputes its decision in a fresh transaction.
+
 Keep two tests:
 
 - The integration harness proves that the driver exposes a real PostgreSQL `40P01` and rolls back the victim.
