@@ -32,6 +32,7 @@
 | 2026-07-23 | How-to / troubleshooting | How to Test Postgres Deadlocks and Lock Timeouts Safely | test-postgres-deadlocks-lock-timeouts | postgres deadlock testing | /docs/mcp-tools/, /docs/architecture/, /blog/run-integration-tests-disposable-postgres-database/, /blog/postgres-mcp-server-error-handling-coding-agents/, /blog/postgres-run-sql-bounded-results/, /blog/postgres-sandbox-ttl-values/ | Astro Markdown source of truth; uses the five-part Concurrency Proof Contract and a deterministic two-connection harness to distinguish `40P01` deadlocks from `55P03` lock timeouts. |
 | 2026-07-24 | How-to / troubleshooting | How to Test Postgres Connection Pool Failures Safely | test-postgres-connection-pool-failures | postgres connection pool testing | /docs/mcp-tools/, /docs/architecture/, /blog/run-integration-tests-disposable-postgres-database/, /blog/postgres-mcp-server-error-handling-coding-agents/, /blog/test-postgres-deadlocks-lock-timeouts/, /blog/postgres-sandbox-ttl-values/ | Astro Markdown source of truth; uses the five-part Pool Failure Proof Contract and a deterministic node-postgres harness to separate client-pool acquisition timeout, backend disconnect, recovery, and cleanup. |
 | 2026-07-25 | How-to / troubleshooting | How to Test Postgres Serialization Failures and Retries | test-postgres-serialization-failure-retries | postgres serialization failure retry | /docs/mcp-tools/, /docs/architecture/, /blog/run-integration-tests-disposable-postgres-database/, /blog/test-postgres-deadlocks-lock-timeouts/, /blog/postgres-mcp-server-error-handling-coding-agents/, /blog/postgres-sandbox-ttl-values/ | Astro Markdown source of truth; uses the five-part Serialization Retry Proof Contract and a deterministic Psycopg harness to force one `40001`, replay the complete transaction, verify final state, and clean up. |
+| 2026-07-26 | How-to / troubleshooting | How to Test Postgres Statement Timeouts and Query Cancellation | test-postgres-statement-timeouts-query-cancellation | postgres statement timeout testing | /docs/mcp-tools/, /docs/architecture/, /blog/test-postgres-deadlocks-lock-timeouts/, /blog/postgres-mcp-server-error-handling-coding-agents/, /blog/test-postgres-serialization-failure-retries/, /blog/postgres-sandbox-ttl-values/ | Astro Markdown source of truth; uses the five-part Cancellation Proof Contract and a deterministic Psycopg harness to separate server timeout, explicit client cancellation, transaction recovery, and outer process cleanup. |
 
 ## Removed
 
@@ -41,11 +42,11 @@
 
 ## Candidate Backlog
 
-Last researched: 2026-07-25
+Last researched: 2026-07-26
 
 | Score | Candidate | Target Keyword | Volume | KD | Intent | Proposed Type | Why / Status |
 | ---: | --- | --- | ---: | ---: | --- | --- | --- |
-| 18 | How to Test Postgres Statement Timeouts and Query Cancellation | postgres statement timeout testing | TBD | TBD | Informational | How-to / troubleshooting | Next failure-mode workflow: distinguish `57014` statement timeout from lock acquisition timeout and client cancellation, then prove connection recovery in a disposable database. |
+| 17 | How to Test Postgres Savepoints and Partial Rollbacks | postgres savepoint testing | TBD | TBD | Informational | How-to / tutorial | Next transaction-control workflow: prove `ROLLBACK TO SAVEPOINT`, preserve earlier work, recover from a statement error, and verify final state in a disposable database. |
 
 ## Notes
 
@@ -79,3 +80,4 @@ Last researched: 2026-07-25
 - 2026-07-23 cron selected the top backlog candidate automatically. DataForSEO credentials were unavailable, so live research used Firecrawl's US-English SERPs, current PostgreSQL 18 locking/configuration/SQLSTATE/monitoring documentation, and the PGSandbox v0.5.0 source and session docs. Keyword volume/KD remained `TBD`. New source-of-truth content file: `site/src/content/blog/test-postgres-deadlocks-lock-timeouts.md`.
 - 2026-07-24 cron selected the top backlog candidate automatically. DataForSEO credentials were unavailable, so live research used current PostgreSQL connection, monitoring, and backend-administration docs; node-postgres pool docs and source guidance; the PGSandbox source/docs; and web SERP fallback. Keyword volume/KD remained `TBD`. New source-of-truth content file: `site/src/content/blog/test-postgres-connection-pool-failures.md`.
 - 2026-07-25 cron selected the top backlog candidate automatically. DataForSEO credentials were unavailable in the cron environment and at the approved Infisical path, so live research used current PostgreSQL isolation, serialization-failure, error-code, and rollback docs; the PGSandbox source/docs; and web SERP fallback. Keyword volume/KD remained `TBD`. New source-of-truth content file: `site/src/content/blog/test-postgres-serialization-failure-retries.md`.
+- 2026-07-26 cron selected the top backlog candidate automatically. DataForSEO credentials were unavailable, so live research used Firecrawl's US-English SERP, current PostgreSQL timeout, cancellation-protocol, SQLSTATE, signaling, and activity docs; current Psycopg cancellation and transaction docs; and the PGSandbox source/docs. Keyword volume/KD remained `TBD`. New source-of-truth content file: `site/src/content/blog/test-postgres-statement-timeouts-query-cancellation.md`.
