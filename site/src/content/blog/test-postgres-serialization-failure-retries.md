@@ -393,7 +393,7 @@ Then inspect the workload:
 
 PostgreSQL's Serializable documentation discusses keeping transactions short, controlling active connections, and using appropriate indexes to reduce serialization failures. Lowering isolation can remove `40001` while reintroducing the anomaly Serializable was selected to prevent. Treat that as a correctness decision, not a retry tweak.
 
-If the test produces `40P01`, `55P03`, or `57014` instead, stop calling it a serialization retry proof. Use the [two-connection concurrency guide](/blog/test-postgres-deadlocks-lock-timeouts/) to verify the intended topology and classify the actual failure.
+If the test produces `40P01`, `55P03`, or `57014` instead, stop calling it a serialization retry proof. Use the [two-connection concurrency guide](/blog/test-postgres-deadlocks-lock-timeouts/) for `40P01` and `55P03`, or the [statement-timeout and cancellation proof](/blog/test-postgres-statement-timeouts-query-cancellation/) for `57014`.
 
 ### When not to use this retry pattern
 

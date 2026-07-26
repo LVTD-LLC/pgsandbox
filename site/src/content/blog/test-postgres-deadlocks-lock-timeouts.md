@@ -47,7 +47,7 @@ The two paths need different tests:
 | Serialization failure | Concurrent result cannot be serialized at the selected isolation level | `40001` (`serialization_failure`) | Retry the complete transaction from a fresh snapshot |
 | Statement cancellation | The statement exceeds `statement_timeout` or is canceled | `57014` (`query_canceled`) | Classify it separately from lock acquisition failure |
 
-Those codes come from PostgreSQL's current [SQLSTATE appendix](https://www.postgresql.org/docs/current/errcodes-appendix.html). Branch on the code, not localized error text. The [PGSandbox error-handling guide](/blog/postgres-mcp-server-error-handling-coding-agents/) applies the same rule to MCP tool responses.
+Those codes come from PostgreSQL's current [SQLSTATE appendix](https://www.postgresql.org/docs/current/errcodes-appendix.html). Branch on the code, not localized error text. The [statement-timeout and query-cancellation guide](/blog/test-postgres-statement-timeouts-query-cancellation/) shows how to prove both `57014` paths and connection recovery; the [PGSandbox error-handling guide](/blog/postgres-mcp-server-error-handling-coding-agents/) applies the same classification rule to MCP tool responses.
 
 `deadlock_timeout` is different again. It controls how long PostgreSQL waits on a lock before running the deadlock detector. The [lock-management settings reference](https://www.postgresql.org/docs/current/runtime-config-locks.html) documents a default of one second and notes that the check has a cost. An application test normally should not rewrite this cluster-level diagnostic setting. Bound the test process and accept the server's configured detector interval.
 

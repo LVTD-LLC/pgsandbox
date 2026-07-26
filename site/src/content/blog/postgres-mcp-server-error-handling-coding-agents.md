@@ -218,7 +218,7 @@ Use the message for context, but branch on `errors[].code`, `errors[].category`,
 
 ### What is the difference between `statement_timeout` and `command_timeout`?
 
-`statement_timeout` is a Postgres-side cancellation for a SQL statement. `command_timeout` is a PGSandbox workflow timeout around a repo command, clone, restore, seed, or migration operation. The recovery is different: narrow SQL for the first, narrow or resize the workflow for the second.
+`statement_timeout` is a Postgres-side cancellation for a SQL statement. `command_timeout` is a PGSandbox workflow timeout around a repo command, clone, restore, seed, or migration operation. The recovery is different: narrow SQL for the first, narrow or resize the workflow for the second. Use the [Postgres query-cancellation proof](/blog/test-postgres-statement-timeouts-query-cancellation/) to distinguish a server budget, an explicit client cancel, and the outer process deadline.
 
 ### When should an agent call `doctor`?
 
