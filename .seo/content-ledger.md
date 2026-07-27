@@ -33,6 +33,7 @@
 | 2026-07-24 | How-to / troubleshooting | How to Test Postgres Connection Pool Failures Safely | test-postgres-connection-pool-failures | postgres connection pool testing | /docs/mcp-tools/, /docs/architecture/, /blog/run-integration-tests-disposable-postgres-database/, /blog/postgres-mcp-server-error-handling-coding-agents/, /blog/test-postgres-deadlocks-lock-timeouts/, /blog/postgres-sandbox-ttl-values/ | Astro Markdown source of truth; uses the five-part Pool Failure Proof Contract and a deterministic node-postgres harness to separate client-pool acquisition timeout, backend disconnect, recovery, and cleanup. |
 | 2026-07-25 | How-to / troubleshooting | How to Test Postgres Serialization Failures and Retries | test-postgres-serialization-failure-retries | postgres serialization failure retry | /docs/mcp-tools/, /docs/architecture/, /blog/run-integration-tests-disposable-postgres-database/, /blog/test-postgres-deadlocks-lock-timeouts/, /blog/postgres-mcp-server-error-handling-coding-agents/, /blog/postgres-sandbox-ttl-values/ | Astro Markdown source of truth; uses the five-part Serialization Retry Proof Contract and a deterministic Psycopg harness to force one `40001`, replay the complete transaction, verify final state, and clean up. |
 | 2026-07-26 | How-to / troubleshooting | How to Test Postgres Statement Timeouts and Query Cancellation | test-postgres-statement-timeouts-query-cancellation | postgres statement timeout testing | /docs/mcp-tools/, /docs/architecture/, /blog/test-postgres-deadlocks-lock-timeouts/, /blog/postgres-mcp-server-error-handling-coding-agents/, /blog/test-postgres-serialization-failure-retries/, /blog/postgres-sandbox-ttl-values/ | Astro Markdown source of truth; uses the five-part Cancellation Proof Contract and a deterministic Psycopg harness to separate server timeout, explicit client cancellation, transaction recovery, and outer process cleanup. |
+| 2026-07-27 | How-to / tutorial | How to Test Postgres Savepoints and Partial Rollbacks | test-postgres-savepoints-partial-rollbacks | postgres savepoint testing | /docs/mcp-tools/, /docs/architecture/, /blog/run-integration-tests-disposable-postgres-database/, /blog/test-postgres-serialization-failure-retries/, /blog/test-postgres-statement-timeouts-query-cancellation/, /blog/what-is-database-sandbox/ | Astro Markdown source of truth; uses the five-part Partial Rollback Proof Contract and a deterministic Psycopg harness to prove `23505`, `25P02`, partial rollback, outer-work preservation, continuation, commit, and cleanup. |
 
 ## Removed
 
@@ -42,11 +43,10 @@
 
 ## Candidate Backlog
 
-Last researched: 2026-07-26
+Last researched: 2026-07-27
 
 | Score | Candidate | Target Keyword | Volume | KD | Intent | Proposed Type | Why / Status |
 | ---: | --- | --- | ---: | ---: | --- | --- | --- |
-| 17 | How to Test Postgres Savepoints and Partial Rollbacks | postgres savepoint testing | TBD | TBD | Informational | How-to / tutorial | Next transaction-control workflow: prove `ROLLBACK TO SAVEPOINT`, preserve earlier work, recover from a statement error, and verify final state in a disposable database. |
 
 ## Notes
 
@@ -81,3 +81,4 @@ Last researched: 2026-07-26
 - 2026-07-24 cron selected the top backlog candidate automatically. DataForSEO credentials were unavailable, so live research used current PostgreSQL connection, monitoring, and backend-administration docs; node-postgres pool docs and source guidance; the PGSandbox source/docs; and web SERP fallback. Keyword volume/KD remained `TBD`. New source-of-truth content file: `site/src/content/blog/test-postgres-connection-pool-failures.md`.
 - 2026-07-25 cron selected the top backlog candidate automatically. DataForSEO credentials were unavailable in the cron environment and at the approved Infisical path, so live research used current PostgreSQL isolation, serialization-failure, error-code, and rollback docs; the PGSandbox source/docs; and web SERP fallback. Keyword volume/KD remained `TBD`. New source-of-truth content file: `site/src/content/blog/test-postgres-serialization-failure-retries.md`.
 - 2026-07-26 cron selected the top backlog candidate automatically. DataForSEO credentials were unavailable, so live research used Firecrawl's US-English SERP, current PostgreSQL timeout, cancellation-protocol, SQLSTATE, signaling, and activity docs; current Psycopg cancellation and transaction docs; and the PGSandbox source/docs. Keyword volume/KD remained `TBD`. New source-of-truth content file: `site/src/content/blog/test-postgres-statement-timeouts-query-cancellation.md`.
+- 2026-07-27 cron selected the top backlog candidate automatically. DataForSEO credentials were unavailable, so live research used Firecrawl's US-English SERP, current PostgreSQL 18 savepoint, rollback, release, SQLSTATE, and subtransaction docs; current Psycopg transaction docs; and the PGSandbox source/docs. Keyword volume/KD remained `TBD`. New source-of-truth content file: `site/src/content/blog/test-postgres-savepoints-partial-rollbacks.md`.

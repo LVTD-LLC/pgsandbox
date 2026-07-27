@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-07-27
+
+- Added the Astro Markdown guide "How to Test Postgres Savepoints and Partial Rollbacks" with a deterministic Psycopg harness, PostgreSQL and Psycopg primary-source citations, SEO ledger and link inventory updates, and inbound blog links.
+
 ## 2026-07-26
 
 - Added the Astro Markdown guide "How to Test Postgres Statement Timeouts and Query Cancellation" with a deterministic Psycopg harness, PostgreSQL and Psycopg primary-source citations, SEO ledger and link inventory updates, and inbound blog links.

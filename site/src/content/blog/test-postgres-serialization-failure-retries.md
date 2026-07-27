@@ -49,6 +49,8 @@ PostgreSQL's [transaction-isolation documentation](https://www.postgresql.org/do
 
 This matters in a test because the failure can arrive at a statement such as `UPDATE` or at `COMMIT`. Put the exception boundary around the entire transaction context. Do not assume the line that raises the driver exception is the only work that must be repeated.
 
+A savepoint solves a narrower problem. The [Postgres savepoint testing guide](/blog/test-postgres-savepoints-partial-rollbacks/) shows how to preserve earlier work after a local statement error, prove `25P02`, and continue the same outer transaction. Do not apply that partial-recovery pattern to `40001`; serialization failure invalidates the complete transaction and its decision-making snapshot.
+
 ### Do not merge `40001` with every retryable-looking error
 
 Preserve the database condition:
