@@ -71,6 +71,8 @@ Concurrency failures need that child-process boundary too. The [Postgres deadloc
 
 Serializable transaction retries use the same boundary with a different invariant. The [Postgres serialization failure retry guide](/blog/test-postgres-serialization-failure-retries/) coordinates two initial snapshots, asserts one SQLSTATE `40001`, replays the complete losing transaction, and verifies the final business state before cleanup.
 
+Nested transaction recovery is another database behavior worth proving inside the child process. The [Postgres savepoint testing guide](/blog/test-postgres-savepoints-partial-rollbacks/) forces a unique violation, observes the failed transaction state, rolls back only the inner unit, preserves outer work, and verifies the committed rows from a new connection.
+
 Connection lifecycle failures use the same boundary without exhausting a shared server. The [Postgres connection pool testing guide](/blog/test-postgres-connection-pool-failures/) shows how to saturate a tiny application pool, terminate one same-role idle backend, and prove the driver serves a replacement query before PGSandbox cleans up.
 
 ## 1. Run the basic one-shot test session
