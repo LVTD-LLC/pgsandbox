@@ -363,6 +363,10 @@ A mock can test application branching. It cannot prove driver pool counters, Pos
 
 Connection URLs contain credentials. Record the safe sandbox ID from the PGSandbox session result, not the URL or password.
 
+### Returning a session-level advisory lock to the pool
+
+Returning a client to an application pool does not necessarily end its PostgreSQL session. A session-level advisory lock can therefore outlive the request that acquired it. The [advisory-lock test workflow](/blog/test-postgres-advisory-locks/) proves rollback, explicit release, and physical disconnect as separate boundaries.
+
 ## PR-ready connection pool proof
 
 Record a compact result with a pool-related patch:
