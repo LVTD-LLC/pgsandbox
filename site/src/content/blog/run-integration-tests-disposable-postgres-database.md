@@ -71,6 +71,8 @@ Concurrency failures need that child-process boundary too. The [Postgres deadloc
 
 Serializable transaction retries use the same boundary with a different invariant. The [Postgres serialization failure retry guide](/blog/test-postgres-serialization-failure-retries/) coordinates two initial snapshots, asserts one SQLSTATE `40001`, replays the complete losing transaction, and verifies the final business state before cleanup.
 
+If the repository has not yet proved which isolation level its invariant requires, run the [PostgreSQL transaction isolation proof](/blog/test-postgres-transaction-isolation-levels/) first. It contrasts statement snapshots, stable transaction snapshots, and Serializable write-skew rejection with two controlled connections.
+
 Nested transaction recovery is another database behavior worth proving inside the child process. The [Postgres savepoint testing guide](/blog/test-postgres-savepoints-partial-rollbacks/) forces a unique violation, observes the failed transaction state, rolls back only the inner unit, preserves outer work, and verifies the committed rows from a new connection.
 
 Authorization migrations need the same real-database boundary. The [Postgres row-level security testing guide](/blog/test-postgres-row-level-security/) verifies that RLS is active for the actual sandbox owner role, then proves tenant read isolation, cross-tenant write rejection, transaction-scoped context reset, and cleanup.
