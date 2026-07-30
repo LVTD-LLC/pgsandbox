@@ -45,6 +45,8 @@ Repeatable Read and Serializable can reach `40001` through different conflict sh
 | Repeatable Read | A transaction tries to update a row changed after its snapshot began | The transaction-level snapshot cannot be reconciled with the concurrent row change |
 | Serializable | Concurrent reads and writes form dependencies inconsistent with every serial execution | Committed transactions must match some one-at-a-time order |
 
+The [transaction isolation testing guide](/blog/test-postgres-transaction-isolation-levels/) runs controlled schedules across Read Committed, Repeatable Read, and Serializable. Use it when the question is which level permits an outcome; use this retry guide when the question is whether application replay is complete and correct.
+
 PostgreSQL's [transaction-isolation documentation](https://www.postgresql.org/docs/current/transaction-iso.html#XACT-SERIALIZABLE) describes Serializable as Repeatable Read plus monitoring for dangerous read/write dependency combinations. That monitoring does not add blocking beyond Repeatable Read. When PostgreSQL detects an unsafe combination, it aborts a transaction instead.
 
 This matters in a test because the failure can arrive at a statement such as `UPDATE` or at `COMMIT`. Put the exception boundary around the entire transaction context. Do not assume the line that raises the driver exception is the only work that must be repeated.

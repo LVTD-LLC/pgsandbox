@@ -36,6 +36,7 @@
 | 2026-07-27 | How-to / tutorial | How to Test Postgres Savepoints and Partial Rollbacks | test-postgres-savepoints-partial-rollbacks | postgres savepoint testing | /docs/mcp-tools/, /docs/architecture/, /blog/run-integration-tests-disposable-postgres-database/, /blog/test-postgres-serialization-failure-retries/, /blog/test-postgres-statement-timeouts-query-cancellation/, /blog/what-is-database-sandbox/ | Astro Markdown source of truth; uses the five-part Partial Rollback Proof Contract and a deterministic Psycopg harness to prove `23505`, `25P02`, partial rollback, outer-work preservation, continuation, commit, and cleanup. |
 | 2026-07-28 | How-to / tutorial | How to Test Postgres Row-Level Security in a Disposable Database | test-postgres-row-level-security | postgres row level security testing | /docs/mcp-tools/, /blog/per-sandbox-postgres-roles-coding-agents/, /blog/run-integration-tests-disposable-postgres-database/, /blog/test-postgres-savepoints-partial-rollbacks/ | Astro Markdown source of truth; uses the five-part RLS Isolation Proof Contract and a deterministic Psycopg harness to prove owner-role activation, tenant read isolation, write rejection, context reset, and cleanup. |
 | 2026-07-29 | How-to / tutorial | How to Test Postgres Advisory Locks Safely | test-postgres-advisory-locks | postgres advisory lock testing | /docs/mcp-tools/, /blog/run-integration-tests-disposable-postgres-database/, /blog/test-postgres-connection-pool-failures/, /blog/test-postgres-deadlocks-lock-timeouts/ | Astro Markdown source of truth; uses the five-part Advisory Lock Proof Contract and a deterministic two-connection Psycopg harness to distinguish session and transaction lock lifetimes. |
+| 2026-07-30 | How-to / tutorial | How to Test PostgreSQL Transaction Isolation Levels | test-postgres-transaction-isolation-levels | postgres transaction isolation testing | /docs/mcp-tools/, /blog/run-integration-tests-disposable-postgres-database/, /blog/test-postgres-serialization-failure-retries/, /blog/test-postgres-connection-pool-failures/, /blog/test-postgres-deadlocks-lock-timeouts/ | Astro Markdown source of truth; uses the five-part Isolation Proof Matrix and controlled snapshot/write-skew schedules to distinguish Read Committed, Repeatable Read, and Serializable outcomes. |
 
 ## Removed
 
@@ -45,11 +46,10 @@
 
 ## Candidate Backlog
 
-Last researched: 2026-07-29
+Last researched: 2026-07-30
 
 | Score | Candidate | Target Keyword | Volume | KD | Intent | Proposed Type | Why / Status |
 | ---: | --- | --- | ---: | ---: | --- | --- | --- |
-| 21 | How to Test PostgreSQL Transaction Isolation Levels | postgres transaction isolation testing | TBD | TBD | informational | How-to / tutorial | Strong primary-source coverage and application relevance, but overlaps the shipped serialization-retry guide. |
 | 18 | How to Test PostgreSQL Foreign Key Cascades | postgres foreign key cascade testing | TBD | TBD | informational | Weak SERP and practical migration value; narrower agent/database-lifecycle fit than advisory locks. |
 | 17 | How to Test PostgreSQL Two-Phase Commit | postgres two phase commit testing | TBD | TBD | informational | Primary docs rank prominently, but `max_prepared_transactions` setup and distributed-system scope increase effort and operational risk. |
 
@@ -89,3 +89,4 @@ Last researched: 2026-07-29
 - 2026-07-27 cron selected the top backlog candidate automatically. DataForSEO credentials were unavailable, so live research used Firecrawl's US-English SERP, current PostgreSQL 18 savepoint, rollback, release, SQLSTATE, and subtransaction docs; current Psycopg transaction docs; and the PGSandbox source/docs. Keyword volume/KD remained `TBD`. New source-of-truth content file: `site/src/content/blog/test-postgres-savepoints-partial-rollbacks.md`.
 - 2026-07-28 cron refreshed the empty backlog and selected the top recommendation automatically. DataForSEO credentials were unavailable, so live research used current web SERPs, PostgreSQL 18 row-security, policy, role, catalog, and parameter-setting docs; current Psycopg transaction/error docs; and the PGSandbox source/docs. Keyword volume/KD remained `TBD`. New source-of-truth content file: `site/src/content/blog/test-postgres-row-level-security.md`.
 - 2026-07-29 cron refreshed the empty backlog and selected the top recommendation automatically. DataForSEO credentials were unavailable, so live research used Firecrawl's US-English SERPs, current PostgreSQL 18 advisory-lock and `pg_locks` docs, current Psycopg transaction docs, and the PGSandbox source/docs. Keyword volume/KD remained `TBD`. New source-of-truth content file: `site/src/content/blog/test-postgres-advisory-locks.md`.
+- 2026-07-30 cron selected the top backlog recommendation automatically. DataForSEO credentials were unavailable, so live research used current web SERPs, PostgreSQL 18 transaction-isolation and `SET TRANSACTION` docs, current Psycopg transaction docs, and the PGSandbox source/docs. Keyword volume/KD remained `TBD`. New source-of-truth content file: `site/src/content/blog/test-postgres-transaction-isolation-levels.md`.
