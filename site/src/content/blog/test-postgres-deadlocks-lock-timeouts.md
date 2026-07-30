@@ -405,6 +405,8 @@ Usually no. It is a server diagnostic setting with a default of one second, and 
 
 No reliable multi-session transaction can be built from separate calls because each call opens and closes its own connection. Run a child test process through `pgsandbox with-database` and let that process own both concurrent connections.
 
+If the application needs cooperative mutual exclusion rather than a deliberate deadlock cycle, use the [Postgres advisory-lock testing guide](/blog/test-postgres-advisory-locks/) to prove key identity, contention, catalog visibility, and release lifetime with two physical connections.
+
 ### Should an application retry a deadlock?
 
 It may retry SQLSTATE `40P01`, but it must roll back and replay the complete transaction with a bounded retry policy. Consistent lock ordering and short transactions remain the primary fixes. Retry logic also needs idempotency for any external side effects.
