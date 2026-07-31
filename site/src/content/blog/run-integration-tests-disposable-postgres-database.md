@@ -75,6 +75,8 @@ If the repository has not yet proved which isolation level its invariant require
 
 Nested transaction recovery is another database behavior worth proving inside the child process. The [Postgres savepoint testing guide](/blog/test-postgres-savepoints-partial-rollbacks/) forces a unique violation, observes the failed transaction state, rolls back only the inner unit, preserves outer work, and verifies the committed rows from a new connection.
 
+Referential-action migrations also need exact final-state checks. The [PostgreSQL foreign key cascade testing guide](/blog/test-postgres-foreign-key-cascades/) verifies installed rules, multi-level update and delete propagation, unrelated-row survival, SQLSTATE `23503`, rollback atomicity, and cleanup.
+
 Authorization migrations need the same real-database boundary. The [Postgres row-level security testing guide](/blog/test-postgres-row-level-security/) verifies that RLS is active for the actual sandbox owner role, then proves tenant read isolation, cross-tenant write rejection, transaction-scoped context reset, and cleanup.
 
 Connection lifecycle failures use the same boundary without exhausting a shared server. The [Postgres connection pool testing guide](/blog/test-postgres-connection-pool-failures/) shows how to saturate a tiny application pool, terminate one same-role idle backend, and prove the driver serves a replacement query before PGSandbox cleans up.
