@@ -55,6 +55,8 @@ Those are not abstract migration concerns. They are review questions:
 
 Generic "migration succeeded" output is too thin. A good proof needs enough database context to catch the difference between a syntactically valid migration and a migration you would actually merge.
 
+For a foreign-key action change, add the [PostgreSQL cascade proof](/blog/test-postgres-foreign-key-cascades/): inspect the installed `delete_rule` and `update_rule`, exercise a target graph plus an unrelated control, and prove rollback restores every cascaded change.
+
 ## Step 1: create a disposable Postgres target
 
 Start with a database that exists only for the agent task.

@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-07-31
+
+- Added the Astro Markdown guide "How to Test PostgreSQL Foreign Key Cascades" with a deterministic Psycopg referential-action harness, PostgreSQL and Psycopg primary-source citations, SEO ledger and link inventory updates, and inbound blog links.
+
 ## 2026-07-30
 
 - Added the Astro Markdown guide "How to Test PostgreSQL Transaction Isolation Levels" with a deterministic Psycopg snapshot/write-skew harness, PostgreSQL and Psycopg primary-source citations, SEO ledger and link inventory updates, and inbound blog links.
