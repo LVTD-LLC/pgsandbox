@@ -205,6 +205,8 @@ A name prefix is useful evidence, not proof. Prefer metadata fields when they ex
 
 `FORCE` is a connection-handling option, not a resource-selection policy. PostgreSQL documents cases where it still will not terminate blockers such as prepared transactions, active logical replication slots, or subscriptions.
 
+If a disposable database contains prepared transactions, recover their recorded decisions before retrying deletion. The [PostgreSQL two-phase commit testing workflow](/blog/test-postgres-two-phase-commit/) demonstrates exact-GID inspection, cross-session commit and rollback, and the zero-prepared-transaction exit check.
+
 ### Mistake: deleting databases but leaving roles behind
 
 Manual cleanup often leaves roles, grants, and owned objects as follow-up work. PGSandbox-created resources should go through the PGSandbox delete/cleanup path so the database and role lifecycle stay together.
