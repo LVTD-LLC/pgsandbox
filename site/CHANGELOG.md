@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-08-02
+
+- Added the Astro Markdown guide "How to Test PostgreSQL Two-Phase Commit" with a deterministic Psycopg prepared-transaction harness, PostgreSQL and Psycopg primary-source citations, SEO ledger and link inventory updates, and inbound blog links.
+
 ## 2026-07-31
 
 - Added the Astro Markdown guide "How to Test PostgreSQL Foreign Key Cascades" with a deterministic Psycopg referential-action harness, PostgreSQL and Psycopg primary-source citations, SEO ledger and link inventory updates, and inbound blog links.

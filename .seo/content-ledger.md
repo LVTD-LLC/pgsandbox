@@ -38,6 +38,7 @@
 | 2026-07-29 | How-to / tutorial | How to Test Postgres Advisory Locks Safely | test-postgres-advisory-locks | postgres advisory lock testing | /docs/mcp-tools/, /blog/run-integration-tests-disposable-postgres-database/, /blog/test-postgres-connection-pool-failures/, /blog/test-postgres-deadlocks-lock-timeouts/ | Astro Markdown source of truth; uses the five-part Advisory Lock Proof Contract and a deterministic two-connection Psycopg harness to distinguish session and transaction lock lifetimes. |
 | 2026-07-30 | How-to / tutorial | How to Test PostgreSQL Transaction Isolation Levels | test-postgres-transaction-isolation-levels | postgres transaction isolation testing | /docs/mcp-tools/, /blog/run-integration-tests-disposable-postgres-database/, /blog/test-postgres-serialization-failure-retries/, /blog/test-postgres-connection-pool-failures/, /blog/test-postgres-deadlocks-lock-timeouts/ | Astro Markdown source of truth; uses the five-part Isolation Proof Matrix and controlled snapshot/write-skew schedules to distinguish Read Committed, Repeatable Read, and Serializable outcomes. |
 | 2026-07-31 | How-to / tutorial | How to Test PostgreSQL Foreign Key Cascades | test-postgres-foreign-key-cascades | postgres foreign key cascade testing | /docs/mcp-tools/, /blog/run-integration-tests-disposable-postgres-database/, /blog/database-migration-testing-agent-pr/, /blog/per-sandbox-postgres-roles-coding-agents/, /blog/what-is-database-sandbox/ | Astro Markdown source of truth; uses the five-part Cascade Proof Contract to verify installed rules, update/delete propagation, unrelated-row survival, rollback atomicity, SQLSTATE 23503, and cleanup. |
+| 2026-08-02 | How-to / tutorial | How to Test PostgreSQL Two-Phase Commit | test-postgres-two-phase-commit | postgres two phase commit testing | /docs/architecture/, /docs/mcp-tools/, /blog/run-integration-tests-disposable-postgres-database/, /blog/per-sandbox-postgres-roles-coding-agents/, /blog/cleanup-expired-vs-manual-postgres-cleanup/ | Astro Markdown source of truth; uses the five-part Prepared Transaction Proof Contract and a deterministic Psycopg harness to prove configuration, prepare-state invisibility, catalog identity, cross-session commit and rollback, and zero-GID cleanup. |
 
 ## Removed
 
@@ -47,11 +48,10 @@
 
 ## Candidate Backlog
 
-Last researched: 2026-07-31
+Last researched: 2026-08-02
 
 | Score | Candidate | Target Keyword | Volume | KD | Intent | Proposed Type | Why / Status |
 | ---: | --- | --- | ---: | ---: | --- | --- | --- |
-| 17 | How to Test PostgreSQL Two-Phase Commit | postgres two phase commit testing | TBD | TBD | informational | How-to / tutorial | Primary docs rank prominently, but `max_prepared_transactions` setup and distributed-system scope increase effort and operational risk. |
 
 ## Notes
 
@@ -91,3 +91,4 @@ Last researched: 2026-07-31
 - 2026-07-29 cron refreshed the empty backlog and selected the top recommendation automatically. DataForSEO credentials were unavailable, so live research used Firecrawl's US-English SERPs, current PostgreSQL 18 advisory-lock and `pg_locks` docs, current Psycopg transaction docs, and the PGSandbox source/docs. Keyword volume/KD remained `TBD`. New source-of-truth content file: `site/src/content/blog/test-postgres-advisory-locks.md`.
 - 2026-07-30 cron selected the top backlog recommendation automatically. DataForSEO credentials were unavailable, so live research used current web SERPs, PostgreSQL 18 transaction-isolation and `SET TRANSACTION` docs, current Psycopg transaction docs, and the PGSandbox source/docs. Keyword volume/KD remained `TBD`. New source-of-truth content file: `site/src/content/blog/test-postgres-transaction-isolation-levels.md`.
 - 2026-07-31 cron selected the top backlog recommendation automatically. DataForSEO credentials were unavailable, so live research used Firecrawl's US-English SERP, current PostgreSQL 18 foreign-key, information-schema, transaction, and SQLSTATE docs, current Psycopg transaction docs, and the PGSandbox source/docs. Keyword volume/KD remained `TBD`. New source-of-truth content file: `site/src/content/blog/test-postgres-foreign-key-cascades.md`.
+- 2026-08-02 cron selected the top backlog recommendation automatically. DataForSEO credentials were unavailable, so live research used Firecrawl's US-English SERP, current PostgreSQL 18 two-phase transaction, prepared-transaction configuration/catalog, commit/rollback recovery docs, current Psycopg 3 two-phase commit docs, and the PGSandbox source/docs. Keyword volume/KD remained `TBD`. New source-of-truth content file: `site/src/content/blog/test-postgres-two-phase-commit.md`.

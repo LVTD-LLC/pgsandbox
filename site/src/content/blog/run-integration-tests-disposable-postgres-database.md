@@ -100,6 +100,8 @@ The child command remains the repository's command. PGSandbox does not infer whe
 
 On normal completion, the child exit code remains the command exit code. A timeout exits `124`. SIGINT and SIGTERM are translated to the conventional `128 + signal` status after PGSandbox terminates the child process group and applies cleanup. The public [`with-database` session documentation](https://github.com/LVTD-LLC/pgsandbox-mcp/blob/540cb5653460b345c3382d26465de54a8670666f/docs/agent-testing.md) defines these fields and outcomes. Those semantics let CI and an agent distinguish an assertion failure from an interrupted or timed-out session.
 
+Tests that deliberately create in-doubt work need a stricter recovery boundary. The [PostgreSQL two-phase commit test guide](/blog/test-postgres-two-phase-commit/) shows how to resolve every prepared GID before database deletion; terminating the child process alone does not roll back a prepared transaction.
+
 ## 2. Pin the Postgres target
 
 Choose the environment that matches the compatibility question. Use a configured profile when the test depends on profile-specific policy or connectivity:
