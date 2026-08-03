@@ -408,6 +408,8 @@ The task relationship does not declare `ON UPDATE CASCADE`, so PostgreSQL report
 
 Schema inspection matters during migrations that drop and recreate constraints. A behavioral test with no matching child rows can pass even when the new constraint has the wrong action. The declaration check fails immediately.
 
+PostgreSQL implements foreign-key enforcement with internal triggers, but application-owned triggers need a different catalog filter and firing matrix. The [PostgreSQL trigger testing guide](/blog/test-postgresql-triggers/) shows how to exclude `tgisinternal`, inspect rendered user-trigger definitions, and prove target rows, side effects, SQLSTATE failures, and rollback separately.
+
 ### Propagation: assert the complete graph
 
 The update probe changes account key `1` to `101`. Both target projects must receive `101`; the control project must remain attached to account `2`. The test then rolls back and expects the original keys.
