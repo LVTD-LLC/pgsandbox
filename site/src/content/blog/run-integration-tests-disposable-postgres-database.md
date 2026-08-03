@@ -77,6 +77,8 @@ Nested transaction recovery is another database behavior worth proving inside th
 
 Referential-action migrations also need exact final-state checks. The [PostgreSQL foreign key cascade testing guide](/blog/test-postgres-foreign-key-cascades/) verifies installed rules, multi-level update and delete propagation, unrelated-row survival, SQLSTATE `23503`, rollback atomicity, and cleanup.
 
+User-authored triggers need a separate declaration and behavior proof. The [PostgreSQL trigger testing guide](/blog/test-postgresql-triggers/) checks `pg_trigger`, exercises the intended firing matrix, asserts exact side effects and a control row, recovers from an expected SQLSTATE with a savepoint, and proves outer rollback removes every transactional effect.
+
 Authorization migrations need the same real-database boundary. The [Postgres row-level security testing guide](/blog/test-postgres-row-level-security/) verifies that RLS is active for the actual sandbox owner role, then proves tenant read isolation, cross-tenant write rejection, transaction-scoped context reset, and cleanup.
 
 Connection lifecycle failures use the same boundary without exhausting a shared server. The [Postgres connection pool testing guide](/blog/test-postgres-connection-pool-failures/) shows how to saturate a tiny application pool, terminate one same-role idle backend, and prove the driver serves a replacement query before PGSandbox cleans up.

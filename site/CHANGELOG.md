@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-08-03
+
+- Added the Astro Markdown guide "How to Test PostgreSQL Triggers in a Disposable Database" with a deterministic Psycopg trigger harness, PostgreSQL and Psycopg primary-source citations, SEO ledger and link inventory updates, and inbound blog links.
+
 ## 2026-08-02
 
 - Added the Astro Markdown guide "How to Test PostgreSQL Two-Phase Commit" with a deterministic Psycopg prepared-transaction harness, PostgreSQL and Psycopg primary-source citations, SEO ledger and link inventory updates, and inbound blog links.
