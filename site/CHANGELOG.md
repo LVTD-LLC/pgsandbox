@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-08-04
+
+- Added the Astro Markdown guide "How to Test Deferrable Constraints in PostgreSQL" with a deterministic Psycopg boundary-timing harness, PostgreSQL and Psycopg primary-source citations, SEO ledger and link inventory updates, and inbound blog links.
+
 ## 2026-08-03
 
 - Added the Astro Markdown guide "How to Test PostgreSQL Triggers in a Disposable Database" with a deterministic Psycopg trigger harness, PostgreSQL and Psycopg primary-source citations, SEO ledger and link inventory updates, and inbound blog links.

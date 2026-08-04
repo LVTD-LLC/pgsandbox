@@ -62,6 +62,8 @@ A cascade can continue through more than one relationship. If `accounts` deletes
 
 `ON DELETE CASCADE` is part of a foreign-key data policy. It deletes matching rows while keeping the tables and constraints.
 
+If the foreign key uses deferrable `NO ACTION` instead, the important behavior moves from propagation to validation timing. Use the [PostgreSQL deferrable constraint proof](/blog/test-postgres-deferrable-constraints/) to test immediate rejection, temporary invalidity, explicit validation, and commit-time failure. `RESTRICT` does not permit the same deferred check.
+
 `DROP ... CASCADE` is a schema dependency operation. PostgreSQL's [dependency-tracking documentation](https://www.postgresql.org/docs/current/ddl-depend.html) explains that dropping a referenced table with `CASCADE` can remove the foreign-key constraint that depends on it. It does not mean "exercise the foreign key's row-deletion rule."
 
 Keep the distinction explicit in test names and PR evidence:

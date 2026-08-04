@@ -58,6 +58,8 @@ PostgreSQL's current [trigger behavior documentation](https://www.postgresql.org
 
 The [PostgreSQL `CREATE TRIGGER` reference](https://www.postgresql.org/docs/18/sql-createtrigger.html) makes an easy-to-miss distinction: a row trigger runs once per affected row, while a statement trigger runs once even when the statement affects zero rows. Do not reuse one firing matrix for both shapes.
 
+Deferred constraint triggers need an additional timing proof. The [deferrable constraint testing guide](/blog/test-postgres-deferrable-constraints/) separates immediate statement failure, a forced `SET CONSTRAINTS ... IMMEDIATE` checkpoint, and commit-time failure so the test shows exactly when PostgreSQL validates the pending state.
+
 ### Trigger declarations and trigger behavior are separate evidence
 
 Catalog inspection proves what PostgreSQL installed. It does not prove what the function does for your fixtures. Behavioral assertions prove outcomes, but they can pass against the wrong trigger if the fixture never reaches the missing branch.
