@@ -100,6 +100,8 @@ PGSandbox's schema workflow gives agents a compact result instead of asking them
 
 If the migration depends on a PostgreSQL extension, verify more than the added catalog entry. The [disposable extension testing workflow](/blog/test-postgres-extensions-locally/) checks profile availability, installed version, application behavior, restore ordering, and cleanup as separate gates before the migration proof is accepted.
 
+If the migration adds or changes a derived field, use the [PostgreSQL generated-column testing workflow](/blog/test-postgresql-generated-columns/) to verify the installed expression and stored/virtual kind, direct-write rejection, recomputation, trigger timing, and PostgreSQL-major compatibility.
+
 For a version transition, the [PostgreSQL extension upgrade workflow](/blog/test-postgres-extension-upgrades/) adds a source-version fixture, update-path proof, and an upgrade-versus-new-database comparison before the migration is accepted.
 
 That diff is the proof artifact the PR needs. A human reviewer can compare it against the migration file and ask better questions:
