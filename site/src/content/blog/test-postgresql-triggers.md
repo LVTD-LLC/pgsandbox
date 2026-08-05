@@ -68,6 +68,8 @@ You need both layers. The declaration check should identify the trigger by schem
 
 There is also a PGSandbox-specific boundary: current `describe_schema`, schema digests, and schema snapshots cover tables, columns, constraints, indexes, and extensions, but not user-authored triggers. Use the [schema snapshot workflow](/blog/postgres-schema-snapshots-agent-migration-reviews/) for the surrounding schema, then query `pg_trigger` for trigger-specific proof. Do not treat a clean snapshot diff as evidence that a trigger is equivalent.
 
+When a trigger changes a base column used by a generated expression, add the [generated-column boundary proof](/blog/test-postgresql-generated-columns/). It verifies that `BEFORE` changes feed stored generation, `AFTER` triggers observe the final stored value, and virtual columns are not read from trigger rows.
+
 ## The Trigger Proof Contract
 
 A reviewable PostgreSQL trigger test should answer five questions:

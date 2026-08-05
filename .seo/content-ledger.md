@@ -41,6 +41,7 @@
 | 2026-08-02 | How-to / tutorial | How to Test PostgreSQL Two-Phase Commit | test-postgres-two-phase-commit | postgres two phase commit testing | /docs/architecture/, /docs/mcp-tools/, /blog/run-integration-tests-disposable-postgres-database/, /blog/per-sandbox-postgres-roles-coding-agents/, /blog/cleanup-expired-vs-manual-postgres-cleanup/ | Astro Markdown source of truth; uses the five-part Prepared Transaction Proof Contract and a deterministic Psycopg harness to prove configuration, prepare-state invisibility, catalog identity, cross-session commit and rollback, and zero-GID cleanup. |
 | 2026-08-03 | How-to / tutorial | How to Test PostgreSQL Triggers in a Disposable Database | test-postgresql-triggers | how to test PostgreSQL triggers | /docs/architecture/, /docs/mcp-tools/, /blog/run-integration-tests-disposable-postgres-database/, /blog/database-migration-testing-agent-pr/, /blog/postgres-run-sql-bounded-results/, /blog/postgres-schema-snapshots-agent-migration-reviews/ | Astro Markdown source of truth; uses the five-part Trigger Proof Contract and a deterministic Psycopg harness to separate catalog declaration, firing paths, exact effects, SQLSTATE/savepoint recovery, rollback, and cleanup. |
 | 2026-08-04 | How-to / tutorial | How to Test Deferrable Constraints in PostgreSQL | test-postgres-deferrable-constraints | how to test deferrable constraints PostgreSQL | /docs/install/, /docs/mcp-tools/, /blog/database-migration-testing-agent-pr/, /blog/test-postgres-savepoints-partial-rollbacks/, /blog/postgres-run-sql-bounded-results/, /blog/what-is-database-sandbox/ | Astro Markdown source of truth; uses the five-part Deferral Boundary Proof and a deterministic Psycopg harness to separate immediate statement checks, repaired temporary invalidity, forced validation, commit-time failure, exact final state, and cleanup. |
+| 2026-08-05 | How-to / tutorial | How to Test PostgreSQL Generated Columns | test-postgresql-generated-columns | PostgreSQL generated column testing | /docs/mcp-tools/, /blog/database-migration-testing-agent-pr/, /blog/test-postgresql-triggers/, /blog/run-integration-tests-disposable-postgres-database/, /blog/postgres-run-sql-bounded-results/, /blog/what-is-database-sandbox/ | Astro Markdown source of truth; uses the five-part Generation Boundary Proof to separate declaration, write authority, derivation, trigger timing, PostgreSQL 18 virtual behavior, exact final state, and cleanup. |
 
 ## Removed
 
@@ -50,11 +51,9 @@
 
 ## Candidate Backlog
 
-Last researched: 2026-08-04
+Last researched: 2026-08-05
 
-| Score | Candidate | Target Keyword | Volume | KD | Intent | Proposed Type | Why / Status |
-| ---: | --- | --- | ---: | ---: | --- | --- | --- |
-| 16 | How to Test PostgreSQL Generated Columns | PostgreSQL generated column testing | TBD | TBD | Informational / procedural | How-to / tutorial | Sparse SERP and a concrete BEFORE/AFTER trigger interaction angle; lower direct product fit than deferred constraints. Validate volume/KD on next run. |
+No remaining validated candidates. Refresh live signals on the next run before selecting a topic.
 
 ## Notes
 
@@ -97,3 +96,4 @@ Last researched: 2026-08-04
 - 2026-08-02 cron selected the top backlog recommendation automatically. DataForSEO credentials were unavailable, so live research used Firecrawl's US-English SERP, current PostgreSQL 18 two-phase transaction, prepared-transaction configuration/catalog, commit/rollback recovery docs, current Psycopg 3 two-phase commit docs, and the PGSandbox source/docs. Keyword volume/KD remained `TBD`. New source-of-truth content file: `site/src/content/blog/test-postgres-two-phase-commit.md`.
 - 2026-08-03 cron refreshed the empty backlog and selected the top recommendation automatically. DataForSEO credentials were unavailable, so live research used Firecrawl's US-English trigger-testing SERPs, current PostgreSQL 18 trigger/catalog/transaction docs, current Psycopg 3 transaction docs, pgTAP documentation, and the PGSandbox source/docs. Keyword volume/KD remained `TBD`. New source-of-truth content file: `site/src/content/blog/test-postgresql-triggers.md`.
 - 2026-08-04 cron selected the top backlog recommendation automatically. DataForSEO credentials were unavailable, so live research used current web SERPs, PostgreSQL 18 constraint, `SET CONSTRAINTS`, catalog, information-schema, and SQLSTATE docs; current Psycopg 3 transaction docs; and the PGSandbox source/docs. Keyword volume/KD remained `TBD`. New source-of-truth content file: `site/src/content/blog/test-postgres-deferrable-constraints.md`.
+- 2026-08-05 cron selected the top backlog recommendation automatically. DataForSEO credentials were unavailable, so live research used Firecrawl's US-English SERP, PostgreSQL 18 generated-column, trigger, catalog, `INSERT`, release, and SQLSTATE docs; current Psycopg 3 docs; and the PGSandbox source/docs. Keyword volume/KD remained `TBD`. New source-of-truth content file: `site/src/content/blog/test-postgresql-generated-columns.md`.
