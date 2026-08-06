@@ -117,6 +117,8 @@ For a deeper version of this review artifact, use the [Postgres schema snapshots
 
 When the migration changes a query path or adds an index, pair the schema diff with a [Postgres EXPLAIN plan review](https://pgsandbox-mcp.lvtd.dev/blog/postgres-explain-plan-agent-sql/). A plan does not prove the migration succeeded, but it can show whether the affected query still touches the intended relations and whether Postgres estimates the access path the patch expects.
 
+For a partial index, add the dedicated [PostgreSQL partial-index proof](/blog/test-postgresql-partial-indexes/). It verifies the catalog predicate, qualifying row set, positive and negative plan paths, and uniqueness behavior when rows cross the predicate.
+
 ## Step 4: seed the data cases that make the migration risky
 
 Most dangerous migrations are dangerous because of data, not syntax.

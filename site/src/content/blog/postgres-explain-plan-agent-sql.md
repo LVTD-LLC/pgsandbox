@@ -212,6 +212,8 @@ Use the migration workflow first:
 
 The [database migration testing workflow](https://pgsandbox-mcp.lvtd.dev/blog/database-migration-testing-agent-pr/) covers that PR gate. The [schema snapshot guide](https://pgsandbox-mcp.lvtd.dev/blog/postgres-schema-snapshots-agent-migration-reviews/) goes deeper on named before/after checkpoints and compact diffs.
 
+When the migration adds a filtered access path, use the [PostgreSQL partial-index testing guide](/blog/test-postgresql-partial-indexes/) to inspect the installed predicate, compare eligible and ineligible plans, and exercise writes that cross the predicate. That proof keeps index existence, planner selection, and partial uniqueness as separate review claims.
+
 EXPLAIN fits inside that workflow when the review question is performance or access path:
 
 - Did the new index change the planned lookup?
