@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-08-06
+
+- Added the Astro Markdown guide "How to Test PostgreSQL Partial Indexes" with a deterministic Psycopg Partial Index Proof, PostgreSQL primary-source citations, SEO ledger and link inventory updates, and inbound blog links.
+
 ## 2026-08-05
 
 - Added the Astro Markdown guide "How to Test PostgreSQL Generated Columns" with a version-aware Generation Boundary Proof, PostgreSQL and Psycopg primary-source citations, SEO ledger and link inventory updates, and inbound blog links.

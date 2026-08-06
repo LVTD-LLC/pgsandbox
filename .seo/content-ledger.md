@@ -42,6 +42,7 @@
 | 2026-08-03 | How-to / tutorial | How to Test PostgreSQL Triggers in a Disposable Database | test-postgresql-triggers | how to test PostgreSQL triggers | /docs/architecture/, /docs/mcp-tools/, /blog/run-integration-tests-disposable-postgres-database/, /blog/database-migration-testing-agent-pr/, /blog/postgres-run-sql-bounded-results/, /blog/postgres-schema-snapshots-agent-migration-reviews/ | Astro Markdown source of truth; uses the five-part Trigger Proof Contract and a deterministic Psycopg harness to separate catalog declaration, firing paths, exact effects, SQLSTATE/savepoint recovery, rollback, and cleanup. |
 | 2026-08-04 | How-to / tutorial | How to Test Deferrable Constraints in PostgreSQL | test-postgres-deferrable-constraints | how to test deferrable constraints PostgreSQL | /docs/install/, /docs/mcp-tools/, /blog/database-migration-testing-agent-pr/, /blog/test-postgres-savepoints-partial-rollbacks/, /blog/postgres-run-sql-bounded-results/, /blog/what-is-database-sandbox/ | Astro Markdown source of truth; uses the five-part Deferral Boundary Proof and a deterministic Psycopg harness to separate immediate statement checks, repaired temporary invalidity, forced validation, commit-time failure, exact final state, and cleanup. |
 | 2026-08-05 | How-to / tutorial | How to Test PostgreSQL Generated Columns | test-postgresql-generated-columns | PostgreSQL generated column testing | /docs/mcp-tools/, /blog/database-migration-testing-agent-pr/, /blog/test-postgresql-triggers/, /blog/run-integration-tests-disposable-postgres-database/, /blog/postgres-run-sql-bounded-results/, /blog/what-is-database-sandbox/ | Astro Markdown source of truth; uses the five-part Generation Boundary Proof to separate declaration, write authority, derivation, trigger timing, PostgreSQL 18 virtual behavior, exact final state, and cleanup. |
+| 2026-08-06 | How-to / tutorial | How to Test PostgreSQL Partial Indexes | test-postgresql-partial-indexes | how to test PostgreSQL partial indexes | /docs/mcp-tools/, /blog/database-migration-testing-agent-pr/, /blog/postgres-explain-plan-agent-sql/, /blog/run-integration-tests-disposable-postgres-database/, /blog/postgres-run-sql-bounded-results/, /blog/what-is-database-sandbox/ | Astro Markdown source of truth; uses the five-part Partial Index Proof to separate declaration, membership, eligible and negative-control plans, mutation boundaries, exact final state, and cleanup. |
 
 ## Removed
 
@@ -51,9 +52,15 @@
 
 ## Candidate Backlog
 
-Last researched: 2026-08-05
+Last researched: 2026-08-06
 
-No remaining validated candidates. Refresh live signals on the next run before selecting a topic.
+DataForSEO credentials were unavailable during this refresh, so volume and KD are not verified. Scores use live SERP shape, primary-source depth, product fit, conversion relevance, and implementation effort; validate metrics before treating them as measured demand.
+
+| Rank | Candidate | Target keyword | Type | Winnability | Traffic potential | Conversion intent | Strategic value | Effort | Score | Notes |
+| --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| 1 | How to Test PostgreSQL Table Partitioning | how to test PostgreSQL table partitioning | How-to / tutorial | 3 | 4 | 4 | 4 | 3 | 18 | Official PostgreSQL docs dominate the live SERP, but few results package partition routing, pruning, default-partition, attach/detach, and cleanup into a migration proof. |
+| 2 | How to Test PostgreSQL Materialized Views | how to test PostgreSQL materialized views | How-to / tutorial | 4 | 3 | 4 | 4 | 3 | 18 | Useful application job with primary documentation and clear freshness/concurrent-refresh boundaries; search demand remains unverified. |
+| 3 | How to Test PostgreSQL Exclusion Constraints | how to test PostgreSQL exclusion constraints | How-to / tutorial | 4 | 2 | 4 | 4 | 4 | 18 | Strong product fit and weak tutorial competition, but likely narrower demand and a possible `btree_gist` extension requirement. |
 
 ## Notes
 
@@ -97,3 +104,4 @@ No remaining validated candidates. Refresh live signals on the next run before s
 - 2026-08-03 cron refreshed the empty backlog and selected the top recommendation automatically. DataForSEO credentials were unavailable, so live research used Firecrawl's US-English trigger-testing SERPs, current PostgreSQL 18 trigger/catalog/transaction docs, current Psycopg 3 transaction docs, pgTAP documentation, and the PGSandbox source/docs. Keyword volume/KD remained `TBD`. New source-of-truth content file: `site/src/content/blog/test-postgresql-triggers.md`.
 - 2026-08-04 cron selected the top backlog recommendation automatically. DataForSEO credentials were unavailable, so live research used current web SERPs, PostgreSQL 18 constraint, `SET CONSTRAINTS`, catalog, information-schema, and SQLSTATE docs; current Psycopg 3 transaction docs; and the PGSandbox source/docs. Keyword volume/KD remained `TBD`. New source-of-truth content file: `site/src/content/blog/test-postgres-deferrable-constraints.md`.
 - 2026-08-05 cron selected the top backlog recommendation automatically. DataForSEO credentials were unavailable, so live research used Firecrawl's US-English SERP, PostgreSQL 18 generated-column, trigger, catalog, `INSERT`, release, and SQLSTATE docs; current Psycopg 3 docs; and the PGSandbox source/docs. Keyword volume/KD remained `TBD`. New source-of-truth content file: `site/src/content/blog/test-postgresql-generated-columns.md`.
+- 2026-08-06 cron refreshed the empty backlog and selected the top recommendation automatically. DataForSEO credentials were unavailable, so live research used current web SERPs, PostgreSQL 18 partial-index, `pg_index`, `EXPLAIN`, `ANALYZE`, and SQLSTATE docs, plus the PGSandbox source/docs. Keyword volume/KD remained unverified. New source-of-truth content file: `site/src/content/blog/test-postgresql-partial-indexes.md`.
