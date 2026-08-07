@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-08-07
+
+- Added the Astro Markdown guide "How to Test PostgreSQL Table Partitioning" with a deterministic Partition Boundary Proof, PostgreSQL primary-source citations, SEO ledger and link inventory updates, and inbound blog links.
+
 ## 2026-08-06
 
 - Added the Astro Markdown guide "How to Test PostgreSQL Partial Indexes" with a deterministic Psycopg Partial Index Proof, PostgreSQL primary-source citations, SEO ledger and link inventory updates, and inbound blog links.
