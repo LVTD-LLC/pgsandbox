@@ -159,6 +159,8 @@ This boundary prevented a misleading conclusion in PGSandbox's own [2026-07-21 t
 
 Run migrations inside the child command or its test harness so they use the injected sandbox connection. If migration behavior is the subject of the change, capture schema and data evidence using the dedicated [database migration testing workflow](/blog/database-migration-testing-agent-pr/) rather than treating a green test summary as complete migration proof.
 
+When a migration introduces partitioning, add the dedicated [PostgreSQL table-partitioning test](/blog/test-postgresql-table-partitioning/). A green application suite does not by itself prove exact range-bound routing, default-partition behavior, pruning, row movement, or the next attach/detach operation.
+
 Prefer a repository-owned direct entrypoint for multi-step setup. For example, define `make verify-db` to run migrations, seed the minimum fixture, and then run the integration suite:
 
 ```makefile

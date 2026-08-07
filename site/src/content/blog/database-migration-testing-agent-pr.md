@@ -119,6 +119,8 @@ When the migration changes a query path or adds an index, pair the schema diff w
 
 For a partial index, add the dedicated [PostgreSQL partial-index proof](/blog/test-postgresql-partial-indexes/). It verifies the catalog predicate, qualifying row set, positive and negative plan paths, and uniqueness behavior when rows cross the predicate.
 
+For a partitioned table, use the [PostgreSQL Partition Boundary Proof](/blog/test-postgresql-table-partitioning/). It verifies the installed key and hierarchy, exact boundary and default routing, cross-partition updates, pruning, attach/detach behavior, and sandbox cleanup.
+
 ## Step 4: seed the data cases that make the migration risky
 
 Most dangerous migrations are dangerous because of data, not syntax.
