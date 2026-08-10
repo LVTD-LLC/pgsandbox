@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-08-10
+
+- Added the Astro Markdown guide "How to Test PostgreSQL Materialized Views" with a deterministic Materialized View Refresh Proof, PostgreSQL primary-source citations, SEO ledger and link inventory updates, and inbound blog links.
+
 ## 2026-08-07
 
 - Added the Astro Markdown guide "How to Test PostgreSQL Table Partitioning" with a deterministic Partition Boundary Proof, PostgreSQL primary-source citations, SEO ledger and link inventory updates, and inbound blog links.

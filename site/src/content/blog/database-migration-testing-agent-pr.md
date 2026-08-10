@@ -96,6 +96,8 @@ Before the command runs, capture the current schema shape. After it runs, captur
 - Views and materialized views if the repo uses them.
 - Any failed command output or SQLSTATE details.
 
+When a migration adds a materialized view, the schema diff proves only its structural identity. Use the [PostgreSQL materialized-view testing workflow](/blog/test-postgresql-materialized-views/) to prove initial population, deliberate staleness, ordinary refresh, concurrent-refresh readiness, and exact post-refresh rows.
+
 PGSandbox's schema workflow gives agents a compact result instead of asking them to paste pages of `\d` output. The [MCP tool docs](https://pgsandbox-mcp.lvtd.dev/docs/mcp-tools/) document `validate_schema_change`, schema snapshots, and schema diff tools for before and after migration review.
 
 If the migration depends on a PostgreSQL extension, verify more than the added catalog entry. The [disposable extension testing workflow](/blog/test-postgres-extensions-locally/) checks profile availability, installed version, application behavior, restore ordering, and cleanup as separate gates before the migration proof is accepted.
