@@ -57,6 +57,8 @@ Good fits include:
 
 Do not use snapshots as a way to avoid data checks. A schema snapshot can show that a `NOT NULL` constraint appeared. It cannot prove existing rows satisfy the constraint unless the agent also seeds or checks the relevant data cases.
 
+The same boundary applies to materialized views. A snapshot can capture the definition and indexes, but it cannot prove freshness or refresh behavior. The [materialized-view testing guide](/blog/test-postgresql-materialized-views/) adds explicit stale-state, ordinary-refresh, concurrent-readiness, and exact-result checks.
+
 That is why this topic sits next to the broader [database migration testing workflow](https://pgsandbox-mcp.lvtd.dev/blog/database-migration-testing-agent-pr/). Migration testing proves the command, schema change, data edge cases, and cleanup. Schema snapshots make the schema-change part precise enough to review.
 
 ## Schema snapshot vs schema diff vs migration lint
