@@ -9,7 +9,7 @@ tags: ["Postgres", "exclusion constraints", "range types", "integration testing"
 category: "Engineering"
 metaTitle: "How to Test PostgreSQL Exclusion Constraints"
 metaDescription: "Test PostgreSQL exclusion constraints with catalog, range-boundary, update, deferral, SQLSTATE 23P01, and cleanup checks."
-canonicalUrl: "https://pgsandbox-mcp.lvtd.dev/blog/test-postgresql-exclusion-constraints/"
+canonicalUrl: "https://pgsandbox.lvtd.dev/blog/test-postgresql-exclusion-constraints/"
 heroImageUrl: ""
 featured: false
 sortOrder: 160

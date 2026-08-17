@@ -9,7 +9,7 @@ tags: ["Postgres", "integration testing", "test databases", "coding agents", "CI
 category: "Engineering"
 metaTitle: "Run Tests in a Disposable Postgres Database"
 metaDescription: "Run integration tests against a fresh Postgres database with injected credentials, explicit cleanup, bounded output, and reproducible failure evidence."
-canonicalUrl: "https://pgsandbox-mcp.lvtd.dev/blog/run-integration-tests-disposable-postgres-database/"
+canonicalUrl: "https://pgsandbox.lvtd.dev/blog/run-integration-tests-disposable-postgres-database/"
 heroImageUrl: ""
 featured: false
 sortOrder: 144

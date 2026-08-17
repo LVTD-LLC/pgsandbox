@@ -9,7 +9,7 @@ tags: ["Postgres", "advisory locks", "concurrency testing", "integration testing
 category: "Engineering"
 metaTitle: "Test Postgres Advisory Locks Safely"
 metaDescription: "Test Postgres advisory locks with two connections, nonblocking contention, pg_locks evidence, rollback checks, disconnect release, and cleanup."
-canonicalUrl: "https://pgsandbox-mcp.lvtd.dev/blog/test-postgres-advisory-locks/"
+canonicalUrl: "https://pgsandbox.lvtd.dev/blog/test-postgres-advisory-locks/"
 heroImageUrl: ""
 featured: false
 sortOrder: 150
@@ -364,7 +364,7 @@ Use nonblocking `pg_try_advisory_*` calls for the main contention assertion. The
       "@type": "HowTo",
       "name": "Test Postgres advisory locks safely",
       "description": "Prove exclusive advisory-lock contention, visibility, lifetime, and cleanup with independent Postgres sessions.",
-      "url": "https://pgsandbox-mcp.lvtd.dev/blog/test-postgres-advisory-locks/",
+      "url": "https://pgsandbox.lvtd.dev/blog/test-postgres-advisory-locks/",
       "step": [
         {"@type": "HowToStep", "position": 1, "name": "Open two physical connections", "text": "Connect two independent sessions to the same disposable Postgres database."},
         {"@type": "HowToStep", "position": 2, "name": "Prove contention", "text": "Acquire one fixed key on the holder and require the contender's nonblocking try-lock to return false."},
@@ -386,9 +386,9 @@ Use nonblocking `pg_try_advisory_*` calls for the main contention assertion. The
     {
       "@type": "BreadcrumbList",
       "itemListElement": [
-        {"@type": "ListItem", "position": 1, "name": "PGSandbox", "item": "https://pgsandbox-mcp.lvtd.dev/"},
-        {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://pgsandbox-mcp.lvtd.dev/blog/"},
-        {"@type": "ListItem", "position": 3, "name": "How to Test Postgres Advisory Locks Safely", "item": "https://pgsandbox-mcp.lvtd.dev/blog/test-postgres-advisory-locks/"}
+        {"@type": "ListItem", "position": 1, "name": "PGSandbox", "item": "https://pgsandbox.lvtd.dev/"},
+        {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://pgsandbox.lvtd.dev/blog/"},
+        {"@type": "ListItem", "position": 3, "name": "How to Test Postgres Advisory Locks Safely", "item": "https://pgsandbox.lvtd.dev/blog/test-postgres-advisory-locks/"}
       ]
     }
   ]

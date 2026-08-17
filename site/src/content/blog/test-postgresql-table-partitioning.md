@@ -9,7 +9,7 @@ tags: ["Postgres", "table partitioning", "integration testing", "query plans", "
 category: "Engineering"
 metaTitle: "How to Test PostgreSQL Table Partitioning"
 metaDescription: "Test PostgreSQL partitioning with topology, boundary routing, row movement, pruning, maintenance, final-state, and cleanup checks."
-canonicalUrl: "https://pgsandbox-mcp.lvtd.dev/blog/test-postgresql-table-partitioning/"
+canonicalUrl: "https://pgsandbox.lvtd.dev/blog/test-postgresql-table-partitioning/"
 heroImageUrl: ""
 featured: false
 sortOrder: 158
@@ -642,7 +642,7 @@ Execute the prepared statement with `EXPLAIN (ANALYZE, FORMAT JSON)` against rep
       "dateModified": "2026-08-07",
       "author": {"@type": "Organization", "name": "PGSandbox Team"},
       "publisher": {"@type": "Organization", "name": "PGSandbox MCP"},
-      "mainEntityOfPage": "https://pgsandbox-mcp.lvtd.dev/blog/test-postgresql-table-partitioning/"
+      "mainEntityOfPage": "https://pgsandbox.lvtd.dev/blog/test-postgresql-table-partitioning/"
     },
     {
       "@type": "HowTo",

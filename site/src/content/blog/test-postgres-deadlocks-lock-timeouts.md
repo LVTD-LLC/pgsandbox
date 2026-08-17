@@ -9,7 +9,7 @@ tags: ["Postgres", "deadlocks", "lock timeout", "integration testing", "coding a
 category: "Engineering"
 metaTitle: "Postgres Deadlock Testing in a Disposable Database"
 metaDescription: "Test Postgres deadlocks and lock timeouts with deterministic connection coordination, SQLSTATE assertions, rollback checks, and disposable cleanup."
-canonicalUrl: "https://pgsandbox-mcp.lvtd.dev/blog/test-postgres-deadlocks-lock-timeouts/"
+canonicalUrl: "https://pgsandbox.lvtd.dev/blog/test-postgres-deadlocks-lock-timeouts/"
 heroImageUrl: ""
 featured: false
 sortOrder: 145

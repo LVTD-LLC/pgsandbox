@@ -9,7 +9,7 @@ tags: ["Postgres", "partial indexes", "integration testing", "query plans", "cod
 category: "Engineering"
 metaTitle: "How to Test PostgreSQL Partial Indexes"
 metaDescription: "Test PostgreSQL partial indexes with catalog checks, positive and negative plans, uniqueness transitions, exact final state, and cleanup."
-canonicalUrl: "https://pgsandbox-mcp.lvtd.dev/blog/test-postgresql-partial-indexes/"
+canonicalUrl: "https://pgsandbox.lvtd.dev/blog/test-postgresql-partial-indexes/"
 heroImageUrl: ""
 featured: false
 sortOrder: 157
@@ -469,7 +469,7 @@ The proof applies real DDL, seeds a planner-relevant distribution, deliberately 
       "dateModified": "2026-08-06",
       "author": {"@type": "Organization", "name": "PGSandbox Team"},
       "publisher": {"@type": "Organization", "name": "PGSandbox"},
-      "mainEntityOfPage": "https://pgsandbox-mcp.lvtd.dev/blog/test-postgresql-partial-indexes/"
+      "mainEntityOfPage": "https://pgsandbox.lvtd.dev/blog/test-postgresql-partial-indexes/"
     },
     {
       "@type": "HowTo",
@@ -496,9 +496,9 @@ The proof applies real DDL, seeds a planner-relevant distribution, deliberately 
     {
       "@type": "BreadcrumbList",
       "itemListElement": [
-        {"@type": "ListItem", "position": 1, "name": "Home", "item": "https://pgsandbox-mcp.lvtd.dev/"},
-        {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://pgsandbox-mcp.lvtd.dev/blog/"},
-        {"@type": "ListItem", "position": 3, "name": "How to Test PostgreSQL Partial Indexes", "item": "https://pgsandbox-mcp.lvtd.dev/blog/test-postgresql-partial-indexes/"}
+        {"@type": "ListItem", "position": 1, "name": "Home", "item": "https://pgsandbox.lvtd.dev/"},
+        {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://pgsandbox.lvtd.dev/blog/"},
+        {"@type": "ListItem", "position": 3, "name": "How to Test PostgreSQL Partial Indexes", "item": "https://pgsandbox.lvtd.dev/blog/test-postgresql-partial-indexes/"}
       ]
     }
   ]

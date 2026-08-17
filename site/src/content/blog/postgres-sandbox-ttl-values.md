@@ -9,7 +9,7 @@ tags: ["Postgres", "MCP", "database sandbox", "TTL", "cleanup"]
 category: "Engineering"
 metaTitle: "Postgres Test Database Cleanup: Choosing TTLs"
 metaDescription: "Choose Postgres sandbox TTL values by task runtime, review buffer, and recovery margin, then verify expiry and cleanup with PGSandbox."
-canonicalUrl: "https://pgsandbox-mcp.lvtd.dev/blog/postgres-sandbox-ttl-values/"
+canonicalUrl: "https://pgsandbox.lvtd.dev/blog/postgres-sandbox-ttl-values/"
 heroImageUrl: ""
 featured: false
 sortOrder: 134

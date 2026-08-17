@@ -9,7 +9,7 @@ tags: ["Postgres", "MCP", "cleanup", "database sandbox", "agent safety"]
 category: "Engineering"
 metaTitle: "cleanup_expired vs Manual Postgres Cleanup"
 metaDescription: "Compare cleanup_expired with manual Postgres cleanup for stale agent sandboxes, scoped roles, TTL metadata, dry runs, and recovery workflows."
-canonicalUrl: "https://pgsandbox-mcp.lvtd.dev/blog/cleanup-expired-vs-manual-postgres-cleanup/"
+canonicalUrl: "https://pgsandbox.lvtd.dev/blog/cleanup-expired-vs-manual-postgres-cleanup/"
 heroImageUrl: ""
 featured: false
 sortOrder: 132
@@ -32,9 +32,9 @@ The information-gain point is this: cleanup is not just "drop the old database."
 
 ## What `cleanup_expired` actually controls
 
-PGSandbox exposes `cleanup_expired` as an MCP tool that deletes expired resources with dry-run support for audit-friendly cleanup (https://pgsandbox-mcp.lvtd.dev/docs/mcp-tools/).
+PGSandbox exposes `cleanup_expired` as an MCP tool that deletes expired resources with dry-run support for audit-friendly cleanup (https://pgsandbox.lvtd.dev/docs/mcp-tools/).
 
-The architecture docs define the underlying boundary: each sandbox gets one database, one login role, scoped credentials, a TTL, and optional labels. Cleanup can run through the explicit MCP tool or a scheduled process, and it only deletes databases listed in metadata and matching the configured prefix (https://pgsandbox-mcp.lvtd.dev/docs/architecture/).
+The architecture docs define the underlying boundary: each sandbox gets one database, one login role, scoped credentials, a TTL, and optional labels. Cleanup can run through the explicit MCP tool or a scheduled process, and it only deletes databases listed in metadata and matching the configured prefix (https://pgsandbox.lvtd.dev/docs/architecture/).
 
 Those two details are the reason `cleanup_expired` is the default for stale PGSandbox resources:
 

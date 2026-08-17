@@ -9,7 +9,7 @@ tags: ["Postgres", "pg_stat_statements", "query performance", "database testing"
 category: "Engineering"
 metaTitle: "Test pg_stat_statements in Agent Sandboxes"
 metaDescription: "Test pg_stat_statements preload setup, task-role query capture, database registration, clone behavior, and cleanup in a disposable Postgres sandbox."
-canonicalUrl: "https://pgsandbox-mcp.lvtd.dev/blog/test-pg-stat-statements-agent-sandboxes/"
+canonicalUrl: "https://pgsandbox.lvtd.dev/blog/test-pg-stat-statements-agent-sandboxes/"
 heroImageUrl: ""
 featured: false
 sortOrder: 143
@@ -363,7 +363,7 @@ Use both when the task needs both perspectives. `EXPLAIN` inspects the plan for 
       "dateModified": "2026-07-21",
       "author": {"@type": "Organization", "name": "PGSandbox Team"},
       "publisher": {"@type": "Organization", "name": "PGSandbox MCP"},
-      "mainEntityOfPage": "https://pgsandbox-mcp.lvtd.dev/blog/test-pg-stat-statements-agent-sandboxes/"
+      "mainEntityOfPage": "https://pgsandbox.lvtd.dev/blog/test-pg-stat-statements-agent-sandboxes/"
     },
     {
       "@type": "HowTo",

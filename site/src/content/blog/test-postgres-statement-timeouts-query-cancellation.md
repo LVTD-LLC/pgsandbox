@@ -9,7 +9,7 @@ tags: ["Postgres", "statement timeout", "query cancellation", "integration testi
 category: "Engineering"
 metaTitle: "Test Postgres Statement Timeouts and Query Cancellation"
 metaDescription: "Test Postgres statement_timeout and client cancellation with SQLSTATE 57014, transaction recovery, and a disposable database."
-canonicalUrl: "https://pgsandbox-mcp.lvtd.dev/blog/test-postgres-statement-timeouts-query-cancellation/"
+canonicalUrl: "https://pgsandbox.lvtd.dev/blog/test-postgres-statement-timeouts-query-cancellation/"
 heroImageUrl: ""
 featured: false
 sortOrder: 148

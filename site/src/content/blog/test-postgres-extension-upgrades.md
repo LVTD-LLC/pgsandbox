@@ -9,7 +9,7 @@ tags: ["Postgres", "PostgreSQL extensions", "database migrations", "database tes
 category: "Engineering"
 metaTitle: "Test PostgreSQL Extension Upgrades Safely"
 metaDescription: "Test a PostgreSQL extension upgrade with path checks, twin sandboxes, application migrations, schema comparison, recovery, and cleanup."
-canonicalUrl: "https://pgsandbox-mcp.lvtd.dev/blog/test-postgres-extension-upgrades/"
+canonicalUrl: "https://pgsandbox.lvtd.dev/blog/test-postgres-extension-upgrades/"
 heroImageUrl: ""
 featured: false
 sortOrder: 142
@@ -368,9 +368,9 @@ The comparison detects state that only one route creates or leaves behind. Expla
     {
       "@type": "BreadcrumbList",
       "itemListElement": [
-        {"@type": "ListItem", "position": 1, "name": "PGSandbox", "item": "https://pgsandbox-mcp.lvtd.dev/"},
-        {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://pgsandbox-mcp.lvtd.dev/blog/"},
-        {"@type": "ListItem", "position": 3, "name": "How to Test PostgreSQL Extension Upgrades Safely", "item": "https://pgsandbox-mcp.lvtd.dev/blog/test-postgres-extension-upgrades/"}
+        {"@type": "ListItem", "position": 1, "name": "PGSandbox", "item": "https://pgsandbox.lvtd.dev/"},
+        {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://pgsandbox.lvtd.dev/blog/"},
+        {"@type": "ListItem", "position": 3, "name": "How to Test PostgreSQL Extension Upgrades Safely", "item": "https://pgsandbox.lvtd.dev/blog/test-postgres-extension-upgrades/"}
       ]
     },
     {

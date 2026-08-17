@@ -9,7 +9,7 @@ tags: ["Postgres", "Docker", "Docker Compose", "database connections", "coding a
 category: "Engineering"
 metaTitle: "Connect Docker to Host PostgreSQL Safely"
 metaDescription: "Connect Docker to host PostgreSQL with host.docker.internal, Linux host-gateway, scoped pg_hba.conf rules, and safe sandbox credentials."
-canonicalUrl: "https://pgsandbox-mcp.lvtd.dev/blog/docker-connect-host-postgres/"
+canonicalUrl: "https://pgsandbox.lvtd.dev/blog/docker-connect-host-postgres/"
 heroImageUrl: ""
 featured: false
 sortOrder: 140
@@ -336,9 +336,9 @@ No. Exit zero proves command completion. Capture a schema digest or before-and-a
     {
       "@type": "BreadcrumbList",
       "itemListElement": [
-        {"@type": "ListItem", "position": 1, "name": "PGSandbox", "item": "https://pgsandbox-mcp.lvtd.dev/"},
-        {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://pgsandbox-mcp.lvtd.dev/blog/"},
-        {"@type": "ListItem", "position": 3, "name": "Connect a Docker Container to Host PostgreSQL Safely", "item": "https://pgsandbox-mcp.lvtd.dev/blog/docker-connect-host-postgres/"}
+        {"@type": "ListItem", "position": 1, "name": "PGSandbox", "item": "https://pgsandbox.lvtd.dev/"},
+        {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://pgsandbox.lvtd.dev/blog/"},
+        {"@type": "ListItem", "position": 3, "name": "Connect a Docker Container to Host PostgreSQL Safely", "item": "https://pgsandbox.lvtd.dev/blog/docker-connect-host-postgres/"}
       ]
     },
     {

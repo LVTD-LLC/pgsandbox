@@ -15,6 +15,7 @@
     "site:check-changelog": "node scripts/check-site-changelog.mjs",
     "site:check-blog-content": "node scripts/check-site-blog-content.mjs",
     "site:check-blog-tables": "node scripts/check-site-blog-tables.mjs",
+    "site:check-production-urls": "node scripts/check-site-production-urls.mjs",
     "site:build": "npm --prefix site run build"
   },
   "keywords": [
