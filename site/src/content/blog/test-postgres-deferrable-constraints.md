@@ -353,7 +353,7 @@ Keep the same five boundaries and change the temporary violation:
 
 - **Deferrable unique constraint:** give two rows the same protected value, repair one before validation, then leave a duplicate unrepaired and expect SQLSTATE `23505`.
 - **Deferrable primary key:** exercise the key rewrite or reorder that requires temporary duplication, then assert the complete final key set.
-- **Deferrable exclusion constraint:** create a temporary overlap, repair the range before validation, and test the driver's mapped exclusion-violation error.
+- **[Deferrable exclusion constraint](/blog/test-postgresql-exclusion-constraints/):** create a temporary overlap, repair the range before validation, then prove the operator truth table, SQLSTATE `23P01`, and final state.
 - **Deferrable foreign key:** insert child before parent, or update related keys in an order that is temporarily invalid, then assert SQLSTATE `23503` for the unrepaired path.
 
 Do not use a deferrable constraint as an `INSERT ... ON CONFLICT` arbiter. PostgreSQL documents that deferrable constraints cannot serve that role. If the application depends on `ON CONFLICT`, add a migration test that proves the chosen non-deferrable unique index or constraint still supports the intended statement.
