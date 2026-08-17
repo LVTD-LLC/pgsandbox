@@ -9,7 +9,7 @@ tags: ["Postgres", "foreign keys", "cascade testing", "migration testing", "codi
 category: "Engineering"
 metaTitle: "Test PostgreSQL Foreign Key Cascades"
 metaDescription: "Test PostgreSQL foreign key cascades with schema checks, positive and negative controls, rollback proof, SQLSTATE 23503, and cleanup."
-canonicalUrl: "https://pgsandbox-mcp.lvtd.dev/blog/test-postgres-foreign-key-cascades/"
+canonicalUrl: "https://pgsandbox.lvtd.dev/blog/test-postgres-foreign-key-cascades/"
 heroImageUrl: ""
 featured: false
 sortOrder: 152
@@ -583,9 +583,9 @@ No. Use it when the child should never outlive the parent and deletion requires 
     {
       "@type": "BreadcrumbList",
       "itemListElement": [
-        {"@type": "ListItem", "position": 1, "name": "PGSandbox", "item": "https://pgsandbox-mcp.lvtd.dev/"},
-        {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://pgsandbox-mcp.lvtd.dev/blog/"},
-        {"@type": "ListItem", "position": 3, "name": "How to Test PostgreSQL Foreign Key Cascades", "item": "https://pgsandbox-mcp.lvtd.dev/blog/test-postgres-foreign-key-cascades/"}
+        {"@type": "ListItem", "position": 1, "name": "PGSandbox", "item": "https://pgsandbox.lvtd.dev/"},
+        {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://pgsandbox.lvtd.dev/blog/"},
+        {"@type": "ListItem", "position": 3, "name": "How to Test PostgreSQL Foreign Key Cascades", "item": "https://pgsandbox.lvtd.dev/blog/test-postgres-foreign-key-cascades/"}
       ]
     }
   ]

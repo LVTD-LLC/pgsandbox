@@ -9,7 +9,7 @@ tags: ["Postgres", "MCP", "database sandbox", "quotas", "coding agents"]
 category: "Engineering"
 metaTitle: "Postgres Sandbox Quotas for Coding Agents"
 metaDescription: "Configure per-owner Postgres sandbox quotas for coding agents, choose a practical cap, and recover safely when an owner reaches the limit."
-canonicalUrl: "https://pgsandbox-mcp.lvtd.dev/blog/postgres-sandbox-quotas-coding-agents/"
+canonicalUrl: "https://pgsandbox.lvtd.dev/blog/postgres-sandbox-quotas-coding-agents/"
 heroImageUrl: ""
 featured: false
 sortOrder: 133
@@ -312,14 +312,14 @@ List databases for the same owner and profile, delete completed work by `databas
       "datePublished": "2026-07-15",
       "dateModified": "2026-07-15",
       "author": {"@type": "Organization", "name": "PGSandbox Team"},
-      "mainEntityOfPage": "https://pgsandbox-mcp.lvtd.dev/blog/postgres-sandbox-quotas-coding-agents/"
+      "mainEntityOfPage": "https://pgsandbox.lvtd.dev/blog/postgres-sandbox-quotas-coding-agents/"
     },
     {
       "@type": "BreadcrumbList",
       "itemListElement": [
-        {"@type": "ListItem", "position": 1, "name": "PGSandbox", "item": "https://pgsandbox-mcp.lvtd.dev/"},
-        {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://pgsandbox-mcp.lvtd.dev/blog/"},
-        {"@type": "ListItem", "position": 3, "name": "Postgres Sandbox Quotas for Coding Agents", "item": "https://pgsandbox-mcp.lvtd.dev/blog/postgres-sandbox-quotas-coding-agents/"}
+        {"@type": "ListItem", "position": 1, "name": "PGSandbox", "item": "https://pgsandbox.lvtd.dev/"},
+        {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://pgsandbox.lvtd.dev/blog/"},
+        {"@type": "ListItem", "position": 3, "name": "Postgres Sandbox Quotas for Coding Agents", "item": "https://pgsandbox.lvtd.dev/blog/postgres-sandbox-quotas-coding-agents/"}
       ]
     },
     {

@@ -2,6 +2,7 @@
 
 ## 2026-08-17
 
+- Changed the production site origin from the redirecting `pgsandbox-mcp.lvtd.dev` hostname to `pgsandbox.lvtd.dev` across canonicals, sitemap and robots output, internal links, and structured data, with a CI regression check for generated URLs.
 - Added the Astro Markdown guide "How to Test PostgreSQL Exclusion Constraints" with a deterministic Exclusion Boundary Proof, PostgreSQL and Psycopg primary-source citations, SEO ledger and link inventory updates, and inbound blog links.
 
 ## 2026-08-10

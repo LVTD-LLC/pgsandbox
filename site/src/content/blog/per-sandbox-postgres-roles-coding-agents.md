@@ -9,7 +9,7 @@ tags: ["Postgres", "MCP", "database roles", "least privilege", "coding agents"]
 category: "Engineering"
 metaTitle: "Per-Sandbox Postgres Roles for Coding Agents"
 metaDescription: "Use one Postgres role per coding-agent sandbox, separate lifecycle authority from task SQL, verify privileges, and clean up the role with the database."
-canonicalUrl: "https://pgsandbox-mcp.lvtd.dev/blog/per-sandbox-postgres-roles-coding-agents/"
+canonicalUrl: "https://pgsandbox.lvtd.dev/blog/per-sandbox-postgres-roles-coding-agents/"
 heroImageUrl: ""
 featured: false
 sortOrder: 134
@@ -289,14 +289,14 @@ Terminate its sessions, drop the owned sandbox database, drop the matching role,
       "datePublished": "2026-07-16",
       "dateModified": "2026-07-16",
       "author": {"@type": "Organization", "name": "PGSandbox Team"},
-      "mainEntityOfPage": "https://pgsandbox-mcp.lvtd.dev/blog/per-sandbox-postgres-roles-coding-agents/"
+      "mainEntityOfPage": "https://pgsandbox.lvtd.dev/blog/per-sandbox-postgres-roles-coding-agents/"
     },
     {
       "@type": "BreadcrumbList",
       "itemListElement": [
-        {"@type": "ListItem", "position": 1, "name": "PGSandbox", "item": "https://pgsandbox-mcp.lvtd.dev/"},
-        {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://pgsandbox-mcp.lvtd.dev/blog/"},
-        {"@type": "ListItem", "position": 3, "name": "Per-Sandbox Postgres Roles for Coding Agents", "item": "https://pgsandbox-mcp.lvtd.dev/blog/per-sandbox-postgres-roles-coding-agents/"}
+        {"@type": "ListItem", "position": 1, "name": "PGSandbox", "item": "https://pgsandbox.lvtd.dev/"},
+        {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://pgsandbox.lvtd.dev/blog/"},
+        {"@type": "ListItem", "position": 3, "name": "Per-Sandbox Postgres Roles for Coding Agents", "item": "https://pgsandbox.lvtd.dev/blog/per-sandbox-postgres-roles-coding-agents/"}
       ]
     },
     {

@@ -9,7 +9,7 @@ tags: ["Postgres", "deferrable constraints", "foreign keys", "integration testin
 category: "Engineering"
 metaTitle: "Test Deferrable Constraints in PostgreSQL"
 metaDescription: "Test PostgreSQL deferrable constraints at statement, SET CONSTRAINTS, and commit boundaries with SQLSTATE checks and disposable cleanup."
-canonicalUrl: "https://pgsandbox-mcp.lvtd.dev/blog/test-postgres-deferrable-constraints/"
+canonicalUrl: "https://pgsandbox.lvtd.dev/blog/test-postgres-deferrable-constraints/"
 heroImageUrl: ""
 featured: false
 sortOrder: 155

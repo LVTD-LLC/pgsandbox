@@ -9,7 +9,7 @@ tags: ["Postgres", "PostgreSQL extensions", "database testing", "MCP", "coding a
 category: "Engineering"
 metaTitle: "Test PostgreSQL Extensions Locally in Sandboxes"
 metaDescription: "Test PostgreSQL extensions locally with profile discovery, disposable installation, behavior checks, migration proof, and cleanup."
-canonicalUrl: "https://pgsandbox-mcp.lvtd.dev/blog/test-postgres-extensions-locally/"
+canonicalUrl: "https://pgsandbox.lvtd.dev/blog/test-postgres-extensions-locally/"
 heroImageUrl: ""
 featured: false
 sortOrder: 141
@@ -348,9 +348,9 @@ Request required target extensions through `clone_database.extensions` so PGSand
     {
       "@type": "BreadcrumbList",
       "itemListElement": [
-        {"@type": "ListItem", "position": 1, "name": "PGSandbox", "item": "https://pgsandbox-mcp.lvtd.dev/"},
-        {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://pgsandbox-mcp.lvtd.dev/blog/"},
-        {"@type": "ListItem", "position": 3, "name": "How to Test PostgreSQL Extensions in Disposable Sandboxes", "item": "https://pgsandbox-mcp.lvtd.dev/blog/test-postgres-extensions-locally/"}
+        {"@type": "ListItem", "position": 1, "name": "PGSandbox", "item": "https://pgsandbox.lvtd.dev/"},
+        {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://pgsandbox.lvtd.dev/blog/"},
+        {"@type": "ListItem", "position": 3, "name": "How to Test PostgreSQL Extensions in Disposable Sandboxes", "item": "https://pgsandbox.lvtd.dev/blog/test-postgres-extensions-locally/"}
       ]
     },
     {

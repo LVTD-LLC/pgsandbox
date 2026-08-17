@@ -9,7 +9,7 @@ tags: ["Postgres", "database roles", "database users", "MCP", "coding agents"]
 category: "Engineering"
 metaTitle: "PostgreSQL ROLE vs USER for Agent Access"
 metaDescription: "PostgreSQL ROLE vs USER explained: compare LOGIN, membership, ownership, and choose a scoped credential model for coding-agent database work."
-canonicalUrl: "https://pgsandbox-mcp.lvtd.dev/blog/postgres-role-vs-user-agent-access/"
+canonicalUrl: "https://pgsandbox.lvtd.dev/blog/postgres-role-vs-user-agent-access/"
 heroImageUrl: ""
 featured: false
 sortOrder: 135
@@ -223,14 +223,14 @@ PGSandbox runs `CREATE ROLE ... LOGIN`, so PostgreSQL treats the generated ident
       "datePublished": "2026-07-17",
       "dateModified": "2026-07-17",
       "author": {"@type": "Organization", "name": "PGSandbox Team"},
-      "mainEntityOfPage": "https://pgsandbox-mcp.lvtd.dev/blog/postgres-role-vs-user-agent-access/"
+      "mainEntityOfPage": "https://pgsandbox.lvtd.dev/blog/postgres-role-vs-user-agent-access/"
     },
     {
       "@type": "BreadcrumbList",
       "itemListElement": [
-        {"@type": "ListItem", "position": 1, "name": "PGSandbox", "item": "https://pgsandbox-mcp.lvtd.dev/"},
-        {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://pgsandbox-mcp.lvtd.dev/blog/"},
-        {"@type": "ListItem", "position": 3, "name": "PostgreSQL ROLE vs USER for Agent Database Access", "item": "https://pgsandbox-mcp.lvtd.dev/blog/postgres-role-vs-user-agent-access/"}
+        {"@type": "ListItem", "position": 1, "name": "PGSandbox", "item": "https://pgsandbox.lvtd.dev/"},
+        {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://pgsandbox.lvtd.dev/blog/"},
+        {"@type": "ListItem", "position": 3, "name": "PostgreSQL ROLE vs USER for Agent Database Access", "item": "https://pgsandbox.lvtd.dev/blog/postgres-role-vs-user-agent-access/"}
       ]
     },
     {

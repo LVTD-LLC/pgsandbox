@@ -9,7 +9,7 @@ tags: ["Postgres", "generated columns", "integration testing", "triggers", "codi
 category: "Engineering"
 metaTitle: "How to Test PostgreSQL Generated Columns"
 metaDescription: "Test PostgreSQL generated columns with catalog checks, direct-write rejection, recomputation, trigger timing, version checks, and cleanup."
-canonicalUrl: "https://pgsandbox-mcp.lvtd.dev/blog/test-postgresql-generated-columns/"
+canonicalUrl: "https://pgsandbox.lvtd.dev/blog/test-postgresql-generated-columns/"
 heroImageUrl: ""
 featured: false
 sortOrder: 156
@@ -417,7 +417,7 @@ The proof applies real migrations, deliberately sends a forbidden direct write, 
       "description": "Prove the installed generated-column declaration, direct-write rejection, derivation, trigger timing, version behavior, final state, and cleanup.",
       "datePublished": "2026-08-05",
       "dateModified": "2026-08-05",
-      "mainEntityOfPage": "https://pgsandbox-mcp.lvtd.dev/blog/test-postgresql-generated-columns/",
+      "mainEntityOfPage": "https://pgsandbox.lvtd.dev/blog/test-postgresql-generated-columns/",
       "step": [
         {"@type": "HowToStep", "position": 1, "name": "Inspect the declaration", "text": "Apply the real migration and assert the generation expression plus stored or virtual catalog kind."},
         {"@type": "HowToStep", "position": 2, "name": "Prove write protection", "text": "Send an explicit generated value, assert SQLSTATE 428C9, and keep DEFAULT as the successful control."},
@@ -439,9 +439,9 @@ The proof applies real migrations, deliberately sends a forbidden direct write, 
     {
       "@type": "BreadcrumbList",
       "itemListElement": [
-        {"@type": "ListItem", "position": 1, "name": "PGSandbox", "item": "https://pgsandbox-mcp.lvtd.dev/"},
-        {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://pgsandbox-mcp.lvtd.dev/blog/"},
-        {"@type": "ListItem", "position": 3, "name": "How to Test PostgreSQL Generated Columns", "item": "https://pgsandbox-mcp.lvtd.dev/blog/test-postgresql-generated-columns/"}
+        {"@type": "ListItem", "position": 1, "name": "PGSandbox", "item": "https://pgsandbox.lvtd.dev/"},
+        {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://pgsandbox.lvtd.dev/blog/"},
+        {"@type": "ListItem", "position": 3, "name": "How to Test PostgreSQL Generated Columns", "item": "https://pgsandbox.lvtd.dev/blog/test-postgresql-generated-columns/"}
       ]
     }
   ]

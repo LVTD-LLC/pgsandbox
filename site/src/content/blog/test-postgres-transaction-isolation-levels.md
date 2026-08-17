@@ -9,7 +9,7 @@ tags: ["Postgres", "transaction isolation", "concurrency testing", "integration 
 category: "Engineering"
 metaTitle: "Test PostgreSQL Transaction Isolation Levels"
 metaDescription: "Test PostgreSQL isolation levels with controlled snapshots, a write-skew schedule, SQLSTATE 40001 assertions, and disposable cleanup."
-canonicalUrl: "https://pgsandbox-mcp.lvtd.dev/blog/test-postgres-transaction-isolation-levels/"
+canonicalUrl: "https://pgsandbox.lvtd.dev/blog/test-postgres-transaction-isolation-levels/"
 heroImageUrl: ""
 featured: false
 sortOrder: 151
@@ -444,9 +444,9 @@ Separate the concerns. One test should prove PostgreSQL rejects the unsafe sched
     {
       "@type": "BreadcrumbList",
       "itemListElement": [
-        {"@type": "ListItem", "position": 1, "name": "PGSandbox", "item": "https://pgsandbox-mcp.lvtd.dev/"},
-        {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://pgsandbox-mcp.lvtd.dev/blog/"},
-        {"@type": "ListItem", "position": 3, "name": "How to Test PostgreSQL Transaction Isolation Levels", "item": "https://pgsandbox-mcp.lvtd.dev/blog/test-postgres-transaction-isolation-levels/"}
+        {"@type": "ListItem", "position": 1, "name": "PGSandbox", "item": "https://pgsandbox.lvtd.dev/"},
+        {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://pgsandbox.lvtd.dev/blog/"},
+        {"@type": "ListItem", "position": 3, "name": "How to Test PostgreSQL Transaction Isolation Levels", "item": "https://pgsandbox.lvtd.dev/blog/test-postgres-transaction-isolation-levels/"}
       ]
     }
   ]

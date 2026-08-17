@@ -9,7 +9,7 @@ tags: ["Postgres", "triggers", "integration testing", "migration testing", "codi
 category: "Engineering"
 metaTitle: "How to Test PostgreSQL Triggers"
 metaDescription: "Test PostgreSQL triggers with catalog checks, exact side-effect assertions, rollback proof, SQLSTATE failures, and disposable database cleanup."
-canonicalUrl: "https://pgsandbox-mcp.lvtd.dev/blog/test-postgresql-triggers/"
+canonicalUrl: "https://pgsandbox.lvtd.dev/blog/test-postgresql-triggers/"
 heroImageUrl: ""
 featured: false
 sortOrder: 154
@@ -548,7 +548,7 @@ Only if the diff tool explicitly includes trigger definitions. PGSandbox's curre
       "dateModified": "2026-08-03",
       "author": {"@type": "Organization", "name": "PGSandbox Team"},
       "publisher": {"@type": "Organization", "name": "PGSandbox MCP"},
-      "mainEntityOfPage": "https://pgsandbox-mcp.lvtd.dev/blog/test-postgresql-triggers/"
+      "mainEntityOfPage": "https://pgsandbox.lvtd.dev/blog/test-postgresql-triggers/"
     },
     {
       "@type": "HowTo",
@@ -575,9 +575,9 @@ Only if the diff tool explicitly includes trigger definitions. PGSandbox's curre
     {
       "@type": "BreadcrumbList",
       "itemListElement": [
-        {"@type": "ListItem", "position": 1, "name": "Home", "item": "https://pgsandbox-mcp.lvtd.dev/"},
-        {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://pgsandbox-mcp.lvtd.dev/blog/"},
-        {"@type": "ListItem", "position": 3, "name": "How to Test PostgreSQL Triggers", "item": "https://pgsandbox-mcp.lvtd.dev/blog/test-postgresql-triggers/"}
+        {"@type": "ListItem", "position": 1, "name": "Home", "item": "https://pgsandbox.lvtd.dev/"},
+        {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://pgsandbox.lvtd.dev/blog/"},
+        {"@type": "ListItem", "position": 3, "name": "How to Test PostgreSQL Triggers", "item": "https://pgsandbox.lvtd.dev/blog/test-postgresql-triggers/"}
       ]
     }
   ]

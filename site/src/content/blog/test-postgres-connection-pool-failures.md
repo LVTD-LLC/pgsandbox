@@ -9,7 +9,7 @@ tags: ["Postgres", "connection pools", "integration testing", "Node.js", "coding
 category: "Engineering"
 metaTitle: "Test Postgres Connection Pool Failures Safely"
 metaDescription: "Test node-postgres pool exhaustion and broken connections with bounded acquisition timeouts, recovery assertions, and disposable database cleanup."
-canonicalUrl: "https://pgsandbox-mcp.lvtd.dev/blog/test-postgres-connection-pool-failures/"
+canonicalUrl: "https://pgsandbox.lvtd.dev/blog/test-postgres-connection-pool-failures/"
 heroImageUrl: ""
 featured: false
 sortOrder: 146

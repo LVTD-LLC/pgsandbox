@@ -9,7 +9,7 @@ tags: ["Postgres", "two-phase commit", "prepared transactions", "integration tes
 category: "Engineering"
 metaTitle: "Test PostgreSQL Two-Phase Commit"
 metaDescription: "Test PostgreSQL two-phase commit with prepared-state visibility, cross-session commit and rollback, recovery checks, and safe cleanup."
-canonicalUrl: "https://pgsandbox-mcp.lvtd.dev/blog/test-postgres-two-phase-commit/"
+canonicalUrl: "https://pgsandbox.lvtd.dev/blog/test-postgres-two-phase-commit/"
 heroImageUrl: ""
 featured: false
 sortOrder: 153
@@ -432,7 +432,7 @@ No. PGSandbox uses PostgreSQL profiles that you configure, but it does not chang
       "dateModified": "2026-08-02",
       "author": {"@type": "Organization", "name": "PGSandbox Team"},
       "publisher": {"@type": "Organization", "name": "PGSandbox MCP"},
-      "mainEntityOfPage": "https://pgsandbox-mcp.lvtd.dev/blog/test-postgres-two-phase-commit/"
+      "mainEntityOfPage": "https://pgsandbox.lvtd.dev/blog/test-postgres-two-phase-commit/"
     },
     {
       "@type": "HowTo",
@@ -459,9 +459,9 @@ No. PGSandbox uses PostgreSQL profiles that you configure, but it does not chang
     {
       "@type": "BreadcrumbList",
       "itemListElement": [
-        {"@type": "ListItem", "position": 1, "name": "Home", "item": "https://pgsandbox-mcp.lvtd.dev/"},
-        {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://pgsandbox-mcp.lvtd.dev/blog/"},
-        {"@type": "ListItem", "position": 3, "name": "How to Test PostgreSQL Two-Phase Commit", "item": "https://pgsandbox-mcp.lvtd.dev/blog/test-postgres-two-phase-commit/"}
+        {"@type": "ListItem", "position": 1, "name": "Home", "item": "https://pgsandbox.lvtd.dev/"},
+        {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://pgsandbox.lvtd.dev/blog/"},
+        {"@type": "ListItem", "position": 3, "name": "How to Test PostgreSQL Two-Phase Commit", "item": "https://pgsandbox.lvtd.dev/blog/test-postgres-two-phase-commit/"}
       ]
     }
   ]

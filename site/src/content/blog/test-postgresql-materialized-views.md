@@ -9,7 +9,7 @@ tags: ["Postgres", "materialized views", "integration testing", "database migrat
 category: "Engineering"
 metaTitle: "How to Test PostgreSQL Materialized Views"
 metaDescription: "Test PostgreSQL materialized views with definition, staleness, refresh, concurrency, exact-result, and disposable-cleanup checks."
-canonicalUrl: "https://pgsandbox-mcp.lvtd.dev/blog/test-postgresql-materialized-views/"
+canonicalUrl: "https://pgsandbox.lvtd.dev/blog/test-postgresql-materialized-views/"
 heroImageUrl: ""
 featured: false
 sortOrder: 159
