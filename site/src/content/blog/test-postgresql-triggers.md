@@ -371,6 +371,8 @@ pgsandbox with-database \
 
 The CLI-only `pgsandbox with-database` command creates the task database and scoped login role, injects `DATABASE_URL`, `PGSANDBOX_DATABASE_URL`, and libpq connection variables into the child process, preserves bounded credential-redacted output, and applies the requested cleanup policy. The [disposable integration-test guide](/blog/run-integration-tests-disposable-postgres-database/) documents the complete session result and cleanup contract.
 
+If the trigger calls `pg_notify()`, add the separate [PostgreSQL LISTEN/NOTIFY workflow proof](/blog/test-postgresql-listen-notify-workflows/). It establishes the listener before the write, then verifies commit delivery, rollback silence, payload identity, and duplicate-folding behavior with a second physical connection.
+
 PGSandbox uses an existing local or private PostgreSQL server. It does not install a new server for each test. Pin `--postgres-version` when the trigger must work across managed local majors, or use `--profile` when it depends on profile-specific extensions, settings, or network placement.
 
 The sandbox role owns its task database but does not receive the lifecycle admin connection. That separation follows the [PGSandbox architecture](/docs/architecture/). A trigger proof should run with the same level of database authority the application or migration receives whenever possible.
