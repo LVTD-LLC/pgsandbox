@@ -69,6 +69,8 @@ The [PGSandbox MCP tool contract](/docs/mcp-tools/) covers the underlying databa
 
 Concurrency failures need that child-process boundary too. The [Postgres deadlock testing guide](/blog/test-postgres-deadlocks-lock-timeouts/) shows how one repository test process can hold two independent connections, coordinate opposite lock order, assert `40P01` and `55P03` separately, and leave cleanup to the enclosing disposable session.
 
+Session-scoped features need the same boundary. The [PostgreSQL LISTEN/NOTIFY testing guide](/blog/test-postgresql-listen-notify-workflows/) keeps a dedicated listener connection alive while a second connection proves commit delivery, rollback silence, payload identity, and bounded waiting.
+
 Serializable transaction retries use the same boundary with a different invariant. The [Postgres serialization failure retry guide](/blog/test-postgres-serialization-failure-retries/) coordinates two initial snapshots, asserts one SQLSTATE `40001`, replays the complete losing transaction, and verifies the final business state before cleanup.
 
 If the repository has not yet proved which isolation level its invariant requires, run the [PostgreSQL transaction isolation proof](/blog/test-postgres-transaction-isolation-levels/) first. It contrasts statement snapshots, stable transaction snapshots, and Serializable write-skew rejection with two controlled connections.
