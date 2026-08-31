@@ -9,7 +9,7 @@ tags: ["Postgres", "foreign keys", "cascade testing", "migration testing", "codi
 category: "Engineering"
 metaTitle: "Test PostgreSQL Foreign Key Cascades"
 metaDescription: "Test PostgreSQL foreign key cascades with schema checks, positive and negative controls, rollback proof, SQLSTATE 23503, and cleanup."
-canonicalUrl: "https://pgsandbox-mcp.lvtd.dev/blog/test-postgres-foreign-key-cascades/"
+canonicalUrl: "https://pgsandbox.lvtd.dev/blog/test-postgres-foreign-key-cascades/"
 heroImageUrl: ""
 featured: false
 sortOrder: 152
@@ -61,6 +61,8 @@ A cascade can continue through more than one relationship. If `accounts` deletes
 ### Foreign key CASCADE and DROP CASCADE are different
 
 `ON DELETE CASCADE` is part of a foreign-key data policy. It deletes matching rows while keeping the tables and constraints.
+
+If the foreign key uses deferrable `NO ACTION` instead, the important behavior moves from propagation to validation timing. Use the [PostgreSQL deferrable constraint proof](/blog/test-postgres-deferrable-constraints/) to test immediate rejection, temporary invalidity, explicit validation, and commit-time failure. `RESTRICT` does not permit the same deferred check.
 
 `DROP ... CASCADE` is a schema dependency operation. PostgreSQL's [dependency-tracking documentation](https://www.postgresql.org/docs/current/ddl-depend.html) explains that dropping a referenced table with `CASCADE` can remove the foreign-key constraint that depends on it. It does not mean "exercise the foreign key's row-deletion rule."
 
@@ -408,6 +410,8 @@ The task relationship does not declare `ON UPDATE CASCADE`, so PostgreSQL report
 
 Schema inspection matters during migrations that drop and recreate constraints. A behavioral test with no matching child rows can pass even when the new constraint has the wrong action. The declaration check fails immediately.
 
+PostgreSQL implements foreign-key enforcement with internal triggers, but application-owned triggers need a different catalog filter and firing matrix. The [PostgreSQL trigger testing guide](/blog/test-postgresql-triggers/) shows how to exclude `tgisinternal`, inspect rendered user-trigger definitions, and prove target rows, side effects, SQLSTATE failures, and rollback separately.
+
 ### Propagation: assert the complete graph
 
 The update probe changes account key `1` to `101`. Both target projects must receive `101`; the control project must remain attached to account `2`. The test then rolls back and expects the original keys.
@@ -579,9 +583,9 @@ No. Use it when the child should never outlive the parent and deletion requires 
     {
       "@type": "BreadcrumbList",
       "itemListElement": [
-        {"@type": "ListItem", "position": 1, "name": "PGSandbox", "item": "https://pgsandbox-mcp.lvtd.dev/"},
-        {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://pgsandbox-mcp.lvtd.dev/blog/"},
-        {"@type": "ListItem", "position": 3, "name": "How to Test PostgreSQL Foreign Key Cascades", "item": "https://pgsandbox-mcp.lvtd.dev/blog/test-postgres-foreign-key-cascades/"}
+        {"@type": "ListItem", "position": 1, "name": "PGSandbox", "item": "https://pgsandbox.lvtd.dev/"},
+        {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://pgsandbox.lvtd.dev/blog/"},
+        {"@type": "ListItem", "position": 3, "name": "How to Test PostgreSQL Foreign Key Cascades", "item": "https://pgsandbox.lvtd.dev/blog/test-postgres-foreign-key-cascades/"}
       ]
     }
   ]

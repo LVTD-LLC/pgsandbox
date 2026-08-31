@@ -9,7 +9,7 @@ tags: ["Postgres", "savepoints", "partial rollback", "transaction testing", "cod
 category: "Engineering"
 metaTitle: "Test Postgres Savepoints and Partial Rollbacks"
 metaDescription: "Test Postgres savepoints by forcing SQLSTATE 23505, proving 25P02, rolling back the failed unit, and preserving the outer transaction."
-canonicalUrl: "https://pgsandbox-mcp.lvtd.dev/blog/test-postgres-savepoints-partial-rollbacks/"
+canonicalUrl: "https://pgsandbox.lvtd.dev/blog/test-postgres-savepoints-partial-rollbacks/"
 heroImageUrl: ""
 featured: false
 sortOrder: 149

@@ -9,7 +9,7 @@ tags: ["Postgres", "integration testing", "test databases", "coding agents", "CI
 category: "Engineering"
 metaTitle: "Run Tests in a Disposable Postgres Database"
 metaDescription: "Run integration tests against a fresh Postgres database with injected credentials, explicit cleanup, bounded output, and reproducible failure evidence."
-canonicalUrl: "https://pgsandbox-mcp.lvtd.dev/blog/run-integration-tests-disposable-postgres-database/"
+canonicalUrl: "https://pgsandbox.lvtd.dev/blog/run-integration-tests-disposable-postgres-database/"
 heroImageUrl: ""
 featured: false
 sortOrder: 144
@@ -69,6 +69,8 @@ The [PGSandbox MCP tool contract](/docs/mcp-tools/) covers the underlying databa
 
 Concurrency failures need that child-process boundary too. The [Postgres deadlock testing guide](/blog/test-postgres-deadlocks-lock-timeouts/) shows how one repository test process can hold two independent connections, coordinate opposite lock order, assert `40P01` and `55P03` separately, and leave cleanup to the enclosing disposable session.
 
+Session-scoped features need the same boundary. The [PostgreSQL LISTEN/NOTIFY testing guide](/blog/test-postgresql-listen-notify-workflows/) keeps a dedicated listener connection alive while a second connection proves commit delivery, rollback silence, payload identity, and bounded waiting.
+
 Serializable transaction retries use the same boundary with a different invariant. The [Postgres serialization failure retry guide](/blog/test-postgres-serialization-failure-retries/) coordinates two initial snapshots, asserts one SQLSTATE `40001`, replays the complete losing transaction, and verifies the final business state before cleanup.
 
 If the repository has not yet proved which isolation level its invariant requires, run the [PostgreSQL transaction isolation proof](/blog/test-postgres-transaction-isolation-levels/) first. It contrasts statement snapshots, stable transaction snapshots, and Serializable write-skew rejection with two controlled connections.
@@ -76,6 +78,8 @@ If the repository has not yet proved which isolation level its invariant require
 Nested transaction recovery is another database behavior worth proving inside the child process. The [Postgres savepoint testing guide](/blog/test-postgres-savepoints-partial-rollbacks/) forces a unique violation, observes the failed transaction state, rolls back only the inner unit, preserves outer work, and verifies the committed rows from a new connection.
 
 Referential-action migrations also need exact final-state checks. The [PostgreSQL foreign key cascade testing guide](/blog/test-postgres-foreign-key-cascades/) verifies installed rules, multi-level update and delete propagation, unrelated-row survival, SQLSTATE `23503`, rollback atomicity, and cleanup.
+
+User-authored triggers need a separate declaration and behavior proof. The [PostgreSQL trigger testing guide](/blog/test-postgresql-triggers/) checks `pg_trigger`, exercises the intended firing matrix, asserts exact side effects and a control row, recovers from an expected SQLSTATE with a savepoint, and proves outer rollback removes every transactional effect.
 
 Authorization migrations need the same real-database boundary. The [Postgres row-level security testing guide](/blog/test-postgres-row-level-security/) verifies that RLS is active for the actual sandbox owner role, then proves tenant read isolation, cross-tenant write rejection, transaction-scoped context reset, and cleanup.
 
@@ -156,6 +160,8 @@ pgsandbox with-database \
 This boundary prevented a misleading conclusion in PGSandbox's own [2026-07-21 test-session measurements](https://github.com/LVTD-LLC/pgsandbox-mcp/blob/540cb5653460b345c3382d26465de54a8670666f/docs/session-benchmarks.md). A 1,173-test Rowset run first reproduced one failure because a frontend build artifact was missing. After the documented consumer prerequisite was built, the same monolithic suite passed. The sandbox lifecycle was working in both runs; the repository was not equally prepared.
 
 Run migrations inside the child command or its test harness so they use the injected sandbox connection. If migration behavior is the subject of the change, capture schema and data evidence using the dedicated [database migration testing workflow](/blog/database-migration-testing-agent-pr/) rather than treating a green test summary as complete migration proof.
+
+When a migration introduces partitioning, add the dedicated [PostgreSQL table-partitioning test](/blog/test-postgresql-table-partitioning/). A green application suite does not by itself prove exact range-bound routing, default-partition behavior, pruning, row movement, or the next attach/detach operation.
 
 Prefer a repository-owned direct entrypoint for multi-step setup. For example, define `make verify-db` to run migrations, seed the minimum fixture, and then run the integration suite:
 

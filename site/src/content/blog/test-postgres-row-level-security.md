@@ -9,7 +9,7 @@ tags: ["Postgres", "row-level security", "RLS testing", "multi-tenant databases"
 category: "Engineering"
 metaTitle: "Test Postgres Row-Level Security in a Sandbox"
 metaDescription: "Test Postgres row-level security with FORCE RLS, tenant read and write checks, transaction-scoped context, and disposable database cleanup."
-canonicalUrl: "https://pgsandbox-mcp.lvtd.dev/blog/test-postgres-row-level-security/"
+canonicalUrl: "https://pgsandbox.lvtd.dev/blog/test-postgres-row-level-security/"
 heroImageUrl: ""
 featured: false
 sortOrder: 150

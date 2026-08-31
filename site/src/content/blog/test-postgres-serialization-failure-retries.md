@@ -9,7 +9,7 @@ tags: ["Postgres", "serialization failures", "transaction retries", "integration
 category: "Engineering"
 metaTitle: "Test Postgres Serialization Failures and Retries"
 metaDescription: "Test Postgres SQLSTATE 40001 with coordinated transactions, whole-transaction retries, final-state assertions, and disposable cleanup."
-canonicalUrl: "https://pgsandbox-mcp.lvtd.dev/blog/test-postgres-serialization-failure-retries/"
+canonicalUrl: "https://pgsandbox.lvtd.dev/blog/test-postgres-serialization-failure-retries/"
 heroImageUrl: ""
 featured: false
 sortOrder: 147

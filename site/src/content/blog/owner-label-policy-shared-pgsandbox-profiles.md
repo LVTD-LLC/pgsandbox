@@ -9,7 +9,7 @@ tags: ["Postgres", "MCP", "cleanup", "database sandbox", "agent safety"]
 category: "Engineering"
 metaTitle: "PGSandbox Owner and Label Policy"
 metaDescription: "Design owner and label policy for shared PGSandbox profiles: cleanup scopes, TTL hygiene, audit fields, label taxonomy, and PR proof notes."
-canonicalUrl: "https://pgsandbox-mcp.lvtd.dev/blog/owner-label-policy-shared-pgsandbox-profiles/"
+canonicalUrl: "https://pgsandbox.lvtd.dev/blog/owner-label-policy-shared-pgsandbox-profiles/"
 heroImageUrl: ""
 featured: false
 sortOrder: 133
@@ -36,7 +36,7 @@ That is enough for most agent workflows. Add labels only when they change cleanu
 
 ## Why owner alone is too broad
 
-PGSandbox's MCP tool contract documents `owner` as an optional agent/session identifier on creation tools and as an owner filter on `list_databases` and `cleanup_expired` (https://pgsandbox-mcp.lvtd.dev/docs/mcp-tools/). When supplied to cleanup, the owner must exactly match the stored owner.
+PGSandbox's MCP tool contract documents `owner` as an optional agent/session identifier on creation tools and as an owner filter on `list_databases` and `cleanup_expired` (https://pgsandbox.lvtd.dev/docs/mcp-tools/). When supplied to cleanup, the owner must exactly match the stored owner.
 
 That exact match is useful, but it is not enough on machines where one owner value runs several repos or task types. If every sandbox uses `owner: "agent-session"`, owner-only cleanup can select expired sandboxes from unrelated work. That may be acceptable on a single-purpose laptop. It is a weak boundary for shared agent hosts, cron jobs, or long-running operator machines.
 
@@ -63,7 +63,7 @@ This is more useful than a clever `nameHint`. The database name is generated. Th
 
 ## How PGSandbox applies owner and label filters
 
-PGSandbox records sandbox lifecycle metadata in `pgsandbox_databases`, including database id, profile name, database name, role name, owner, purpose, labels, timestamps, and deletion state (https://pgsandbox-mcp.lvtd.dev/docs/architecture/).
+PGSandbox records sandbox lifecycle metadata in `pgsandbox_databases`, including database id, profile name, database name, role name, owner, purpose, labels, timestamps, and deletion state (https://pgsandbox.lvtd.dev/docs/architecture/).
 
 The `cleanup_expired` contract is deliberately narrow:
 
@@ -182,7 +182,7 @@ The goal is not a universal naming standard. The goal is that every cleanup run 
 
 ## The cleanup flow for shared profiles
 
-Start with inventory. `list_databases` returns active database metadata without full secrets, including database id, database name, role name, profile, creation and expiration timestamps, and TTL state. It excludes expired sandboxes by default unless `includeExpired` is true (https://pgsandbox-mcp.lvtd.dev/docs/mcp-tools/).
+Start with inventory. `list_databases` returns active database metadata without full secrets, including database id, database name, role name, profile, creation and expiration timestamps, and TTL state. It excludes expired sandboxes by default unless `includeExpired` is true (https://pgsandbox.lvtd.dev/docs/mcp-tools/).
 
 For a shared profile, use this cleanup sequence:
 
@@ -225,7 +225,7 @@ Only run destructive cleanup after the dry-run output matches the intended work.
 
 ## Cross-version cleanup needs stricter labels
 
-PGSandbox can list or clean across configured profiles and running managed-local version profiles with `includeAllVersions` or `postgresVersion: "*"`. The tool contract says all-version cleanup continues across profiles and reports profile-level failures separately (https://pgsandbox-mcp.lvtd.dev/docs/mcp-tools/).
+PGSandbox can list or clean across configured profiles and running managed-local version profiles with `includeAllVersions` or `postgresVersion: "*"`. The tool contract says all-version cleanup continues across profiles and reports profile-level failures separately (https://pgsandbox.lvtd.dev/docs/mcp-tools/).
 
 That broad scope is useful when agents test multiple Postgres versions, but it raises the cost of weak labels. Do not run all-version cleanup with only `owner` unless the owner is already unique to the task.
 
