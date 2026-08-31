@@ -3,8 +3,8 @@ title: "How to Test PostgreSQL Two-Phase Commit"
 excerpt: "Prove prepare-state invisibility, pg_prepared_xacts identity, cross-session commit and rollback, and zero remaining prepared transactions."
 author: "PGSandbox Team"
 status: "published"
-publishedAt: "2026-08-02"
-updatedAt: "2026-08-02T06:00:00Z"
+publishedAt: "2026-08-01"
+updatedAt: "2026-08-01T06:00:00Z"
 tags: ["Postgres", "two-phase commit", "prepared transactions", "integration testing", "coding agents"]
 category: "Engineering"
 metaTitle: "Test PostgreSQL Two-Phase Commit"
@@ -20,7 +20,7 @@ A happy-path `PREPARE TRANSACTION` demo misses the operational risk. If a test f
 
 Use five checks for a reviewable **Prepared Transaction Proof Contract**: configuration, preparation, identity, decision, and hygiene. PGSandbox MCP provides the disposable database and scoped role. Your PostgreSQL operator must explicitly enable prepared transactions on the selected profile; PGSandbox does not change cluster startup settings.
 
-*Published and last updated August 2, 2026.*
+*Published and last updated August 1, 2026.*
 
 The complete proof has five steps:
 
@@ -263,9 +263,10 @@ Run the harness against the prepared-transaction-enabled profile:
 ```bash
 pgsandbox with-database \
   --profile prepared-tx-test \
-  --name-hint postgres-2pc-proof \
+  --label postgres-2pc-proof \
   --ttl-minutes 30 \
   --cleanup on-success \
+  --env-var PGSANDBOX_DATABASE_URL \
   -- python tests/postgres_two_phase_commit_proof.py
 ```
 
@@ -428,11 +429,11 @@ No. PGSandbox uses PostgreSQL profiles that you configure, but it does not chang
       "@type": "Article",
       "headline": "How to Test PostgreSQL Two-Phase Commit",
       "description": "Prove prepare-state invisibility, pg_prepared_xacts identity, cross-session commit and rollback, and zero remaining prepared transactions.",
-      "datePublished": "2026-08-02",
-      "dateModified": "2026-08-02",
+      "datePublished": "2026-08-01",
+      "dateModified": "2026-08-01",
       "author": {"@type": "Organization", "name": "PGSandbox Team"},
       "publisher": {"@type": "Organization", "name": "PGSandbox MCP"},
-      "mainEntityOfPage": "https://pgsandbox.lvtd.dev/blog/test-postgres-two-phase-commit/"
+        "mainEntityOfPage": "https://pgsandbox.lvtd.dev/blog/test-postgres-two-phase-commit/"
     },
     {
       "@type": "HowTo",

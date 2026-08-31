@@ -1,39 +1,6 @@
 # Changelog
 
-## 2026-08-24
-
-- Added the Astro Markdown guide "How to Test PostgreSQL LISTEN/NOTIFY Workflows" with a deterministic Notification Delivery Proof, PostgreSQL and Psycopg primary-source citations, SEO ledger and link inventory updates, and inbound blog links.
-
-## 2026-08-17
-
-- Changed the production site origin from the redirecting `pgsandbox-mcp.lvtd.dev` hostname to `pgsandbox.lvtd.dev` across canonicals, sitemap and robots output, internal links, and structured data, with a CI regression check for generated URLs.
-- Added the Astro Markdown guide "How to Test PostgreSQL Exclusion Constraints" with a deterministic Exclusion Boundary Proof, PostgreSQL and Psycopg primary-source citations, SEO ledger and link inventory updates, and inbound blog links.
-
-## 2026-08-10
-
-- Added the Astro Markdown guide "How to Test PostgreSQL Materialized Views" with a deterministic Materialized View Refresh Proof, PostgreSQL primary-source citations, SEO ledger and link inventory updates, and inbound blog links.
-
-## 2026-08-07
-
-- Added the Astro Markdown guide "How to Test PostgreSQL Table Partitioning" with a deterministic Partition Boundary Proof, PostgreSQL primary-source citations, SEO ledger and link inventory updates, and inbound blog links.
-
-## 2026-08-06
-
-- Added the Astro Markdown guide "How to Test PostgreSQL Partial Indexes" with a deterministic Psycopg Partial Index Proof, PostgreSQL primary-source citations, SEO ledger and link inventory updates, and inbound blog links.
-
-## 2026-08-05
-
-- Added the Astro Markdown guide "How to Test PostgreSQL Generated Columns" with a version-aware Generation Boundary Proof, PostgreSQL and Psycopg primary-source citations, SEO ledger and link inventory updates, and inbound blog links.
-
-## 2026-08-04
-
-- Added the Astro Markdown guide "How to Test Deferrable Constraints in PostgreSQL" with a deterministic Psycopg boundary-timing harness, PostgreSQL and Psycopg primary-source citations, SEO ledger and link inventory updates, and inbound blog links.
-
-## 2026-08-03
-
-- Added the Astro Markdown guide "How to Test PostgreSQL Triggers in a Disposable Database" with a deterministic Psycopg trigger harness, PostgreSQL and Psycopg primary-source citations, SEO ledger and link inventory updates, and inbound blog links.
-
-## 2026-08-02
+## 2026-08-01
 
 - Added the Astro Markdown guide "How to Test PostgreSQL Two-Phase Commit" with a deterministic Psycopg prepared-transaction harness, PostgreSQL and Psycopg primary-source citations, SEO ledger and link inventory updates, and inbound blog links.
 
