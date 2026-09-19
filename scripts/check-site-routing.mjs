@@ -5,8 +5,10 @@ import { execFileSync } from 'node:child_process';
 const image = `pgsandbox-site-routing:${process.pid}`;
 const docker = (...args) => execFileSync('docker', args, { encoding: 'utf8' }).trim();
 let container;
+let imageBuilt = false;
 try {
   docker('build', '-t', image, 'site');
+  imageBuilt = true;
   container = docker('run', '--rm', '-d', '-p', '127.0.0.1::80', image);
   const port = docker('inspect', '--format', '{{(index (index .NetworkSettings.Ports "80/tcp") 0).HostPort}}', container);
   const base = `http://127.0.0.1:${port}`;
@@ -47,5 +49,5 @@ try {
   console.log('Production routing passed: real 404s, proxy-safe redirects, workflow guide, sitemap.');
 } finally {
   if (container) docker('stop', container);
-  docker('image', 'rm', image);
+  if (imageBuilt) docker('image', 'rm', image);
 }

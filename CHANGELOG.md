@@ -5,6 +5,7 @@
 - Fixed website 404 responses and proxy-safe trailing-slash redirects after the pgsandbox.dev migration.
 - Published the maintained agent workflow documentation on the website, linked it from the docs hub and navigation, and included it in the sitemap.
 - Updated documentation search descriptions, removed unrelated blog dates from static sitemap entries, and aligned SEO configuration and positioning with the current domain and local runtime.
+- Included the prebuilt site output in the Docker build context required by the production image.
 - Added production-container routing checks for missing pages, HTTPS-origin redirects, and the restored workflow guide.
 
 ## 2026-08-01
