@@ -6,6 +6,7 @@ const staticPages = [
   '/docs/',
   '/docs/install/',
   '/docs/mcp-tools/',
+  '/docs/agent-workflows/',
   '/docs/architecture/',
   '/docs/homebrew/',
   '/blog/',
@@ -54,7 +55,9 @@ export const GET: APIRoute = async ({ site }) => {
   const latestPost = posts[0];
   const latestLastmod = sitemapLastmod(latestPost?.data.updatedAt, latestPost?.data.publishedAt);
   const pages = [
-    ...staticPages.map((path) => ({ path, lastmod: latestLastmod })),
+    // Only the blog listing changes when the newest article changes. Static pages
+    // omit lastmod until they have their own reliable content-modification dates.
+    ...staticPages.map((path) => ({ path, lastmod: path === '/blog/' ? latestLastmod : undefined })),
     ...posts.map((post) => ({
       path: getBlogCanonicalUrl(post, baseUrl) || `/blog/${getBlogSlug(post)}/`,
       lastmod: sitemapLastmod(post.data.updatedAt, post.data.publishedAt)

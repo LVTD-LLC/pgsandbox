@@ -5,6 +5,7 @@ const {
   canonicalUrl,
   imageUrl,
   ogType = 'website',
+  noindex = false,
   articlePublishedTime,
   articleModifiedTime,
   articleAuthor,
@@ -26,6 +27,7 @@ const structuredDataJson = structuredData ? JSON.stringify(structuredData) : und
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="description" content={description} />
+    {noindex && <meta name="robots" content="noindex" />}
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:type" content={ogType} />
@@ -486,7 +488,8 @@ const structuredDataJson = structuredData ? JSON.stringify(structuredData) : und
         }
       }
     </style>
-    <script defer data-domain="pgsandbox.lvtd.dev" src="https://plausible-v2.cr.lvtd.dev/js/script.file-downloads.hash.outbound-links.js"></script>
+    <!-- Keep the existing Plausible property: it receives pgsandbox.dev visits and preserves history. -->
+    <script is:inline defer data-domain="pgsandbox.lvtd.dev" src="https://plausible-v2.cr.lvtd.dev/js/script.file-downloads.hash.outbound-links.js"></script>
     <script>window.plausible = window.plausible || function() { (window.plausible.q = window.plausible.q || []).push(arguments) }</script>
   </head>
   <body>
