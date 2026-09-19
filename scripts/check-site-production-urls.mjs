@@ -2,8 +2,8 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { extname, join, relative } from 'node:path';
 
 const distDir = 'site/dist';
-const productionOrigin = 'https://pgsandbox.lvtd.dev';
-const legacyOrigin = 'https://pgsandbox-mcp.lvtd.dev';
+const productionOrigin = 'https://pgsandbox.dev';
+const legacyOrigins = ['https://pgsandbox.lvtd.dev', 'https://pgsandbox-mcp.lvtd.dev'];
 const textExtensions = new Set(['.html', '.xml', '.txt']);
 
 function walk(directory) {
@@ -18,11 +18,11 @@ function walk(directory) {
 const outputFiles = walk(distDir);
 const output = outputFiles.map((path) => [path, readFileSync(path, 'utf8')]);
 const legacyReferences = output
-  .filter(([, content]) => content.includes(legacyOrigin))
+  .filter(([, content]) => legacyOrigins.some((origin) => content.includes(origin)))
   .map(([path]) => relative(distDir, path));
 
 if (legacyReferences.length > 0) {
-  throw new Error(`Built site still references ${legacyOrigin}: ${legacyReferences.join(', ')}`);
+  throw new Error(`Built site still references a legacy origin: ${legacyReferences.join(', ')}`);
 }
 
 const htmlFiles = output.filter(([path]) => extname(path) === '.html');

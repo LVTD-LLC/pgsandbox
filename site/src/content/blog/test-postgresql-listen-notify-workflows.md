@@ -9,7 +9,7 @@ tags: ["Postgres", "LISTEN NOTIFY", "integration testing", "Psycopg", "coding ag
 category: "Engineering"
 metaTitle: "How to Test PostgreSQL LISTEN/NOTIFY Workflows"
 metaDescription: "Test PostgreSQL LISTEN/NOTIFY with commit, rollback, payload, duplicate-folding, timeout, and disposable cleanup checks."
-canonicalUrl: "https://pgsandbox.lvtd.dev/blog/test-postgresql-listen-notify-workflows/"
+canonicalUrl: "https://pgsandbox.dev/blog/test-postgresql-listen-notify-workflows/"
 heroImageUrl: ""
 featured: false
 sortOrder: 161
