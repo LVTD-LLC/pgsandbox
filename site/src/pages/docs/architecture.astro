@@ -1,7 +1,7 @@
 ---
 import DocsLayout from '../../layouts/DocsLayout.astro';
 ---
-<DocsLayout title="Architecture" description="PGSandbox architecture notes."><h1>Architecture</h1><p>PGSandbox is a local Rust MCP server in front of a managed local Postgres cluster by default, with optional explicit external Postgres admin profiles. It does not install Postgres versions or use Docker, and the local runtime chooses a high port such as <code>65432</code> instead of binding <code>5432</code>.</p><p>This local-first shape is the current deployment boundary, not the permanent product ceiling. A future hosted PGSandbox database platform should preserve the same agent workflow while adding managed compute, auth, tenancy, quotas, billing, and faster clone/fork backends.</p><h2>Flow</h2><pre><code>Agent / MCP client
+<DocsLayout title="Architecture" description="Understand PGSandbox’s local Postgres runtime, scoped database roles, lifecycle metadata, and cleanup boundaries for disposable coding-agent databases."><h1>Architecture</h1><p>PGSandbox is a local Rust MCP server in front of a managed local Postgres cluster by default, with optional explicit external Postgres admin profiles. It does not install Postgres versions or use Docker, and the local runtime chooses a high port such as <code>65432</code> instead of binding <code>5432</code>.</p><p>This local-first shape is the current deployment boundary, not the permanent product ceiling. A future hosted PGSandbox database platform should preserve the same agent workflow while adding managed compute, auth, tenancy, quotas, billing, and faster clone/fork backends.</p><h2>Flow</h2><pre><code>Agent / MCP client
         |
         v
 PGSandbox

@@ -1,0 +1,12 @@
+---
+import { createMarkdownProcessor } from '@astrojs/markdown-remark';
+import DocsLayout from '../../layouts/DocsLayout.astro';
+import workflows from '../../../../docs/agent-workflows.md?raw';
+
+// Render the maintained tool examples directly rather than keeping a second copy.
+const processor = await createMarkdownProcessor();
+const { code } = await processor.render(workflows);
+---
+<DocsLayout title="Agent workflows" description="Use disposable Postgres databases to validate SQL, compare schemas, run repository commands, restore templates, and clean up coding-agent work.">
+  <Fragment set:html={code} />
+</DocsLayout>

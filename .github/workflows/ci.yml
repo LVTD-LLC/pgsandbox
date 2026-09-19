@@ -34,3 +34,4 @@ jobs:
       - run: npm run site:build
       - run: npm run site:check-production-urls
       - run: npm run site:check-blog-tables
+      - run: npm run site:check-routing

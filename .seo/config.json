@@ -1,5 +1,5 @@
 {
-  "domain": "https://pgsandbox-mcp.lvtd.dev",
+  "domain": "https://pgsandbox.dev",
   "stack": "astro",
   "language": "markdown",
   "content_dir": "site/src/content/blog",
@@ -14,5 +14,20 @@
     "write_method": "file",
     "body_format": "markdown",
     "render_path": "/blog/:slug/"
+  },
+  "git": {
+    "mode": "pr",
+    "merge_policy": "autonomous"
+  },
+  "openseo": {
+    "project_id": "a462f88e-3f0f-4ee6-ac2b-99e7ca45e8be"
+  },
+  "analytics": {
+    "provider": "plausible",
+    "base_url": "https://plausible-v2.cr.lvtd.dev",
+    "site_id": "pgsandbox.lvtd.dev",
+    "hostname": "pgsandbox.dev",
+    "api_key_env": "PLAUSIBLE_API_KEY",
+    "note": "Existing property retained to preserve history; new-domain pageview ingestion verified 2026-09-19. The Sites API is unavailable on this deployment."
   }
 }
