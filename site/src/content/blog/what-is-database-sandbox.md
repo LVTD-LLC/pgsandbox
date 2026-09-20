@@ -4,7 +4,7 @@ excerpt: "A database sandbox is an isolated database environment for testing cha
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-07-01"
-updatedAt: "2026-07-01"
+updatedAt: "2026-09-20"
 tags: ["database sandbox", "Postgres", "AI agents", "MCP", "database testing"]
 category: "Engineering"
 metaTitle: "What Is a Database Sandbox?"
@@ -138,7 +138,7 @@ Do not use a sandbox to hide unsafe production access behind a nicer word. If th
 
 PGSandbox is a local-first way to create task databases for coding agents.
 
-It does not install Postgres. It does not host Postgres. It does not replace Neon, Supabase, RDS, Docker Compose, Testcontainers, or database branching. It sits in front of Postgres you already control and exposes a narrow MCP surface for sandbox lifecycle work.
+PGSandbox manages a local Postgres cluster by default. Its setup flow can install missing PostgreSQL binaries through a supported package manager when available; explicit external Postgres profiles remain optional. It is not a hosted database service or a replacement for Neon, Supabase, RDS, Docker Compose, Testcontainers, or database branching. It exposes a narrow MCP surface for sandbox lifecycle work.
 
 The model is:
 

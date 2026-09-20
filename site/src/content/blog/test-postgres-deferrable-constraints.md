@@ -4,7 +4,7 @@ excerpt: "Prove immediate checks, temporary invalid states, SET CONSTRAINTS chec
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-08-04"
-updatedAt: "2026-08-04T06:00:00Z"
+updatedAt: "2026-09-20"
 tags: ["Postgres", "deferrable constraints", "foreign keys", "integration testing", "coding agents"]
 category: "Engineering"
 metaTitle: "Test Deferrable Constraints in PostgreSQL"
@@ -310,7 +310,7 @@ PostgreSQL assigns SQLSTATE `23503` to `foreign_key_violation` and `23505` to `u
 
 ## 3. Run the proof with PGSandbox
 
-Install PGSandbox and confirm the configured PostgreSQL target by following the [setup guide](/docs/install/). PGSandbox does not install or host PostgreSQL. It creates a tracked database and scoped login role on the managed-local runtime or explicit profile you select.
+Install PGSandbox and confirm the configured PostgreSQL target by following the [setup guide](/docs/install/). PGSandbox creates a tracked database and scoped login role on the managed-local runtime or explicit profile you select. Setup can install missing PostgreSQL binaries through a supported package manager when available; PGSandbox does not provide hosted databases.
 
 Add Psycopg to the test environment, then run the proof as one bounded child process:
 

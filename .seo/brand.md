@@ -11,7 +11,7 @@ Technical founders, backend engineers, staff engineers, platform leads, and AI-a
 ## Positioning
 
 - Local-first and private by default.
-- Managed local Postgres cluster by default; users supply PostgreSQL server binaries. Explicit external Postgres profiles remain optional. PGSandbox does not offer hosted databases or install PostgreSQL binaries.
+- Managed local Postgres cluster by default. Setup and `ensure_postgres` can install missing PostgreSQL binaries through a supported package manager when available; users install them manually when that path is unavailable. Explicit external Postgres profiles remain optional. PGSandbox does not offer hosted databases.
 - Narrow MCP surface for database lifecycle, not a general SQL IDE or admin shell.
 - One task gets one database, one scoped role, TTL metadata, bounded query results, and cleanup.
 - The core promise is safer verification: agents can prove migrations, SQL, seeded states, and bug reproductions against real Postgres.
@@ -65,7 +65,7 @@ Write like a technical founder explaining infrastructure to another technical op
 ## Forbidden Words and Moves
 
 - Do not call it "magic", "revolutionary", "effortless", "seamless", "game-changing", or "AI-powered" as filler.
-- Do not imply PGSandbox installs, hosts, or manages Postgres.
+- Do not imply PGSandbox provides hosted databases, installs PostgreSQL without a supported package manager, or deletes expired sandboxes without an explicit cleanup call or user-owned scheduler.
 - Do not imply it can mutate production databases safely.
 - Do not invent customer stories, usage metrics, benchmarks, or incident claims.
 - Do not publish unmasked database URLs.

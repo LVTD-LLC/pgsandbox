@@ -1,0 +1,36 @@
+[
+  {
+    "claim": "Installation is supported; blanket no-install claims are stale",
+    "paths": [
+      "site/src/content/blog/*.md",
+      "site/src/pages/docs/architecture.astro",
+      "AGENTS.md",
+      ".seo/brand.md"
+    ],
+    "urls": [
+      "/blog/*",
+      "/docs/architecture/"
+    ],
+    "must_not_match": [
+      "(?<![A-Za-z])(?:It|PGSandbox) does not install (?:Postgres[.,]|Postgres versions|or host PostgreSQL|,?host, or reconfigure)",
+      "PGSandbox does not install, host, or reconfigure"
+    ],
+    "flags": "i"
+  },
+  {
+    "claim": "Homepage must state explicit expired cleanup",
+    "paths": [
+      "site/src/pages/index.astro"
+    ],
+    "urls": [
+      "/"
+    ],
+    "must_not_match": [
+      "after the task, or when the TTL expires"
+    ],
+    "must_match": [
+      "cleanup_expired"
+    ],
+    "flags": "i"
+  }
+]

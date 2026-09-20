@@ -4,7 +4,7 @@ excerpt: "Database branching is great for preview environments and team workflow
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-06-29"
-updatedAt: "2026-06-29"
+updatedAt: "2026-09-20"
 tags: ["database branching", "Postgres", "AI agents", "MCP", "sandboxes"]
 category: "Engineering"
 metaTitle: "Database Branching vs Disposable Sandboxes"
@@ -98,7 +98,7 @@ That gives you a different default from a shared development database:
 - Cleanup can target only PGSandbox-created resources.
 - The database can be created empty or cloned from an existing Postgres source when realistic data matters.
 
-PGSandbox is not a hosted database branching provider today. It does not install Postgres, host Postgres, or replace Neon, Supabase, PlanetScale, Xata, RDS, or your existing database platform. It sits in front of Postgres you already control and gives agents a disposable database workflow through MCP.
+PGSandbox is not a hosted database branching provider today. It manages a local Postgres cluster by default, and setup can install missing PostgreSQL binaries through a supported package manager when available. You can also configure an explicit external Postgres profile. It gives agents a disposable database workflow through MCP; it does not replace Neon, Supabase, PlanetScale, Xata, RDS, or your existing hosted database platform.
 
 That distinction is the product boundary.
 

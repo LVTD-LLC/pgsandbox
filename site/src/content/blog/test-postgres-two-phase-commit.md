@@ -4,7 +4,7 @@ excerpt: "Prove prepare-state invisibility, pg_prepared_xacts identity, cross-se
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-08-01"
-updatedAt: "2026-08-01T06:00:00Z"
+updatedAt: "2026-09-20"
 tags: ["Postgres", "two-phase commit", "prepared transactions", "integration testing", "coding agents"]
 category: "Engineering"
 metaTitle: "Test PostgreSQL Two-Phase Commit"
@@ -102,7 +102,7 @@ The right value depends on the coordinator's maximum in-flight work. PostgreSQL 
 
 Register that server as an explicit PGSandbox profile, then select the profile by name. PGSandbox remains responsible for creating and tracking the task database. The profile operator remains responsible for PostgreSQL startup configuration.
 
-This boundary follows the [PGSandbox architecture](/docs/architecture/): lifecycle commands use the configured admin connection, while test SQL runs through a scoped role inside the sandbox database. PGSandbox does not install, host, or reconfigure your PostgreSQL server.
+This boundary follows the [PGSandbox architecture](/docs/architecture/): lifecycle commands use the configured admin connection, while test SQL runs through a scoped role inside the sandbox database. PGSandbox manages a local Postgres cluster by default, and setup can install missing binaries through a supported package manager when available. It does not provide hosted databases or enable two-phase commit for this test: configure the selected server deliberately before running the harness.
 
 ## 2. Create a deterministic two-phase commit test
 

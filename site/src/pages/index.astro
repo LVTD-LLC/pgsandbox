@@ -48,7 +48,7 @@ const structuredData = {
         <p class="hero-kicker"><span>Open source</span><i aria-hidden="true"></i>Local-first Postgres MCP server</p>
         <h1>Safe Postgres for coding agents.</h1>
         <p class="hero-summary">
-          PGSandbox gives each agent task an isolated database, then cleans it up when the work is done.
+          PGSandbox gives each agent task an isolated database with a tracked cleanup workflow.
         </p>
         <div class="hero-action">
           <button class="button primary copy-prompt-button" type="button" data-copy-setup-prompt>
@@ -99,7 +99,7 @@ const structuredData = {
           </div>
           <div>
             <dt><span>03</span>Delete</dt>
-            <dd>PGSandbox removes the tracked database and role after the task, or when the TTL expires.</dd>
+            <dd>Your agent deletes the tracked database and role after the task. Expired sandboxes are removed when you call <code>cleanup_expired</code> or schedule that cleanup yourself.</dd>
           </div>
         </dl>
       </div>
