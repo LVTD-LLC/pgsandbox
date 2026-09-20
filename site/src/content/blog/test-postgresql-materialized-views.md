@@ -4,7 +4,7 @@ excerpt: "Prove the installed definition, stale-data boundary, refresh behavior,
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-08-10"
-updatedAt: "2026-08-10T06:00:00Z"
+updatedAt: "2026-09-20"
 tags: ["Postgres", "materialized views", "integration testing", "database migrations", "coding agents"]
 category: "Engineering"
 metaTitle: "How to Test PostgreSQL Materialized Views"
@@ -349,7 +349,7 @@ Use the [PGSandbox MCP tool contract](/docs/mcp-tools/) to keep lifecycle author
 5. Keep output bounded and redact connection strings.
 6. Call `delete_database` with the safe database ID and retain only the credential-free result.
 
-The [disposable Postgres integration-test guide](/blog/run-integration-tests-disposable-postgres-database/) shows how to wrap provisioning, command execution, timeout handling, and cleanup around a repository test command. PGSandbox does not install or host PostgreSQL; it creates a database and scoped role on an existing configured server.
+The [disposable Postgres integration-test guide](/blog/run-integration-tests-disposable-postgres-database/) shows how to wrap provisioning, command execution, timeout handling, and cleanup around a repository test command. PGSandbox creates a database and scoped role on its managed local runtime or an explicit external Postgres profile. Setup can install missing PostgreSQL binaries through a supported package manager when available; this is local developer infrastructure, not a hosted database service.
 
 The CLI provides the same one-shot lifecycle for a local repository:
 

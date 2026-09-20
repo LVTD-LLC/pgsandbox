@@ -1,6 +1,8 @@
 {
   "domain": "https://pgsandbox.dev",
-  "stack": "astro",
+  "stack": {
+    "kind": "astro"
+  },
   "language": "markdown",
   "content_dir": "site/src/content/blog",
   "content_layout": "site/src/pages/blog/[slug].astro",
@@ -29,5 +31,146 @@
     "hostname": "pgsandbox.dev",
     "api_key_env": "PLAUSIBLE_API_KEY",
     "note": "Existing property retained to preserve history; new-domain pageview ingestion verified 2026-09-19. The Sites API is unavailable on this deployment."
-  }
+  },
+  "gsc": {
+    "site_url": "sc-domain:pgsandbox.dev",
+    "status": "attempted_failed"
+  },
+  "posthog": {},
+  "research_store": {
+    "backend": "rowset",
+    "project_key": "c1734535-4a04-4138-97d1-f2814af34cb7",
+    "section_key": "9b3ffb99-d82c-42ac-9f80-d695c73d5c0e",
+    "datasets": {
+      "history": "dfa42306-949e-4413-bb25-8f89611cd6ab"
+    },
+    "index_column": "record_key",
+    "schema_version": 1,
+    "legacy_migration": {
+      "verified_records": 65,
+      "source_head": "00902a66af09569498c0983a17d0f2c483fa8833",
+      "verified_at": "2026-09-20T06:05:00Z"
+    },
+    "note": "Kinds run/action/claim/observation/research/brief/archive share the private history dataset. Immutable legacy files are migration inputs, not a second active ledger. Paginate all matching rows and exact-filter locally; hydrate private script projections. Latest run key is pgsandbox.dev|run|<scheduled Istanbul date>."
+  },
+  "tool_evidence": {
+    "openseo": {
+      "status": "connected",
+      "checked_at": "2026-09-20",
+      "scope": "a462f88e-3f0f-4ee6-ac2b-99e7ca45e8be",
+      "probe": "get_project_context"
+    },
+    "openseo_gsc": {
+      "status": "attempted_failed",
+      "checked_at": "2026-09-20",
+      "reason": "expired or revoked connection on three performance reads"
+    },
+    "plausible": {
+      "status": "connected",
+      "checked_at": "2026-09-20",
+      "coverage": "rows",
+      "probe": "POST /api/v2/query; historical property filtered to pgsandbox.dev hostname"
+    },
+    "rowset": {
+      "status": "connected",
+      "checked_at": "2026-09-20",
+      "coverage": "rows",
+      "probe": "65 imported history rows read back with identical payloads; private preview disabled"
+    },
+    "posthog": {
+      "status": "not_checked",
+      "reason": "No project locator or PostHog instrumentation in this repository; configured analytics source is Plausible. Not zero traffic."
+    },
+    "gsc": {
+      "status": "attempted_failed",
+      "checked_at": "2026-09-20",
+      "scope": "sc-domain:pgsandbox.dev",
+      "probe": "Direct service-account property listing and Search Analytics/Inspection",
+      "reason": "Service account authenticates but property is absent and scoped reads return HTTP 403; OpenSEO bridge separately expired."
+    }
+  },
+  "radar": {
+    "_comment": "Demand radar seeds: 5-15 topic phrases in the audience's own words (not product names) and the communities where the ideal customer talks. cadence_days governs the paid tier (news, trends, video); the free tier runs daily.",
+    "seeds": [
+      "postgres mcp server",
+      "disposable postgres test database",
+      "database migration testing",
+      "postgres sandbox cleanup",
+      "postgres clone database",
+      "coding agent database isolation"
+    ],
+    "communities": [
+      "reddit.com/r/PostgreSQL"
+    ],
+    "cadence_days": 7,
+    "evidence": "Inferred from existing brand and shipped content; not independently measured demand."
+  },
+  "repo": {
+    "_comment": "Product-change panel (measure.md 4b). scripts/repo_changes.py lists commits since the last run that touch these globs; a shipped feature, a price change or a removed route is the freshest demand signal the site has. Fill with this repo's real paths.",
+    "watch_paths": [
+      "README.md",
+      "CHANGELOG.md",
+      "docs/**",
+      "rust-src/**",
+      "site/src/**"
+    ]
+  },
+  "serp": {
+    "_comment": "SERP-feature panel (measure.md 3d). Weekly serp_organic_live_advanced on the top N queries by clicks; serp_features.py records which features appeared and whether the AI Overview cites us.",
+    "top_queries": 20
+  },
+  "distribute": {
+    "_comment": "Restore the full distribute lane: discovery push, Postiz owned-channel drafts, and one third-party brief. Postiz scheduling/posting uses the user's explicit channel/content authorization; site-shipping autonomy is not blanket social/outreach permission.",
+    "social_skill": "postiz",
+    "window_days": 14
+  },
+  "cadence": {
+    "_comment": "Freshness windows in hours; a panel younger than its window is read from cache. See measure.md section 0. Weekly (168) and monthly (720) panels: competitor delta, SERP features, backlinks new/lost, link opportunities, seasonality, on-site search.",
+    "gsc_hours": 20,
+    "health_hours": 6,
+    "link_check_hours": 20,
+    "radar_free_hours": 20,
+    "bing_hours": 20,
+    "outcomes_hours": 20,
+    "competitor_hours": 168,
+    "serp_hours": 168,
+    "backlinks_hours": 168,
+    "link_opportunities_hours": 168,
+    "seasonality_hours": 720,
+    "site_search_hours": 168
+  },
+  "site": {
+    "domain": "https://pgsandbox.dev",
+    "sitemap_url": "https://pgsandbox.dev/sitemap.xml"
+  },
+  "paths": {
+    "roadmap": ".seo/roadmap.md",
+    "ledger": ".seo/content-ledger.md",
+    "truth": ".seo/truth.md",
+    "needs_you": ".seo/needs-you.md",
+    "runs": ".seo/runs/",
+    "health": ".seo/health/",
+    "briefs": ".seo/briefs/",
+    "evidence": ".seo/evidence/"
+  },
+  "budget": {
+    "per_run_usd": 2,
+    "ai_panel_cadence_days": 14,
+    "health_diff_cadence_days": 1,
+    "claim_reverify_sample": 3,
+    "_comment": "Unattended runs stay under per_run_usd. Cost never overrides a quality gate \u2014 if a decision needs a number, buy it or say you couldn't and why.",
+    "link_check_cadence_days": 7
+  },
+  "select": {
+    "floor": 9,
+    "_comment": "Below this rubric score (of a possible 40) the best unblocked candidate loses to measure-only. See references/select.md \u00a77."
+  },
+  "bing": {
+    "api_key_env": null,
+    "site_url": null,
+    "_comment": "Optional. api_key_env names the environment variable holding the Bing Webmaster API key; never store the key itself. The AI Performance report is UI-only \u2014 no API. Record Bing as a separate panel, never summed with Google."
+  },
+  "_legacy_keys_note": "Flat pre-v2 keys are kept for anything that still reads them. The nested blocks above are authoritative. `stack` was a string in v1; its value now lives at stack.kind.",
+  "version": "2.2",
+  "initialized": true
 }

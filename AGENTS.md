@@ -13,9 +13,11 @@ inspect, use, and delete disposable Postgres databases. The goal is to make a
 real isolated database the easy default for migrations, SQL validation, seeded
 demo states, and backend bug reproduction.
 
-The package is a Rust native CLI and MCP stdio server. It does not install or
-manage Postgres itself. It targets one or more existing Postgres admin
-connections configured by environment variables or a JSON config file.
+The package is a Rust native CLI and MCP stdio server. It manages a local
+Postgres cluster by default. Setup and `ensure_postgres` can install missing
+PostgreSQL binaries through a supported package manager when available.
+Explicit external Postgres admin profiles remain optional and can be configured
+by environment variables or a JSON config file.
 
 ## First Files To Read
 

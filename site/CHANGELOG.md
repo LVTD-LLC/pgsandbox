@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-20
+
+- Corrected website and guide claims about managed local PostgreSQL, supported package-manager installation, and explicit expired-sandbox cleanup.
+- Recorded content-specific modification dates for the corrected pages.
+- Completed the unified SEO foundation and private history migration while preserving legacy source records and analytics identity.
+
 ## 2026-09-19
 
 - Fixed website 404 responses and proxy-safe trailing-slash redirects after the pgsandbox.dev migration.

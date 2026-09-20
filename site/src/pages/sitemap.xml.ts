@@ -13,6 +13,12 @@ const staticPages = [
   '/changelog/'
 ];
 
+const staticPageModified: Record<string, string> = {
+  '/': '2026-09-20',
+  '/docs/architecture/': '2026-09-20',
+  '/changelog/': '2026-09-20'
+};
+
 async function getSitemapBlogPosts() {
   try {
     return await getPublishedBlogPosts();
@@ -55,9 +61,8 @@ export const GET: APIRoute = async ({ site }) => {
   const latestPost = posts[0];
   const latestLastmod = sitemapLastmod(latestPost?.data.updatedAt, latestPost?.data.publishedAt);
   const pages = [
-    // Only the blog listing changes when the newest article changes. Static pages
-    // omit lastmod until they have their own reliable content-modification dates.
-    ...staticPages.map((path) => ({ path, lastmod: path === '/blog/' ? latestLastmod : undefined })),
+    // Static dates are explicit content edits, never the build date.
+    ...staticPages.map((path) => ({ path, lastmod: path === '/blog/' ? latestLastmod : staticPageModified[path] })),
     ...posts.map((post) => ({
       path: getBlogCanonicalUrl(post, baseUrl) || `/blog/${getBlogSlug(post)}/`,
       lastmod: sitemapLastmod(post.data.updatedAt, post.data.publishedAt)
