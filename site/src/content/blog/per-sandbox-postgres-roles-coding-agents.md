@@ -4,7 +4,7 @@ excerpt: "Use one login role per disposable Postgres database, keep admin creden
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-07-16"
-updatedAt: "2026-07-16T06:00:00Z"
+updatedAt: "2026-09-21T06:00:00Z"
 tags: ["Postgres", "MCP", "database roles", "least privilege", "coding agents"]
 category: "Engineering"
 metaTitle: "Per-Sandbox Postgres Roles for Coding Agents"
@@ -56,7 +56,7 @@ One role per sandbox changes the unit of control:
 
 The value is not that the agent becomes harmless. A database owner can still change or drop objects inside its database. That is the point of a writable task sandbox: the agent needs enough authority to prove migrations and application behavior. The safety improvement is that this destructive authority lands in a disposable database instead of a shared development or production database.
 
-This is also why a sandbox role should not be a generic read-only reporting role. Agent development work often needs `CREATE TABLE`, `ALTER TABLE`, data writes, extension installation, and rollback testing. The right target is **full task authority inside a disposable boundary**, not a weak credential that cannot exercise the code under review.
+This is also why a sandbox role should not be a generic read-only reporting role. Agent development work often needs `CREATE TABLE`, `ALTER TABLE`, data writes, extension-backed application behavior, and rollback testing. PGSandbox provisions requested extensions through the profile-allowed lifecycle-admin path; it does not grant the task role ownership or management of those extensions. The right target is **application task authority inside a disposable boundary**, not a weak credential that cannot exercise the code under review.
 
 ## What PGSandbox creates for one task
 
@@ -287,7 +287,7 @@ Terminate its sessions, drop the owned sandbox database, drop the matching role,
       "@type": "Article",
       "headline": "Per-Sandbox Postgres Roles for Coding Agents",
       "datePublished": "2026-07-16",
-      "dateModified": "2026-07-16",
+      "dateModified": "2026-09-21",
       "author": {"@type": "Organization", "name": "PGSandbox Team"},
       "mainEntityOfPage": "https://pgsandbox.dev/blog/per-sandbox-postgres-roles-coding-agents/"
     },

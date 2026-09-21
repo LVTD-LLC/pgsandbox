@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-09-21
+
+- Corrected extension-provisioning authority, profile allowlist, and ownership guidance across four existing blog guides.
+- Distinguished lifecycle-admin extension setup from restricted application SQL and updated the guides' modification dates.
+
 ## 2026-09-20
 
 - Corrected website and guide claims about managed local PostgreSQL, supported package-manager installation, and explicit expired-sandbox cleanup.

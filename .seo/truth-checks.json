@@ -32,5 +32,22 @@
       "cleanup_expired"
     ],
     "flags": "i"
+  },
+  {
+    "claim": "Requested extension provisioning uses the allowlisted lifecycle-admin path, not the sandbox role",
+    "paths": [
+      "site/src/content/blog/*.md"
+    ],
+    "urls": [
+      "/blog/*"
+    ],
+    "must_not_match": [
+      "installation runs through the generated sandbox role",
+      "install through the sandbox role",
+      "CREATE EXTENSION IF NOT EXISTS.{0,30}through the generated sandbox role",
+      "required extension requested through the task role boundary",
+      "does not hide that boundary by installing every extension"
+    ],
+    "flags": "i"
   }
 ]
