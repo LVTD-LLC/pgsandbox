@@ -34,7 +34,7 @@
   },
   "gsc": {
     "site_url": "sc-domain:pgsandbox.dev",
-    "status": "attempted_failed"
+    "status": "connected"
   },
   "posthog": {},
   "research_store": {
@@ -61,9 +61,10 @@
       "probe": "get_project_context"
     },
     "openseo_gsc": {
-      "status": "attempted_failed",
-      "checked_at": "2026-09-20",
-      "reason": "expired or revoked connection on three performance reads"
+      "status": "connected",
+      "checked_at": "2026-09-21",
+      "coverage": "empty",
+      "probe": "Successful finalized page and query-page reads plus URL Inspection; new-domain migration still processing. Earlier error wording did not prove revoked credentials."
     },
     "plausible": {
       "status": "connected",
@@ -86,7 +87,7 @@
       "checked_at": "2026-09-20",
       "scope": "sc-domain:pgsandbox.dev",
       "probe": "Direct service-account property listing and Search Analytics/Inspection",
-      "reason": "Service account authenticates but property is absent and scoped reads return HTTP 403; OpenSEO bridge separately expired."
+      "reason": "Earlier direct service-account 403 is a separate path. Preferred OpenSEO reads verified working on 2026-09-21; no direct fallback required."
     }
   },
   "radar": {

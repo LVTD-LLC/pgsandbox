@@ -4,7 +4,7 @@ excerpt: "Test pg_stat_statements preload setup, database registration, task-rol
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-07-21"
-updatedAt: "2026-07-21T06:00:00Z"
+updatedAt: "2026-09-21T06:00:00Z"
 tags: ["Postgres", "pg_stat_statements", "query performance", "database testing", "coding agents"]
 category: "Engineering"
 metaTitle: "Test pg_stat_statements in Agent Sandboxes"
@@ -135,9 +135,11 @@ Create a disposable database on the configured profile and request the extension
 }
 ```
 
-Use that input with `create_database`. PGSandbox checks `pg_available_extensions` in the new target, then runs `CREATE EXTENSION IF NOT EXISTS` through the generated sandbox role. If extension installation fails, database creation is rolled back so the task does not continue with an ambiguous half-configured sandbox.
+Use that input with `create_database`. PGSandbox checks `pg_available_extensions` in the new target, then runs `CREATE EXTENSION IF NOT EXISTS` through the profile admin connection after validating the profile's `allowedExtensions` policy. The installed extension remains lifecycle-admin-owned; the returned sandbox role does not gain extension-management authority. If extension installation fails, database creation is rolled back so the task does not continue with an ambiguous half-configured sandbox.
 
 This is where the cluster and database boundaries meet. The operator has prepared the server; the agent asks for the database-local object it needs. The returned sandbox role remains the credential for task SQL. The admin profile stays on the lifecycle side of the boundary described in the [PGSandbox architecture](/docs/architecture/).
+
+`pg_stat_statements` is in the managed-local default allowlist. An explicit profile must authorize it in `allowedExtensions`; `extension_not_allowed` means that policy must be configured before provisioning.
 
 If the request returns `extension_setup_required`, stop. Confirm that you restarted the profile selected by the request, not a different PostgreSQL instance. If it returns `invalid_extensions`, confirm the package files exist for that exact server major and installation.
 
@@ -360,7 +362,7 @@ Use both when the task needs both perspectives. `EXPLAIN` inspects the plan for 
       "headline": "How to Test pg_stat_statements in Agent Sandboxes",
       "description": "Test pg_stat_statements preload setup, database registration, task-role visibility, query capture, clone behavior, and cleanup in disposable Postgres sandboxes.",
       "datePublished": "2026-07-21",
-      "dateModified": "2026-07-21",
+      "dateModified": "2026-09-21",
       "author": {"@type": "Organization", "name": "PGSandbox Team"},
       "publisher": {"@type": "Organization", "name": "PGSandbox MCP"},
       "mainEntityOfPage": "https://pgsandbox.dev/blog/test-pg-stat-statements-agent-sandboxes/"

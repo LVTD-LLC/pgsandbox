@@ -9,3 +9,11 @@ Verified against current main `00902a6` on 2026-09-20. Evidence details and obse
 | Bounded SQL results | run_sql preserves row limits and truncation metadata; the limit applies independently to statements with result sets. | docs/mcp-tools.md run_sql; rust-src/postgres.rs (2026-09-20) | Medium |
 
 Do not generalize package-manager support into guaranteed installation. Do not imply that PGSandbox is a hosted service or that TTL alone enforces immediate resource removal.
+
+## Extension provisioning — verified 2026-09-21
+
+| Claim | Supported wording | Dated primary source | Risk |
+|---|---|---|---|
+| Requested extensions | create_database and clone_database validate allowedExtensions, then use the profile admin connection to install available extensions in the target database. Task SQL uses restricted sandbox credentials. | README.md, Extension workflows; docs/mcp-tools.md, create_database; rust-src/postgres.rs, create_database_internal and install_extensions at adbe9a8 (2026-09-21) | High |
+| Profile defaults | Managed-local defaults allow pgcrypto, pg_stat_statements, pg_trgm, uuid-ossp and vector. Explicit profiles require an operator-configured allowlist. | rust-src/config.rs; rust-src/postgres.rs, validate_allowed_extensions; docs/mcp-tools.md (2026-09-21) | High |
+| Ownership boundary | Lifecycle-installed extensions remain owned by the lifecycle role; provisioning does not grant extension-management authority to the sandbox role. Direct SQL follows PostgreSQL privileges. | README.md, Security model; PostgreSQL CREATE EXTENSION documentation (2026-09-21) | High |

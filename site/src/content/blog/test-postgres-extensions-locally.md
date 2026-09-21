@@ -4,7 +4,7 @@ excerpt: "Test PostgreSQL extension availability, installation, behavior, migrat
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-07-19"
-updatedAt: "2026-07-19T06:00:00Z"
+updatedAt: "2026-09-21T06:00:00Z"
 tags: ["Postgres", "PostgreSQL extensions", "database testing", "MCP", "coding agents"]
 category: "Engineering"
 metaTitle: "Test PostgreSQL Extensions Locally in Sandboxes"
@@ -41,7 +41,7 @@ Extension testing becomes clearer when you separate five gates that are often co
 | Gate | Question | Evidence |
 | --- | --- | --- |
 | Availability | Does this PostgreSQL profile have the extension's control and script files? | Profile-scoped `list_extensions` result |
-| Installation | Can the sandbox role install the requested extension in a new database? | `create_database.installedExtensions` and sandbox-scoped `list_extensions` |
+| Installation | Can the lifecycle admin install the profile-allowed extension in a new database? | `create_database.installedExtensions` and sandbox-scoped `list_extensions` |
 | Behavior | Does the exact function, type, operator, or index needed by the application work? | Small deterministic `run_sql` assertion |
 | Migration compatibility | Can the real migration, schema clone, or restore reproduce the dependency? | Repo command result plus schema digest or diff |
 | Cleanup | Did the test remove its database and generated role without touching unrelated resources? | `delete_database` result or intentional TTL record |
@@ -106,9 +106,11 @@ After availability passes, request the extension as part of sandbox creation:
 
 PGSandbox trims extension names, lowercases them, removes duplicates, and accepts only single identifiers containing letters, numbers, underscores, or hyphens. It checks the selected target's `pg_available_extensions` view before executing `CREATE EXTENSION IF NOT EXISTS`.
 
-The installation runs through the generated sandbox role connection, not the admin connection. That detail gives the test practical value: it verifies the authority available inside the task database instead of silently using lifecycle credentials to make the check pass.
+Requested extension installation is a lifecycle operation: PGSandbox uses the profile admin connection, scoped to the new database, after checking the profile's `allowedExtensions` policy. The returned sandbox role remains restricted. Successful provisioning proves that the approved setup path works; application behavior and migration checks must still run through the task role.
 
-The [MCP tool contract](/docs/mcp-tools/) documents two useful failure branches:
+The [MCP tool contract](/docs/mcp-tools/) documents three useful failure branches:
+
+- `extension_not_allowed` means the selected profile has not authorized the requested extension. PGSandbox rejects the request before creating resources.
 
 - `invalid_extensions` means the name is malformed, unavailable on the selected profile, or failed normal installation.
 - `extension_setup_required` means PostgreSQL reported a recognized server-level requirement, such as preload configuration.
@@ -119,7 +121,9 @@ PGSandbox removes the new database and generated role if requested extension ins
 
 PostgreSQL's [`CREATE EXTENSION` documentation](https://www.postgresql.org/docs/current/sql-createextension.html) says a trusted extension can be installed by a user that has `CREATE` privilege on the current database. Extensions that are not trusted generally require superuser privileges.
 
-PGSandbox does not hide that boundary by installing every extension through its admin connection. If the task role cannot install the extension under the selected profile's rules, the workflow should fail and tell you that the environment needs deliberate server setup.
+PGSandbox separates provisioning from task SQL. Managed-local profiles allow `pgcrypto`, `pg_stat_statements`, `pg_trgm`, `uuid-ossp`, and `vector` by default. Explicit profiles allow no privileged extension installation until the operator configures `allowedExtensions`. The lifecycle admin must have the required installation privileges; package availability alone does not grant that authority.
+
+Extensions installed by this lifecycle path remain owned by the lifecycle role. The sandbox role is not granted extension-management authority merely because it can use the extension. A direct `CREATE EXTENSION` issued through `run_sql` instead runs as the sandbox role and is subject to that role's PostgreSQL privileges.
 
 Do not repair the failure by granting the coding agent a superuser login. Configure an explicit profile for the extension, document the requirement, or choose a different test environment. The [PGSandbox architecture](/docs/architecture/) keeps lifecycle authority and task SQL authority separate for this reason.
 
@@ -287,7 +291,7 @@ An entry in `pg_available_extensions` means PostgreSQL can see the extension pac
 
 ### Using admin credentials for behavior tests
 
-That hides privilege and ownership failures. Install and run application checks through the task database role whenever the real workflow expects that role to own the objects.
+That hides application privilege and ownership failures. Let the approved lifecycle path provision requested extensions, then run application checks through the task database role. If the real deployment expects an application migration to install or update an extension itself, test that separate privilege requirement explicitly; provisioning success does not prove it.
 
 ### Checking only the extension name
 
@@ -313,9 +317,9 @@ Query `pg_extension` in the target database, or use sandbox-scoped `list_extensi
 
 The extension package files are available to a PostgreSQL installation, while `CREATE EXTENSION` registers the extension and its objects in one database. PostgreSQL documents extensions as database-local; roles, databases, and tablespaces cannot be extension members because those objects are cluster-wide.
 
-### Why is an extension available but not installable by the sandbox role?
+### Why can requested extension provisioning fail when the package is available?
 
-Availability proves that PostgreSQL can find the extension control and script files. Installation can still require superuser authority, a trusted-extension declaration, a server package, or preload configuration. Treat that as a profile setup decision instead of granting a coding agent broad cluster privileges.
+Availability proves that PostgreSQL can find the extension control and script files. Requested provisioning also needs the selected profile's allowlist, sufficient lifecycle-admin privileges, and any required server configuration. Check `extension_not_allowed`, `invalid_extensions`, or `extension_setup_required` and fix the profile setup instead of granting the coding agent broad cluster privileges.
 
 ### Should the application migration run CREATE EXTENSION?
 
@@ -334,10 +338,10 @@ Request required target extensions through `clone_database.extensions` so PGSand
       "name": "How to Test PostgreSQL Extensions in Disposable Sandboxes",
       "description": "Test PostgreSQL extension availability, installation, application behavior, migration compatibility, and cleanup in a disposable task database.",
       "datePublished": "2026-07-19",
-      "dateModified": "2026-07-19",
+      "dateModified": "2026-09-21",
       "step": [
         {"@type": "HowToStep", "position": 1, "name": "Match the PostgreSQL profile", "text": "Select the target PostgreSQL major or explicit profile and list the extensions available there."},
-        {"@type": "HowToStep", "position": 2, "name": "Create an extension sandbox", "text": "Create a disposable database with the required extension requested through the task role boundary."},
+        {"@type": "HowToStep", "position": 2, "name": "Create an extension sandbox", "text": "Create a disposable database with the required extension installed through the profile-allowed lifecycle-admin path; keep task SQL on the restricted sandbox role."},
         {"@type": "HowToStep", "position": 3, "name": "Verify the installed version", "text": "Use sandbox-scoped extension discovery or pg_extension to record the installed extension version."},
         {"@type": "HowToStep", "position": 4, "name": "Test application behavior", "text": "Run a small deterministic function, type, operator, or index check that represents the application's real dependency."},
         {"@type": "HowToStep", "position": 5, "name": "Test migration compatibility", "text": "Run the real migration or clone path and capture extension-aware schema evidence."},
@@ -358,7 +362,7 @@ Request required target extensions through `clone_database.extensions` so PGSand
       "mainEntity": [
         {"@type": "Question", "name": "How do I list installed PostgreSQL extensions?", "acceptedAnswer": {"@type": "Answer", "text": "Query pg_extension in the target database or use sandbox-scoped list_extensions. pg_extension shows installed entries and versions, while pg_available_extensions lists packages available for installation."}},
         {"@type": "Question", "name": "Are PostgreSQL extensions installed per database or per server?", "acceptedAnswer": {"@type": "Answer", "text": "Extension package files are available to a PostgreSQL installation, while CREATE EXTENSION registers the extension and its objects in one database."}},
-        {"@type": "Question", "name": "Why is an extension available but not installable by the sandbox role?", "acceptedAnswer": {"@type": "Answer", "text": "Availability proves PostgreSQL can find the package files. Installation can still require superuser authority, a trusted-extension declaration, a server package, or preload configuration."}},
+        {"@type": "Question", "name": "Why can requested extension provisioning fail when the package is available?", "acceptedAnswer": {"@type": "Answer", "text": "Availability proves PostgreSQL can find the package files. Requested provisioning also requires profile allowlist approval, sufficient lifecycle-admin privileges, and any required server configuration."}},
         {"@type": "Question", "name": "Should the application migration run CREATE EXTENSION?", "acceptedAnswer": {"@type": "Answer", "text": "Only when the migration role is intentionally allowed to install that extension in every target environment. Otherwise, treat installation as a platform prerequisite and test that boundary explicitly."}},
         {"@type": "Question", "name": "How do I test an extension-dependent database clone?", "acceptedAnswer": {"@type": "Answer", "text": "Request required target extensions so they are installed before pg_restore, exclude only source-specific entries the sandbox does not need, then verify installed versions and application behavior after restore."}}
       ]
