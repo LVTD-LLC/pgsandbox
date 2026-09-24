@@ -4,7 +4,7 @@ excerpt: "Run agent-generated SQL against a disposable Postgres sandbox with rea
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-07-08"
-updatedAt: "2026-07-08"
+updatedAt: "2026-09-24T06:00:00Z"
 tags: ["Postgres", "SQL", "AI agents", "MCP", "query results"]
 category: "Engineering"
 metaTitle: "Run Agent SQL with Bounded Postgres Results"
@@ -29,7 +29,7 @@ A useful agent SQL proof loop looks like this:
 7. Run intentional mutation only when the task actually needs it.
 8. Delete the sandbox or leave an explicit TTL cleanup path.
 
-The information-gain point is the result contract. For coding agents, bounded SQL output is not a convenience feature. It is the review surface that converts "the agent queried the database" into a small, inspectable proof record.
+For coding agents, bounded SQL output is not a convenience feature. It is the review surface that converts "the agent queried the database" into a small, inspectable proof record.
 
 ## Why bounded Postgres results matter for agents
 

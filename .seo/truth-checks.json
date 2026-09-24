@@ -49,5 +49,54 @@
       "does not hide that boundary by installing every extension"
     ],
     "flags": "i"
+  },
+  {
+    "claim": "Corrected reader-facing guides do not expose internal editorial labels",
+    "paths": [
+      "site/src/content/blog/cleanup-expired-vs-manual-postgres-cleanup.md",
+      "site/src/content/blog/database-migration-testing-agent-pr.md",
+      "site/src/content/blog/how-to-create-postgres-test-database-agent-sql.md",
+      "site/src/content/blog/owner-label-policy-shared-pgsandbox-profiles.md",
+      "site/src/content/blog/postgres-explain-plan-agent-sql.md",
+      "site/src/content/blog/postgres-mcp-server-error-handling-coding-agents.md",
+      "site/src/content/blog/postgres-run-sql-bounded-results.md",
+      "site/src/content/blog/postgres-schema-snapshots-agent-migration-reviews.md",
+      "site/src/content/blog/postgres-template-database-vs-task-sandbox.md",
+      "site/src/content/blog/test-postgres-deadlocks-lock-timeouts.md",
+      "site/src/content/blog/test-postgres-foreign-key-cascades.md",
+      "site/src/content/blog/test-postgres-row-level-security.md",
+      "site/src/content/blog/test-postgres-savepoints-partial-rollbacks.md",
+      "site/src/content/blog/test-postgres-statement-timeouts-query-cancellation.md",
+      "site/src/content/blog/test-postgresql-exclusion-constraints.md",
+      "site/src/content/blog/test-postgresql-generated-columns.md",
+      "site/src/content/blog/test-postgresql-listen-notify-workflows.md",
+      "site/src/content/blog/test-postgresql-partial-indexes.md",
+      "site/src/content/blog/testcontainers-vs-disposable-postgres-sandboxes.md"
+    ],
+    "urls": [
+      "/blog/cleanup-expired-vs-manual-postgres-cleanup/",
+      "/blog/database-migration-testing-agent-pr/",
+      "/blog/how-to-create-postgres-test-database-agent-sql/",
+      "/blog/owner-label-policy-shared-pgsandbox-profiles/",
+      "/blog/postgres-explain-plan-agent-sql/",
+      "/blog/postgres-mcp-server-error-handling-coding-agents/",
+      "/blog/postgres-run-sql-bounded-results/",
+      "/blog/postgres-schema-snapshots-agent-migration-reviews/",
+      "/blog/postgres-template-database-vs-task-sandbox/",
+      "/blog/test-postgres-deadlocks-lock-timeouts/",
+      "/blog/test-postgres-foreign-key-cascades/",
+      "/blog/test-postgres-row-level-security/",
+      "/blog/test-postgres-savepoints-partial-rollbacks/",
+      "/blog/test-postgres-statement-timeouts-query-cancellation/",
+      "/blog/test-postgresql-exclusion-constraints/",
+      "/blog/test-postgresql-generated-columns/",
+      "/blog/test-postgresql-listen-notify-workflows/",
+      "/blog/test-postgresql-partial-indexes/",
+      "/blog/testcontainers-vs-disposable-postgres-sandboxes/"
+    ],
+    "must_not_match": [
+      "information[ -]gain"
+    ],
+    "flags": "i"
   }
 ]

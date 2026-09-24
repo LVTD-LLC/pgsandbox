@@ -4,7 +4,7 @@ excerpt: "Create a task-scoped Postgres test database when a coding agent needs 
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-07-02"
-updatedAt: "2026-07-02"
+updatedAt: "2026-09-24T06:00:00Z"
 tags: ["Postgres", "test database", "AI agents", "MCP", "SQL validation"]
 category: "Engineering"
 metaTitle: "Postgres Test Database for Agent SQL"
@@ -31,7 +31,7 @@ The useful pattern is a short-lived proof harness:
 5. Inspect the result and schema diff.
 6. Clean up the database and role.
 
-PGSandbox exists to make that loop explicit for MCP clients. The information-gain point is not "use a test database." It is this: agent SQL needs a database lifecycle with authority, state, output, and cleanup boundaries, not just a convenient connection string.
+PGSandbox exists to make that loop explicit for MCP clients. Agent SQL needs a database lifecycle with authority, state, output, and cleanup boundaries, not just a convenient connection string.
 
 ## When an agent needs a Postgres test database
 

@@ -4,7 +4,7 @@ excerpt: "Reproduce PostgreSQL deadlocks and lock timeouts with two coordinated 
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-07-23"
-updatedAt: "2026-07-23T06:00:00Z"
+updatedAt: "2026-09-24T06:00:00Z"
 tags: ["Postgres", "deadlocks", "lock timeout", "integration testing", "coding agents"]
 category: "Engineering"
 metaTitle: "Postgres Deadlock Testing in a Disposable Database"
@@ -63,7 +63,7 @@ A passing deadlock test should answer five questions:
 | Recovery | What happened after the error? | Victim rollback, surviving commit, and final data invariant |
 | Cleanup | What state and connections remain? | Closed clients plus deleted or deliberately retained sandbox |
 
-This framework is the information gain over a copy-paste pair of SQL sessions. The SQL example shows that a deadlock can happen. The contract proves that application code recognized the right failure, left the connection usable, preserved a valid database state, and did not turn the fixture into shared infrastructure.
+Use this framework to verify recovery, not just to reproduce a deadlock. The SQL example shows that a deadlock can happen. The contract proves that application code recognized the right failure, left the connection usable, preserved a valid database state, and did not turn the fixture into shared infrastructure.
 
 ## Why the test needs one child process
 

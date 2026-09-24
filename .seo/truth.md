@@ -17,3 +17,7 @@ Do not generalize package-manager support into guaranteed installation. Do not i
 | Requested extensions | create_database and clone_database validate allowedExtensions, then use the profile admin connection to install available extensions in the target database. Task SQL uses restricted sandbox credentials. | README.md, Extension workflows; docs/mcp-tools.md, create_database; rust-src/postgres.rs, create_database_internal and install_extensions at adbe9a8 (2026-09-21) | High |
 | Profile defaults | Managed-local defaults allow pgcrypto, pg_stat_statements, pg_trgm, uuid-ossp and vector. Explicit profiles require an operator-configured allowlist. | rust-src/config.rs; rust-src/postgres.rs, validate_allowed_extensions; docs/mcp-tools.md (2026-09-21) | High |
 | Ownership boundary | Lifecycle-installed extensions remain owned by the lifecycle role; provisioning does not grant extension-management authority to the sandbox role. Direct SQL follows PostgreSQL privileges. | README.md, Security model; PostgreSQL CREATE EXTENSION documentation (2026-09-21) | High |
+
+## Reader-facing editorial language — verified 2026-09-24
+
+Published guides explain the technical benefit directly; they do not narrate internal editorial criteria. The scoped content rule covers the guides corrected in this pass. Technical examples, cited sources, and product claims are unchanged. Source: the maintained brand voice and the corrected guide paragraphs.

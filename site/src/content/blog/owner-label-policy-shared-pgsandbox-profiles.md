@@ -4,7 +4,7 @@ excerpt: "Design a stable owner and label policy for PGSandbox cleanup so shared
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-07-13"
-updatedAt: "2026-07-13T06:00:00Z"
+updatedAt: "2026-09-24T06:00:00Z"
 tags: ["Postgres", "MCP", "cleanup", "database sandbox", "agent safety"]
 category: "Engineering"
 metaTitle: "PGSandbox Owner and Label Policy"
@@ -18,7 +18,7 @@ Use a stable `owner` for the actor or automation lane, then use labels for the r
 
 For shared coding-agent machines, do not treat labels as decoration. PGSandbox stores owner and labels in lifecycle metadata, exposes them through `list_databases`, and uses them in `cleanup_expired` filtering. A cleanup run should be able to answer: which workflow created this sandbox, why is it expired, which repo/task owns it, and what can be deleted without crossing into another agent's work.
 
-The information-gain point is the policy itself: design labels as a cleanup contract, not as tags for later search. The contract should be small enough that every agent can apply it, but strict enough that cleanup never falls back to guessing from database names.
+Design labels as a cleanup contract, not as tags for later search. The contract should be small enough that every agent can apply it, but strict enough that cleanup never falls back to guessing from database names.
 
 ## The policy in one table
 

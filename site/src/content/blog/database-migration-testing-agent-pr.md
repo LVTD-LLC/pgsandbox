@@ -4,7 +4,7 @@ excerpt: "A practical workflow for validating Postgres migrations in a disposabl
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-07-05"
-updatedAt: "2026-07-05"
+updatedAt: "2026-09-24T06:00:00Z"
 tags: ["Postgres", "database migrations", "AI agents", "MCP", "schema validation"]
 category: "Engineering"
 metaTitle: "Database Migration Testing for Agent PRs"
@@ -31,7 +31,7 @@ The useful workflow is:
 6. Save the proof in the PR notes.
 7. Delete the sandbox or let TTL cleanup catch it.
 
-PGSandbox turns that into an MCP workflow instead of a pile of shell commands. The information-gain point is the PR gate: a migration is not "tested" because the agent ran something. It is tested when the reviewer can see what changed in a real Postgres database, under a task-scoped role, with cleanup accounted for.
+PGSandbox turns that into an MCP workflow instead of a pile of shell commands. A migration is not "tested" because the agent ran something. It is tested when the reviewer can see what changed in a real Postgres database, under a task-scoped role, with cleanup accounted for.
 
 When the same seed state is needed across several migration tasks, use a local template deliberately rather than keeping a long-lived test database around. The [Postgres template database vs task sandbox](https://pgsandbox.dev/blog/postgres-template-database-vs-task-sandbox/) comparison explains when a reusable template state should restore into a fresh sandbox with its own role and TTL.
 

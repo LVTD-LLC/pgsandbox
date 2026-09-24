@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-09-24
+
+- Replaced internal editorial labels with direct technical explanations in 19 existing guides, preserving examples, sources, and URLs.
+- Updated the corrected guides’ modification dates and added a scoped content-language check.
+
 ## 2026-09-21
 
 - Corrected extension-provisioning authority, profile allowlist, and ownership guidance across four existing blog guides.

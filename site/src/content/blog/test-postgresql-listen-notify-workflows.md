@@ -4,7 +4,7 @@ excerpt: "Prove registration, commit delivery, rollback silence, payload identit
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-08-24"
-updatedAt: "2026-08-24T06:00:00Z"
+updatedAt: "2026-09-24T06:00:00Z"
 tags: ["Postgres", "LISTEN NOTIFY", "integration testing", "Psycopg", "coding agents"]
 category: "Engineering"
 metaTitle: "How to Test PostgreSQL LISTEN/NOTIFY Workflows"
@@ -82,7 +82,7 @@ A reviewable PostgreSQL `LISTEN`/`NOTIFY` test should answer six questions:
 | Multiplicity | Are identical events folded while distinct payloads remain distinct? | One identical-payload event and two distinct-payload events |
 | Cleanup | Does the test stop listening and remove its task database? | Closed connection, bounded process exit, and sandbox deletion result |
 
-The information gain is the **transaction-and-multiplicity proof**, not another syntax example. Many examples demonstrate `LISTEN` in one terminal and `NOTIFY` in another. This contract proves the timing guarantees application code actually depends on and gives every negative path a deadline.
+Use the **transaction-and-multiplicity proof** to test behavior beyond syntax. Many examples demonstrate `LISTEN` in one terminal and `NOTIFY` in another. This contract proves the timing guarantees application code actually depends on and gives every negative path a deadline.
 
 ## Run a deterministic Psycopg LISTEN/NOTIFY test
 

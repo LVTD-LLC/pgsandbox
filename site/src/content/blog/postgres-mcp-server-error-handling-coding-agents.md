@@ -4,7 +4,7 @@ excerpt: "Handle Postgres MCP server errors by branching on stable error codes, 
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-07-09"
-updatedAt: "2026-07-09"
+updatedAt: "2026-09-24T06:00:00Z"
 tags: ["Postgres", "MCP", "error handling", "AI agents", "SQL"]
 category: "Engineering"
 metaTitle: "Postgres MCP Server Error Handling for Agents"
@@ -29,7 +29,7 @@ The short runbook is:
 7. Use `detailHandles` for safe follow-up tools such as `list_profiles`, `doctor`, or `describe_schema`.
 8. Do not echo raw database URLs, credentials, or full source connection strings into the agent transcript.
 
-The information-gain point is the remediation envelope. A generic Postgres MCP server can return "tool failed" and leave the agent to guess. PGSandbox turns common database failures into reviewable control flow for agents working in [disposable Postgres sandboxes](https://pgsandbox.dev/blog/what-is-database-sandbox/).
+A generic Postgres MCP server can return "tool failed" and leave the agent to guess. PGSandbox turns common database failures into reviewable control flow for agents working in [disposable Postgres sandboxes](https://pgsandbox.dev/blog/what-is-database-sandbox/).
 
 ## Why Postgres MCP errors need structure
 

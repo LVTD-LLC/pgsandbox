@@ -4,7 +4,7 @@ excerpt: "Use Postgres EXPLAIN plans to review agent-generated SQL before execut
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-07-07"
-updatedAt: "2026-07-07"
+updatedAt: "2026-09-24T06:00:00Z"
 tags: ["Postgres", "EXPLAIN", "query plans", "AI agents", "MCP"]
 category: "Engineering"
 metaTitle: "Postgres EXPLAIN Plans for Agent SQL Review"
@@ -29,7 +29,7 @@ The agent-safe sequence is:
 7. Use an intentional mutation path only after review.
 8. Delete the sandbox or let TTL cleanup handle it.
 
-The information-gain point is the review contract. For agent work, a Postgres EXPLAIN plan is not just a tuning artifact. It is a pre-execution safety record: what the agent intended to ask Postgres to do, which relations Postgres planned to touch, and whether that plan is narrow enough to continue.
+For agent work, a Postgres EXPLAIN plan is not just a tuning artifact. It is a pre-execution safety record: what the agent intended to ask Postgres to do, which relations Postgres planned to touch, and whether that plan is narrow enough to continue.
 
 ## What does a Postgres EXPLAIN plan show?
 
