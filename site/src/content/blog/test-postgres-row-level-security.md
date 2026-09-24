@@ -4,7 +4,7 @@ excerpt: "Prove that Postgres RLS filters tenant reads, rejects cross-tenant wri
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-07-28"
-updatedAt: "2026-07-28T06:00:00Z"
+updatedAt: "2026-09-24T06:00:00Z"
 tags: ["Postgres", "row-level security", "RLS testing", "multi-tenant databases", "coding agents"]
 category: "Engineering"
 metaTitle: "Test Postgres Row-Level Security in a Sandbox"
@@ -72,7 +72,7 @@ A reviewable RLS test should answer five questions:
 | Mutation | Can a tenant write its own row while a cross-tenant write fails? | Successful same-tenant insert and SQLSTATE `42501` for the foreign insert |
 | Context | Does request identity end with the transaction? | `SET LOCAL`/`set_config(..., true)` resets after commit; a context-free query sees no rows |
 
-This contract is the information gain over a single `SELECT count(*)` check. It verifies the execution identity, the policy's active state, both halves of the authorization rule, and the lifetime of request context.
+This contract goes beyond a single `SELECT count(*)` check. It verifies the execution identity, the policy's active state, both halves of the authorization rule, and the lifetime of request context.
 
 ## 1. Create a deterministic RLS test
 

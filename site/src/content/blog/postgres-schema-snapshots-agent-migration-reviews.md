@@ -4,7 +4,7 @@ excerpt: "A practical workflow for using Postgres schema snapshots and diffs as 
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-07-06"
-updatedAt: "2026-07-06"
+updatedAt: "2026-09-24T06:00:00Z"
 tags: ["Postgres", "schema diff", "database migrations", "AI agents", "MCP"]
 category: "Engineering"
 metaTitle: "Postgres Schema Snapshots for Agent Reviews"
@@ -28,7 +28,7 @@ The shortest safe loop is:
 6. Add targeted data checks for the risky cases.
 7. Delete the sandbox or leave a short TTL with a reason.
 
-The information-gain point is the review contract. A schema diff is not enough by itself. For agent work, a review-grade schema snapshot ties the diff to a specific sandbox id, scoped role, command array, object counts, bounded output, and cleanup path. That is what lets a human reviewer distinguish "the agent says it ran the migration" from "the agent produced database evidence worth reviewing."
+A schema diff is not enough by itself. For agent work, a review-grade schema snapshot ties the diff to a specific sandbox id, scoped role, command array, object counts, bounded output, and cleanup path. That is what lets a human reviewer distinguish "the agent says it ran the migration" from "the agent produced database evidence worth reviewing."
 
 PGSandbox exposes that contract directly. The [MCP tool contract](https://pgsandbox.dev/docs/mcp-tools/) includes `create_schema_snapshot`, `list_schema_snapshots`, `diff_schema_snapshot`, `schema_digest`, `schema_diff`, and `validate_schema_change`. The [architecture notes](https://pgsandbox.dev/docs/architecture/) describe the resource model behind those tools: one sandbox database, one scoped role, TTL metadata, and cleanup tied to tracked resources.
 

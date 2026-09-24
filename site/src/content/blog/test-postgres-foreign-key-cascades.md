@@ -4,7 +4,7 @@ excerpt: "Prove ON DELETE and ON UPDATE CASCADE behavior, rollback atomicity, un
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-07-31"
-updatedAt: "2026-07-31T06:00:00Z"
+updatedAt: "2026-09-24T06:00:00Z"
 tags: ["Postgres", "foreign keys", "cascade testing", "migration testing", "coding agents"]
 category: "Engineering"
 metaTitle: "Test PostgreSQL Foreign Key Cascades"
@@ -84,7 +84,7 @@ A reviewable cascade test should answer five questions:
 | Atomicity | Does rollback restore the whole graph, including cascaded changes? | Queries inside the transaction followed by the original rows after `ROLLBACK` |
 | Cleanup | Did the test close connections and remove its task database? | Structured PGSandbox session and deletion result |
 
-The boundary and atomicity checks are the information gain over a typical cascade example. A positive-only test can pass while deleting too much. A commit-only test cannot show that the cascade participates in the same transaction as the parent statement.
+Boundary and atomicity checks catch failures that a positive-only cascade example misses. A positive-only test can pass while deleting too much. A commit-only test cannot show that the cascade participates in the same transaction as the parent statement.
 
 PostgreSQL's [`ROLLBACK` reference](https://www.postgresql.org/docs/current/sql-rollback.html) states that rollback discards all updates made by the transaction. That includes the child changes caused by referential actions. The test should observe both the temporary in-transaction state and the restored state from the same connection after rollback.
 

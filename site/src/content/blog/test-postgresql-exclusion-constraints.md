@@ -4,7 +4,7 @@ excerpt: "Prove the installed operator contract, allowed and rejected ranges, up
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-08-17"
-updatedAt: "2026-08-17T06:00:00Z"
+updatedAt: "2026-09-24T06:00:00Z"
 tags: ["Postgres", "exclusion constraints", "range types", "integration testing", "coding agents"]
 category: "Engineering"
 metaTitle: "How to Test PostgreSQL Exclusion Constraints"
@@ -115,7 +115,7 @@ A reviewable exclusion-constraint test should answer six questions:
 | Timing | If deferrable, does a repaired conflict commit while an unrepaired one fails at validation? | `SET CONSTRAINTS` checkpoints and exact final rows |
 | Cleanup | Did the proof remove the task database and role? | Credential-free sandbox deletion result |
 
-The information gain is the **operator truth-table plus timing proof**. Basic examples often stop at one rejected booking. This proof isolates both operator dimensions, the exact range boundary, insert and update paths, and immediate versus deferred validation. That is enough evidence to review the migration as a database contract rather than as a lucky example.
+Use the **operator truth-table plus timing proof** to verify the full constraint contract. Basic examples often stop at one rejected booking. This proof isolates both operator dimensions, the exact range boundary, insert and update paths, and immediate versus deferred validation. That is enough evidence to review the migration as a database contract rather than as a lucky example.
 
 ## 1. Inspect the installed exclusion constraint
 

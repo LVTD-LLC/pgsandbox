@@ -4,7 +4,7 @@ excerpt: "Compare PGSandbox cleanup_expired with manual Postgres cleanup when co
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-07-12"
-updatedAt: "2026-07-12T06:00:00Z"
+updatedAt: "2026-09-24T06:00:00Z"
 tags: ["Postgres", "MCP", "cleanup", "database sandbox", "agent safety"]
 category: "Engineering"
 metaTitle: "cleanup_expired vs Manual Postgres Cleanup"
@@ -28,7 +28,7 @@ Here is the short version:
 | Drop an untracked scratch database | Manual Postgres cleanup | PGSandbox should not delete resources it did not create. |
 | Recover from broken metadata or profile access | Manual Postgres cleanup after diagnosis | The metadata path may be unavailable, but the SQL path still needs explicit scope. |
 
-The information-gain point is this: cleanup is not just "drop the old database." For coding agents, cleanup is part of the proof boundary. A good cleanup path can say which task owned the database, why it was selected, whether it was expired, what was deleted, and what still needs follow-up.
+Cleanup is not just "drop the old database." For coding agents, cleanup is part of the proof boundary. A good cleanup path can say which task owned the database, why it was selected, whether it was expired, what was deleted, and what still needs follow-up.
 
 ## What `cleanup_expired` actually controls
 

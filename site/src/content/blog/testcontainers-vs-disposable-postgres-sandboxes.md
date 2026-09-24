@@ -4,7 +4,7 @@ excerpt: "Compare Testcontainers Postgres with task-scoped disposable Postgres s
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-07-03"
-updatedAt: "2026-07-03"
+updatedAt: "2026-09-24T06:00:00Z"
 tags: ["Postgres", "Testcontainers", "database sandbox", "AI agents", "MCP"]
 category: "Engineering"
 metaTitle: "Testcontainers vs Postgres Sandboxes"
@@ -30,7 +30,7 @@ Here is the short version:
 | Validate generated SQL or migrations with bounded output | Disposable Postgres sandbox | The proof record can track database id, role, SQL, schema diff, and cleanup. |
 | Avoid requiring Docker on the agent path | Disposable Postgres sandbox | The sandbox can use local, container-local, VPS, or private Postgres hosts. |
 
-The information-gain point is this: for agent work, the stronger boundary is often not "one container per test." It is "one database, one role, one task, one cleanup record." Testcontainers isolates the service process. A PGSandbox-style sandbox isolates the authority the agent gets inside an existing Postgres control plane.
+For agent work, the stronger boundary is often not "one container per test." It is "one database, one role, one task, one cleanup record." Testcontainers isolates the service process. A PGSandbox-style sandbox isolates the authority the agent gets inside an existing Postgres control plane.
 
 ## What Testcontainers is good at
 

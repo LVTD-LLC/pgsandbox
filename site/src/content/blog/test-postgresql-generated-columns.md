@@ -4,7 +4,7 @@ excerpt: "Prove the installed expression and storage kind, rejected direct write
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-08-05"
-updatedAt: "2026-08-05T06:00:00Z"
+updatedAt: "2026-09-24T06:00:00Z"
 tags: ["Postgres", "generated columns", "integration testing", "triggers", "coding agents"]
 category: "Engineering"
 metaTitle: "How to Test PostgreSQL Generated Columns"
@@ -80,7 +80,7 @@ A reviewable generated-column test should answer five questions:
 | Execution boundary | Do trigger changes feed generation at the documented time? | `BEFORE` base rewrite plus stored-value observation in `AFTER` |
 | Compatibility | Does the DDL mean the same thing on every supported major? | Per-major migration and behavior result, with explicit handling of PostgreSQL 18 virtual columns |
 
-This framework is the information gain of the guide. Most examples stop after `SELECT` returns a calculated value. The proof separates schema identity, write authority, value derivation, trigger timing, and server-version behavior so one passing assertion cannot hide a different broken boundary.
+Most examples stop after `SELECT` returns a calculated value. The proof separates schema identity, write authority, value derivation, trigger timing, and server-version behavior so one passing assertion cannot hide a different broken boundary.
 
 ## 1. Inspect the installed generated column
 

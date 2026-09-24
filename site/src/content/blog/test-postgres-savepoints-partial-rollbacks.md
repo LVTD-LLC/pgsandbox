@@ -4,7 +4,7 @@ excerpt: "Force a statement error, roll back only the failed unit, preserve earl
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-07-27"
-updatedAt: "2026-07-27T06:00:00Z"
+updatedAt: "2026-09-24T06:00:00Z"
 tags: ["Postgres", "savepoints", "partial rollback", "transaction testing", "coding agents"]
 category: "Engineering"
 metaTitle: "Test Postgres Savepoints and Partial Rollbacks"
@@ -73,7 +73,7 @@ A reviewable savepoint test should answer five questions:
 | Continuation | Did the same outer transaction continue and commit? | A new insert after recovery plus final rows read from a new connection |
 | Cleanup | Did the test close connections and remove the task database? | Structured PGSandbox session and deletion result |
 
-This is the information gain over the common three-line savepoint example. It verifies the database state machine as well as the data: a real error aborts the current transaction context, rollback restores a usable point, earlier work survives, provisional work disappears, and later work can still commit.
+This proof goes beyond the common three-line savepoint example. It verifies the database state machine as well as the data: a real error aborts the current transaction context, rollback restores a usable point, earlier work survives, provisional work disappears, and later work can still commit.
 
 The [PGSandbox MCP tool contract](/docs/mcp-tools/) exposes database lifecycle and bounded SQL operations. The savepoint harness itself belongs in one repository test process because all statements must use the same connection and outer transaction.
 

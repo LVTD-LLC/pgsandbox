@@ -4,7 +4,7 @@ excerpt: "Prove the installed predicate, indexed row set, positive and negative 
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-08-06"
-updatedAt: "2026-08-06T06:00:00Z"
+updatedAt: "2026-09-24T06:00:00Z"
 tags: ["Postgres", "partial indexes", "integration testing", "query plans", "coding agents"]
 category: "Engineering"
 metaTitle: "How to Test PostgreSQL Partial Indexes"
@@ -93,7 +93,7 @@ A reviewable partial-index test should answer five questions:
 | Negative control | Does an ineligible query avoid that partial index? | JSON plan without the partial index name |
 | Mutation boundary | What happens when rows enter or leave the indexed set? | Successful controls, SQLSTATE `23505`, and exact committed final rows |
 
-This separation is the information gain of the guide. It prevents a green plan assertion from hiding the wrong predicate, a nonrepresentative fixture, or broken write semantics. It also gives a reviewer a compact answer to the important question: did the migration install the intended contract, or did one lucky query happen to run quickly?
+This separation prevents a green plan assertion from hiding the wrong predicate, a nonrepresentative fixture, or broken write semantics. It also gives a reviewer a compact answer to the important question: did the migration install the intended contract, or did one lucky query happen to run quickly?
 
 ## 1. Inspect the installed partial index
 

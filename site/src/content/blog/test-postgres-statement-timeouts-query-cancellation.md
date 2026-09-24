@@ -4,7 +4,7 @@ excerpt: "Force SQLSTATE 57014 with a server timeout and an explicit client canc
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-07-26"
-updatedAt: "2026-07-26T06:00:00Z"
+updatedAt: "2026-09-24T06:00:00Z"
 tags: ["Postgres", "statement timeout", "query cancellation", "integration testing", "coding agents"]
 category: "Engineering"
 metaTitle: "Test Postgres Statement Timeouts and Query Cancellation"
@@ -72,7 +72,7 @@ A reviewable integration test should answer five questions.
 | Recovery | Is the connection in the expected state afterward? | Immediate reuse in autocommit; `25P02` then rollback in an explicit transaction |
 | Cleanup | Did the test remove the database and close connections? | Closed connection contexts and a structured PGSandbox cleanup result |
 
-This contract is the information gain over a one-line `SELECT pg_sleep(10)` example. It proves not only that a query stopped, but also that the intended clock stopped it, the application recognized the stable condition, and the connection returned to a known state.
+This contract checks more than a one-line `SELECT pg_sleep(10)` example. It proves not only that a query stopped, but also that the intended clock stopped it, the application recognized the stable condition, and the connection returned to a known state.
 
 ## 1. Create a deterministic cancellation harness
 

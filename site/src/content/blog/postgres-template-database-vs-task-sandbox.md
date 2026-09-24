@@ -4,7 +4,7 @@ excerpt: "Compare native Postgres template databases with task-scoped sandboxes 
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-07-05"
-updatedAt: "2026-07-05"
+updatedAt: "2026-09-24T06:00:00Z"
 tags: ["Postgres", "template database", "database sandbox", "AI agents", "MCP"]
 category: "Engineering"
 metaTitle: "Postgres Template Database vs Sandbox"
@@ -22,7 +22,7 @@ PostgreSQL has a native template mechanism. The `CREATE DATABASE` docs say a new
 
 PGSandbox has a different template layer. Its template tools create local `pg_dump` artifacts from PGSandbox-owned sandboxes, store JSON metadata, and restore those artifacts into fresh tracked sandboxes. The [MCP tool docs](https://pgsandbox.dev/docs/mcp-tools/) describe `create_template_from_sandbox`, `create_sandbox_from_template`, `list_templates`, and `delete_template` as local artifact workflows, not native Postgres copy-on-write forks.
 
-The information-gain point is this: for coding agents, the useful unit is not "a copyable database." It is "a reusable starting state that still restores into a new database, new role, TTL, proof record, and cleanup path."
+For coding agents, the useful unit is not "a copyable database." It is "a reusable starting state that still restores into a new database, new role, TTL, proof record, and cleanup path."
 
 ## Template database vs task sandbox: the short answer
 
