@@ -488,9 +488,9 @@ const structuredDataJson = structuredData ? JSON.stringify(structuredData) : und
         }
       }
     </style>
-    <!-- Keep the existing Plausible property: it receives pgsandbox.dev visits and preserves history. -->
-    <script is:inline defer data-domain="pgsandbox.lvtd.dev" src="https://plausible-v2.cr.lvtd.dev/js/script.file-downloads.hash.outbound-links.js"></script>
-    <script>window.plausible = window.plausible || function() { (window.plausible.q = window.plausible.q || []).push(arguments) }</script>
+    <script>
+      import '../lib/analytics';
+    </script>
   </head>
   <body>
     <a class="skip-link" href="#content">Skip to content</a>

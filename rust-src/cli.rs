@@ -40,6 +40,75 @@ use crate::{
 const UNINSTALL_SCRIPT: &str = include_str!("../scripts/uninstall.sh");
 
 pub async fn run(args: Vec<String>) -> anyhow::Result<u8> {
+    let Some(mut event_properties) = invocation_properties(&args) else {
+        return run_inner(args).await;
+    };
+    let telemetry = Telemetry::new(crate::config::load_telemetry_config());
+    let started = std::time::Instant::now();
+    let result = run_inner(args).await;
+    event_properties.insert(
+        "success".into(),
+        serde_json::json!(matches!(&result, Ok(0))),
+    );
+    event_properties.insert(
+        "exitCode".into(),
+        serde_json::json!(result.as_ref().copied().unwrap_or(1)),
+    );
+    event_properties.insert(
+        "elapsedMs".into(),
+        serde_json::json!(started.elapsed().as_millis()),
+    );
+    telemetry
+        .capture(
+            crate::telemetry::EVENT_CLI_INVOCATION_COMPLETED,
+            event_properties,
+        )
+        .await;
+    result
+}
+
+// Only allowlisted command names and booleans: never raw argv, SQL, paths or URLs.
+fn invocation_properties(args: &[String]) -> Option<Map<String, Value>> {
+    let command = args.first().map(String::as_str).unwrap_or("mcp");
+    if matches!(
+        command,
+        "" | "mcp" | "stdio" | "help" | "--help" | "-h" | "version" | "--version" | "-v"
+    ) {
+        return None;
+    }
+    let tool = if command == "tool" {
+        args.get(1).and_then(|name| find_cli_tool_command(name))
+    } else {
+        find_cli_tool_command(command)
+    };
+    let name = match command {
+        "setup" | "doctor" | "list-extensions" | "ensure-postgres" | "upgrade" | "uninstall"
+        | "local" | "smoke-test" | "with-database" | "tool" => command,
+        _ => tool.map_or("unknown", |tool| tool.command_name),
+    };
+    let mut result = properties([
+        ("command", serde_json::json!(name)),
+        ("helpRequested", serde_json::json!(has_help_flag(args))),
+        (
+            "dryRun",
+            serde_json::json!(args.iter().any(|arg| arg == "--dry-run")),
+        ),
+    ]);
+    if let Some(tool) = tool {
+        result.insert("tool".into(), serde_json::json!(tool.tool_name));
+    }
+    if command == "local" {
+        let subcommand = args
+            .get(1)
+            .map(String::as_str)
+            .filter(|name| matches!(*name, "start" | "stop" | "status" | "init" | "reset"))
+            .unwrap_or("other");
+        result.insert("subcommand".into(), serde_json::json!(subcommand));
+    }
+    Some(result)
+}
+
+async fn run_inner(args: Vec<String>) -> anyhow::Result<u8> {
     let (command, rest) = args
         .split_first()
         .map(|(command, rest)| (command.as_str(), rest.to_vec()))
@@ -2380,6 +2449,28 @@ Uninstall options:
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn invocation_metadata_never_contains_raw_arguments() {
+        let args = vec![
+            "tool",
+            "run_sql",
+            "--input",
+            r#"{"sql":"secret SQL","databaseName":"private"}"#,
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect::<Vec<_>>();
+        let props = super::invocation_properties(&args).unwrap();
+        assert_eq!(props["command"], "tool");
+        assert_eq!(props["tool"], "run_sql");
+        let encoded = serde_json::to_string(&props).unwrap();
+        assert!(!encoded.contains("secret"));
+        assert!(!encoded.contains("private"));
+        let props = super::invocation_properties(&["postgres://secret".into()]).unwrap();
+        assert_eq!(props["command"], "unknown");
+        assert!(super::invocation_properties(&[]).is_none());
+    }
+
     use super::*;
 
     fn args(values: &[&str]) -> Vec<String> {

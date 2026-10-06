@@ -1,4 +1,8 @@
-use std::{fs, sync::LazyLock, time::Duration};
+use std::{
+    fs,
+    sync::{Arc, LazyLock, Mutex},
+    time::Duration,
+};
 
 use serde_json::{json, Map, Value};
 use uuid::Uuid;
@@ -8,6 +12,8 @@ use crate::{config::TelemetryConfig, VERSION};
 const POSTHOG_PROJECT_TOKEN: &str = "phc_BGKAJLGN9zQ9BD8LTpRXxsE25BewML4ZnfNR8RtmPQZf";
 const POSTHOG_CAPTURE_URL: &str = "https://us.i.posthog.com/i/v0/e/";
 const TELEMETRY_TIMEOUT_MS: u64 = 750;
+
+pub const EVENT_CLI_INVOCATION_COMPLETED: &str = "pgsandbox_cli_invocation_completed";
 
 pub const EVENT_CLI_COMMAND_COMPLETED: &str = "pgsandbox_cli_command_completed";
 pub const EVENT_MCP_TOOL_COMPLETED: &str = "pgsandbox_tool_completed";
@@ -20,6 +26,7 @@ pub struct Telemetry {
     enabled: bool,
     distinct_id: Option<String>,
     client: Option<reqwest::Client>,
+    pending: Arc<Mutex<Vec<tokio::task::JoinHandle<()>>>>,
 }
 
 impl Telemetry {
@@ -28,6 +35,7 @@ impl Telemetry {
             enabled: config.enabled,
             distinct_id: config.enabled.then(installation_id),
             client: config.enabled.then(reqwest::Client::new),
+            pending: Arc::default(),
         }
     }
 
@@ -36,6 +44,7 @@ impl Telemetry {
             enabled: false,
             distinct_id: None,
             client: None,
+            pending: Arc::default(),
         }
     }
 
@@ -64,9 +73,28 @@ impl Telemetry {
             return;
         }
         let telemetry = self.clone();
-        tokio::spawn(async move {
+        let handle = tokio::spawn(async move {
             telemetry.capture(event, properties).await;
         });
+        if let Ok(mut pending) = self.pending.lock() {
+            pending.retain(|task| !task.is_finished());
+            pending.push(handle);
+        }
+    }
+
+    /// Give in-flight MCP events a bounded opportunity to finish before runtime shutdown.
+    pub async fn flush(&self) {
+        let tasks = self
+            .pending
+            .lock()
+            .map(|mut tasks| std::mem::take(&mut *tasks))
+            .unwrap_or_default();
+        let _ = tokio::time::timeout(Duration::from_millis(TELEMETRY_TIMEOUT_MS + 100), async {
+            for task in tasks {
+                let _ = task.await;
+            }
+        })
+        .await;
     }
 }
 
@@ -78,6 +106,16 @@ pub fn properties(entries: impl IntoIterator<Item = (&'static str, Value)>) -> M
 }
 
 fn capture_payload(distinct_id: &str, event: &str, mut properties: Map<String, Value>) -> Value {
+    properties.insert(
+        "surface".to_string(),
+        json!(if event.starts_with("pgsandbox_cli_") {
+            "cli"
+        } else {
+            "mcp"
+        }),
+    );
+    properties.insert("telemetrySchemaVersion".to_string(), json!(2));
+    properties.insert("$geoip_disable".to_string(), json!(true));
     properties.insert("app".to_string(), json!("pgsandbox"));
     properties.insert("version".to_string(), json!(VERSION));
     properties.insert("os".to_string(), json!(std::env::consts::OS));
@@ -124,6 +162,24 @@ fn session_installation_id() -> String {
 mod tests {
     use super::*;
 
+    #[tokio::test]
+    async fn flush_waits_for_pending_tasks() {
+        let telemetry = Telemetry::disabled();
+        let completed = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let flag = completed.clone();
+        telemetry
+            .pending
+            .lock()
+            .unwrap()
+            .push(tokio::spawn(async move {
+                tokio::task::yield_now().await;
+                flag.store(true, std::sync::atomic::Ordering::SeqCst);
+            }));
+        telemetry.flush().await;
+        assert!(completed.load(std::sync::atomic::Ordering::SeqCst));
+        assert!(telemetry.pending.lock().unwrap().is_empty());
+    }
+
     #[test]
     fn payload_marks_events_as_personless() {
         let payload = capture_payload(
@@ -137,6 +193,7 @@ mod tests {
         assert_eq!(payload["distinct_id"], "install-id");
         assert_eq!(payload["properties"]["tool"], "create_database");
         assert_eq!(payload["properties"]["app"], "pgsandbox");
+        assert_eq!(payload["properties"]["surface"], "mcp");
         assert_eq!(payload["properties"]["$process_person_profile"], false);
     }
 

@@ -128,7 +128,13 @@ impl PgsandboxServer {
         let started = std::time::Instant::now();
         let result = operation.await;
         event_properties.insert("tool".to_string(), json!(tool));
-        event_properties.insert("success".to_string(), json!(result.is_ok()));
+        let success = result
+            .as_ref()
+            .ok()
+            .and_then(|value| serde_json::to_value(value).ok())
+            .map(|value| value.get("ok").and_then(Value::as_bool).unwrap_or(true))
+            .unwrap_or(false);
+        event_properties.insert("success".to_string(), json!(success));
         event_properties.insert(
             "elapsedMs".to_string(),
             json!(started.elapsed().as_millis()),
@@ -764,7 +770,9 @@ pub async fn serve_stdio(config: SandboxConfig) -> anyhow::Result<()> {
         EVENT_MCP_SERVER_STARTED,
         properties([("profileCount", json!(profile_count))]),
     );
-    service.waiting().await?;
+    let result = service.waiting().await;
+    telemetry.flush().await;
+    result?;
     Ok(())
 }
 
