@@ -28,7 +28,11 @@ jobs:
         run: node scripts/check-site-changelog.mjs
       - name: Build site
         working-directory: site
-        run: npm run build
+        env:
+          PUBLIC_POSTHOG_KEY: ${{ vars.PUBLIC_POSTHOG_KEY }}
+        run: |
+          test -n "$PUBLIC_POSTHOG_KEY" || { echo "Missing PUBLIC_POSTHOG_KEY repository variable"; exit 1; }
+          npm run build
       - name: Package site for CapRover
         working-directory: site
         run: tar --exclude=node_modules -czf /tmp/pgsandbox-mcp-site.tar.gz .

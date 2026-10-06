@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-06
+
+- Replaced retired website analytics with PostHog pageviews, interactions, setup-prompt outcomes, outbound/docs clicks, web vitals, and browser errors.
+- Added one CLI invocation completion event across command paths, including failures, without capturing raw arguments.
+- Added website/CLI/MCP source dimensions and bounded MCP telemetry shutdown draining, retaining existing opt-outs.
+
 ## 2026-09-24
 
 - Replaced internal editorial labels with direct technical explanations in 19 existing guides, preserving examples, sources, and URLs.

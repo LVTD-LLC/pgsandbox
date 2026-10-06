@@ -1,8 +1,4 @@
-interface PlausibleFunction {
-  (...args: unknown[]): void;
-  q?: IArguments[];
-}
-
-interface Window {
-  plausible: PlausibleFunction;
+/// <reference types="astro/client" />
+interface ImportMetaEnv {
+  readonly PUBLIC_POSTHOG_KEY: string;
 }

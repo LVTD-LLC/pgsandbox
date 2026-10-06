@@ -169,6 +169,7 @@ const structuredData = {
 
   <template id="agent-setup-prompt-data">{agentSetupPrompt}</template>
   <script>
+    import { capture } from '../lib/analytics';
     const copyButtons = document.querySelectorAll('[data-copy-setup-prompt]');
     const copyStatuses = document.querySelectorAll('[data-copy-setup-status]');
     const promptData = document.getElementById('agent-setup-prompt-data');
@@ -210,9 +211,11 @@ const structuredData = {
 
         try {
           if (!value || !(await copyText(value))) throw new Error('copy failed');
+          capture('pgsandbox_setup_prompt_copied', { location: button.classList.contains('closing-copy-button') ? 'footer' : 'hero' });
           button.textContent = 'Prompt copied';
           copyStatuses.forEach((status) => status.textContent = 'Ready to paste into your coding agent.');
         } catch {
+          capture('pgsandbox_setup_prompt_copy_failed');
           button.textContent = 'Copy failed';
           copyStatuses.forEach((status) => status.textContent = 'Open the installation guide to copy the setup prompt.');
         }
