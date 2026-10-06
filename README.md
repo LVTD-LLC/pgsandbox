@@ -1655,6 +1655,18 @@ CAPROVER_PGSANDBOX_SITE_APP
 CAPROVER_PGSANDBOX_SITE_TOKEN
 ```
 
+The production CapRover instance is `https://captain.cr.lvtd.dev` on
+`138.201.126.181`, and the app name is `pgsandbox-mcp`. Set the URL and app
+secrets to those values and use this destination app's deployment token for
+the token secret. The workflow reads these secrets for both automatic and
+manual deployments.
+
+The canonical website is `https://pgsandbox.dev`. The legacy domains
+`pgsandbox.lvtd.dev`, `pgsandbox-mcp.lvtd.dev`, and
+`pgsandbox-mcp.cap.gregagi.com` redirect permanently to it, preserving paths
+and query strings. All four domains point to the new server; the old
+`captain.cap.gregagi.com` instance is retained only for migration rollback.
+
 ### Docker Demo Postgres
 
 `docker-compose.example.yml` starts a normal Postgres service on `5432` for
