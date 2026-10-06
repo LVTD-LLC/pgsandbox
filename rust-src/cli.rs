@@ -98,10 +98,11 @@ fn invocation_properties(args: &[String]) -> Option<Map<String, Value>> {
         result.insert("tool".into(), serde_json::json!(tool.tool_name));
     }
     if command == "local" {
-        let subcommand = match args.get(1).map(String::as_str) {
-            Some(name @ ("start" | "stop" | "status" | "init" | "reset")) => name,
-            _ => "other",
-        };
+        let subcommand = args
+            .get(1)
+            .map(String::as_str)
+            .filter(|name| matches!(*name, "start" | "stop" | "status" | "init" | "reset"))
+            .unwrap_or("other");
         result.insert("subcommand".into(), serde_json::json!(subcommand));
     }
     Some(result)
