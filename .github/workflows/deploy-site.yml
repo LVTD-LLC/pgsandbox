@@ -30,8 +30,10 @@ jobs:
         working-directory: site
         env:
           PUBLIC_POSTHOG_KEY: ${{ vars.PUBLIC_POSTHOG_KEY }}
+          POSTHOG_SOURCEMAP_TOKEN: ${{ secrets.POSTHOG_SOURCEMAP_TOKEN }}
         run: |
           test -n "$PUBLIC_POSTHOG_KEY" || { echo "Missing PUBLIC_POSTHOG_KEY repository variable"; exit 1; }
+          test -n "$POSTHOG_SOURCEMAP_TOKEN" || { echo "Missing POSTHOG_SOURCEMAP_TOKEN secret"; exit 1; }
           npm run build
       - name: Package site for CapRover
         working-directory: site

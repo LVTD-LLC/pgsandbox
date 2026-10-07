@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-07
+
+- Added content-free CLI/MCP operation logs, correlated OTLP traces, grouped runtime failure events, and metadata-only MCP AI spans in the existing PostHog project.
+- Kept runtime opt-outs and bounded delivery; added explicit public-token/host overrides and QA tagging for verification.
+- Added private source-map uploads for website error tracking and documented the observability boundaries.
+
 ## 2026-10-06
 
 - Replaced retired website analytics with PostHog pageviews, interactions, setup-prompt outcomes, outbound/docs clicks, web vitals, and browser errors.
