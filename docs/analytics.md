@@ -48,6 +48,15 @@ URL property query strings and fragments are stripped before sending; standard
 SDK campaign dimensions remain available separately. Browser errors are intended
 for the public static site, not a SQL editor or application containing secrets.
 
+## Dashboard
+
+[Website & runtime usage](https://us.posthog.com/project/471530/dashboard/2183663)
+contains eight native charts: website visitors/pages/actions, MCP tools, CLI
+invocations, anonymous installations, failures, and p95 tool latency. QA events
+and `utm_source=analytics_qa` traffic are excluded. Installation UUIDs are not
+people and CLI/MCP installation series can overlap. Logs, Error Tracking, AI
+Observability and Tracing remain separate PostHog product views in the same project.
+
 ## Verification and monitoring
 
 Use the event contract above to query counts grouped by event and surface. Use
