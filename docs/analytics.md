@@ -60,3 +60,49 @@ traffic reports. Development/preview hostnames do not send website events.
 Audit baseline, 2026-10-06 (previous 30 days): 1,305 server starts, 25 MCP tool
 completions, one legacy CLI completion, one anonymous installation ID, zero
 pageviews. This proves ingestion for that installation, not broader adoption.
+
+## Runtime observability (2026-10-07)
+
+The existing project is reused, not duplicated. Each comprehensive CLI invocation
+and MCP tool completion emits an OTLP JSON operation log and a root operation span.
+`trace_id` on the product event correlates to the log and trace. Legacy detailed
+CLI events do not generate a second log/trace. Logs preserve existing stderr/stdout
+behavior; no arbitrary console, process, PostgreSQL, or SQL logs are exported.
+
+Failures emit `$exception` with a synthetic, handled `PGSandboxOperationFailed`
+exception grouped by surface/operation. The message is generated from the
+allowlisted operation name, never from the original error. This gives operation
+failure counts, **not** production stack traces or panic/crash coverage. Inspect
+local diagnostics for the original error. Browser exceptions retain SDK stacks;
+the deploy build uploads private source maps and removes them before packaging.
+
+MCP completions additionally emit `$ai_span` with operation name, elapsed seconds,
+success and a shared trace ID. These are independent root tool spans: the MCP
+caller does not supply a parent model trace, and we do not pretend these capture
+an entire agent conversation. No `$ai_generation`, prompts, SQL, responses, model,
+token counts or costs are invented. Instrument the calling agent to measure those.
+
+All runtime signals share the existing opt-out configuration and one 750ms
+network deadline per capture (parallel requests, no retries). MCP sends run in
+the background and graceful shutdown drains pending work for at most 850ms.
+Offline, opted-out, forcibly terminated, and older installations remain invisible.
+
+Optional runtime overrides (read once at initialization):
+
+- `PGSANDBOX_POSTHOG_KEY`: public `phc_` ingestion token for a different project;
+  defaults to the existing public distribution token. Personal tokens are rejected.
+- `PGSANDBOX_POSTHOG_HOST`: ingestion origin; defaults to `https://us.i.posthog.com`.
+  Use the matching region for your project, or a local HTTP receiver for tests.
+- `PGSANDBOX_TELEMETRY_TEST=1`: marks every signal `telemetry_test: true`.
+  Exclude this in usage dashboards; it does not bypass telemetry opt-outs.
+
+Website builds retain `PUBLIC_POSTHOG_KEY`. Production deployments additionally
+require GitHub secret `POSTHOG_SOURCEMAP_TOKEN` (management token with error-tracking
+write permission). It is consumed only by the build plugin, never bundled in the
+site. Local/PR builds without that secret skip uploads.
+
+References: [OTLP traces](https://posthog.com/docs/distributed-tracing/start-here),
+[OTLP logs](https://posthog.com/docs/logs/installation/other),
+[manual exceptions](https://posthog.com/docs/error-tracking/installation/manual),
+[AI spans](https://posthog.com/docs/ai-observability/installation/manual-capture),
+[Vite source maps](https://posthog.com/docs/error-tracking/upload-source-maps/vite).

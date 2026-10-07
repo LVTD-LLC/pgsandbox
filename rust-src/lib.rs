@@ -4,6 +4,7 @@ pub mod doctor;
 pub mod local;
 pub mod mcp;
 pub mod names;
+mod observability;
 pub mod postgres;
 pub mod setup;
 pub mod telemetry;

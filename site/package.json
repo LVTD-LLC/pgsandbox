@@ -20,6 +20,7 @@
     "typescript": "^6.0.3"
   },
   "devDependencies": {
+    "@posthog/rollup-plugin": "^1.6.1",
     "@types/node": "^26.0.0"
   },
   "overrides": {

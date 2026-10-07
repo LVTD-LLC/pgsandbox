@@ -957,7 +957,11 @@ clients exhaust their own call budget. Cloning and template tools require
 
 Telemetry is enabled by default and sends anonymous, personless usage events to
 PostHog. It records command/tool names, version, OS/architecture, success,
-elapsed time, and small booleans/counts.
+elapsed time, and small booleans/counts. The same opt-out controls also cover
+structured operation logs, correlated timing traces, synthetic grouped failure
+events, and metadata-only MCP tool spans in AI Observability. Raw errors and
+SQL remain local; model usage/cost is not collected because PGSandbox makes no
+LLM calls. See [Analytics coverage](docs/analytics.md).
 
 Telemetry must not include:
 
