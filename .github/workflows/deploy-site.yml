@@ -8,8 +8,13 @@ on:
       - 'CHANGELOG.md'
       - 'site/**'
       - 'scripts/check-site-changelog.mjs'
+      - 'scripts/submit_indexnow.py'
       - '.github/workflows/deploy-site.yml'
   workflow_dispatch:
+
+concurrency:
+  group: deploy-site
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -35,6 +40,12 @@ jobs:
           test -n "$PUBLIC_POSTHOG_KEY" || { echo "Missing PUBLIC_POSTHOG_KEY repository variable"; exit 1; }
           test -n "$POSTHOG_SOURCEMAP_TOKEN" || { echo "Missing POSTHOG_SOURCEMAP_TOKEN secret"; exit 1; }
           npm run build
+      - name: Validate IndexNow URLs and stamp deployment
+        env:
+          DEPLOY_REVISION: ${{ github.sha }}
+        run: |
+          python3 scripts/submit_indexnow.py --dry-run
+          printf '%s\n' "$DEPLOY_REVISION" > site/dist/indexnow-deploy.txt
       - name: Package site for CapRover
         working-directory: site
         run: tar --exclude=node_modules -czf /tmp/pgsandbox-mcp-site.tar.gz .
@@ -50,3 +61,8 @@ jobs:
             --caproverApp "$CAPROVER_APP" \
             --appToken "$CAPROVER_APP_TOKEN" \
             --tarFile /tmp/pgsandbox-mcp-site.tar.gz
+      - name: Notify IndexNow after live deployment
+        timeout-minutes: 20
+        env:
+          DEPLOY_REVISION: ${{ github.sha }}
+        run: python3 scripts/submit_indexnow.py --revision "$DEPLOY_REVISION"

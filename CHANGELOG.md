@@ -2,6 +2,8 @@
 
 ## 2026-10-08
 
+- Added IndexNow ownership verification and automatic sitemap submission after verified live website deployments.
+
 - Expanded the install guide with Cursor project/user setup, a first disposable-database check, cleanup guidance, and targeted troubleshooting.
 - Made the Cursor walkthrough discoverable from the documentation hub; no runtime or analytics behavior changed.
 
