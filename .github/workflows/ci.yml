@@ -22,6 +22,7 @@ jobs:
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
+      - run: python3 -m unittest discover -s scripts -p "test_indexnow.py"
       - run: npm ci
       - run: cargo fmt -- --check
       - run: cargo clippy --all-targets -- -D warnings
@@ -32,6 +33,7 @@ jobs:
       - run: npm run site:check-blog-content
       - run: npm --prefix site ci --include=dev
       - run: npm run site:build
+      - run: python3 scripts/submit_indexnow.py --dry-run
       - run: npm run site:check-production-urls
       - run: npm run site:check-blog-tables
       - run: npm run site:check-routing
