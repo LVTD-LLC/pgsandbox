@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-10-08
+
+- Expanded the install guide with Cursor project/user setup, a first disposable-database check, cleanup guidance, and targeted troubleshooting.
+- Made the Cursor walkthrough discoverable from the documentation hub; no runtime or analytics behavior changed.
+
 ## 2026-10-07
 
 - Added content-free CLI/MCP operation logs, correlated OTLP traces, grouped runtime failure events, and metadata-only MCP AI spans in the existing PostHog project.
