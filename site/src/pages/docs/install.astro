@@ -77,6 +77,85 @@ pgsandbox setup --client vscode --scope project
 pgsandbox setup --client claude-desktop
 pgsandbox setup --client all</code></pre>
 
+  <h2 id="cursor-postgres-mcp">Set up a Postgres MCP server in Cursor</h2>
+  <p>
+    Use PGSandbox when Cursor needs a disposable PostgreSQL database for a
+    migration, SQL check, or test—not access to your production database.
+    Cursor launches the local <code>pgsandbox mcp</code> process over stdio;
+    PGSandbox manages the sandbox database lifecycle.
+  </p>
+  <h3>1. Choose project or user configuration</h3>
+  <p>
+    After installing the binary above, run this from the repository you open
+    in Cursor. Project scope writes <code>.cursor/mcp.json</code> in the current
+    directory. It does not create a separate Postgres cluster for each repository.
+  </p>
+  <pre class="shell"><code>pgsandbox --version
+pgsandbox setup --client cursor --scope project
+pgsandbox doctor
+pgsandbox smoke-test</code></pre>
+  <p>
+    For configuration shared across your projects, use
+    <code>pgsandbox setup --client cursor --scope user</code> instead; it writes
+    <code>~/.cursor/mcp.json</code>. Pick the scope you intend to use rather than
+    configuring both while troubleshooting. Setup may install missing PostgreSQL
+    binaries when a supported package manager is available. If that fails,
+    install the required server binaries and rerun setup.
+  </p>
+  <p>
+    These commands and paths match PGSandbox v0.5.0 and the current
+    <a href="https://github.com/LVTD-LLC/pgsandbox/blob/v0.5.0/rust-src/setup.rs">setup implementation</a>.
+    See <a href="https://cursor.com/docs/mcp">Cursor’s MCP documentation</a>
+    for its project/user configuration and tool-approval controls.
+  </p>
+  <h3>2. Restart Cursor and check the server</h3>
+  <p>
+    Restart Cursor, open the intended repository, and check that its MCP
+    settings list <code>pgsandbox</code> and expose its tools. A successful
+    <code>doctor</code> or <code>smoke-test</code> checks the local runtime;
+    it does not prove that Cursor has loaded the configuration. Keep tool
+    approvals enabled while checking the first workflow.
+  </p>
+  <h3>3. Ask for one disposable database</h3>
+  <p>Use this as an agent instruction, not as a shell command:</p>
+  <pre><code>Use PGSandbox to create a disposable database for this task.
+Run SELECT 1 AS ready in that sandbox using run_sql and show the result.
+Do not use an existing application or production database.
+When the check is complete, delete only the sandbox you just created.
+Do not print database credentials in your explanation.</code></pre>
+  <p>
+    Check that the query returns <code>ready = 1</code> and that the deletion
+    succeeds. TTL records expiry; it does not delete a database by itself.
+    If the task is interrupted, inspect <code>list_databases</code> before an
+    explicit <code>delete_database</code> or <code>cleanup_expired</code> call.
+    Continue with the <a href="/docs/agent-workflows/">migration and repository workflow recipes</a>
+    and the <a href="/docs/mcp-tools/">MCP tool contracts</a> once this check works.
+  </p>
+  <h3>If Cursor cannot find or start PGSandbox</h3>
+  <ul>
+    <li>
+      Confirm you ran project-scoped setup in the repository Cursor actually
+      opened, not its parent directory.
+    </li>
+    <li>
+      If the terminal finds the binary but Cursor does not, rerun setup with
+      <code>--command /absolute/path/to/pgsandbox</code>, substituting the real
+      installed executable path, then restart Cursor. GUI applications can
+      inherit a different <code>PATH</code> from your shell.
+    </li>
+    <li>
+      If tools appear but database creation fails, run <code>pgsandbox doctor</code>
+      and fix the reported runtime issue. Changing MCP JSON will not install
+      missing PostgreSQL binaries.
+    </li>
+    <li>
+      For the managed local workflow, do not add an external admin URL to the
+      MCP config. Review project config before committing it; never commit
+      credentials for an external profile.
+    </li>
+  </ul>
+  <p><small>Cursor walkthrough updated October 8, 2026.</small></p>
+
   <h2>Verify</h2>
   <pre class="shell"><code>pgsandbox doctor
 pgsandbox smoke-test</code></pre>
