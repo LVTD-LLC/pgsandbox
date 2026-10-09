@@ -156,6 +156,76 @@ Do not print database credentials in your explanation.</code></pre>
   </ul>
   <p><small>Cursor walkthrough updated October 8, 2026.</small></p>
 
+  <h2 id="claude-code-postgres-mcp">Set up a Postgres MCP server in Claude Code</h2>
+  <p>
+    Register <code>pgsandbox mcp</code> as a local stdio server when Claude Code
+    needs a disposable PostgreSQL database for SQL or migration checks.
+    <code>pgsandbox setup --client claude-desktop</code> configures Claude Desktop,
+    not Claude Code. PGSandbox v0.5.0 has no <code>--client claude-code</code> option.
+  </p>
+  <h3>1. Prepare the local database runtime</h3>
+  <p>
+    Install PGSandbox using a method above, then run these commands in your
+    terminal. This prepares Postgres without writing another client's MCP config.
+  </p>
+  <pre class="shell"><code>pgsandbox --version
+pgsandbox ensure-postgres
+pgsandbox doctor
+pgsandbox smoke-test</code></pre>
+  <p>
+    <code>ensure-postgres</code> can install missing server binaries through a
+    supported package manager; it is not a guarantee that every machine can
+    install them automatically. Resolve any reported runtime error before
+    continuing. A successful smoke test creates, queries, and deletes a sandbox;
+    it does not check Claude Code's connection.
+  </p>
+  <h3>2. Register the stdio server in Claude Code</h3>
+  <p>
+    With Claude Code installed, run this from the repository where you want to
+    use PGSandbox. Local scope keeps the registration private to you and limited
+    to that project; it does not create a separate Postgres cluster.
+  </p>
+  <pre class="shell"><code>claude mcp add --transport stdio --scope local pgsandbox -- pgsandbox mcp
+claude mcp get pgsandbox</code></pre>
+  <p>
+    Start or restart Claude Code in that repository and use <code>/mcp</code>
+    to check the connection. If the executable cannot be found, use its actual
+    absolute path in place of the second <code>pgsandbox</code> in the add command.
+    Check an existing registration before replacing it.
+  </p>
+  <p>
+    The PGSandbox commands match the
+    <a href="https://github.com/LVTD-LLC/pgsandbox/blob/v0.5.0/README.md">v0.5.0 CLI reference</a>
+    and <a href="https://github.com/LVTD-LLC/pgsandbox/blob/v0.5.0/rust-src/setup.rs">client setup implementation</a>.
+    Registration syntax and scope follow
+    <a href="https://code.claude.com/docs/en/mcp">Claude Code's MCP documentation</a>,
+    checked October 9, 2026. This is a stdio configuration recipe, not a claim
+    that every Claude Code version has been tested with PGSandbox.
+  </p>
+  <h3>3. Verify one task through the agent</h3>
+  <p>Ask Claude Code to perform this check, keeping tool approvals enabled:</p>
+  <pre><code>Use PGSandbox to create a new disposable database for this check.
+Run SELECT 1 AS ready with run_sql in that new sandbox.
+Confirm ready = 1, then delete only the database created for this check.
+Report the query and cleanup outcomes without printing credentials.
+Do not connect to an existing application or production database.</code></pre>
+  <p>
+    If the tools load but database creation fails, troubleshoot with
+    <code>pgsandbox doctor</code> rather than repeatedly changing MCP registration.
+    TTL records expiry, not automatic deletion: after an interrupted task,
+    inspect tracked databases and use an explicit cleanup call. See the
+    <a href="/docs/mcp-tools/">tool contracts</a> and
+    <a href="/docs/agent-workflows/">repository and migration workflows</a>
+    for the next task. Do not supply an external admin URL for this managed-local recipe.
+  </p>
+  <h3>Using Claude Desktop instead?</h3>
+  <p>
+    Use <code>pgsandbox setup --client claude-desktop</code> and restart Desktop.
+    Its configuration is user-scoped; PGSandbox rejects project scope for that
+    client. This is a separate configuration path from <code>claude mcp add</code>.
+  </p>
+  <p><small>Claude setup walkthrough updated October 9, 2026.</small></p>
+
   <h2>Verify</h2>
   <pre class="shell"><code>pgsandbox doctor
 pgsandbox smoke-test</code></pre>

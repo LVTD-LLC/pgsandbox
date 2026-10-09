@@ -21,3 +21,7 @@ Do not generalize package-manager support into guaranteed installation. Do not i
 ## Reader-facing editorial language — verified 2026-09-24
 
 Published guides explain the technical benefit directly; they do not narrate internal editorial criteria. The scoped content rule covers the guides corrected in this pass. Technical examples, cited sources, and product claims are unchanged. Source: the maintained brand voice and the corrected guide paragraphs.
+
+## Claude client setup — verified 2026-10-09
+
+PGSandbox v0.5.0 writes Claude Desktop configuration with `setup --client claude-desktop`, user scope only. Its client selector does not accept `claude-code`. Claude Code can register the `pgsandbox mcp` stdio launch command through its own `claude mcp add` command. Source: `rust-src/setup.rs` at v0.5.0 and current main; https://code.claude.com/docs/en/mcp (checked 2026-10-09). This documents configuration compatibility, not a completed Claude Code end-to-end test.

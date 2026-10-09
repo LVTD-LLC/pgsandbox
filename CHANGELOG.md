@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-10-09
+
+- Added a Claude Code stdio registration walkthrough to the install guide, distinguishing it from Claude Desktop setup and separating runtime checks from agent tool verification.
+- Linked the Claude Code setup path from the docs hub; no runtime or analytics behavior changed.
+
 ## 2026-10-08
 
 - Added IndexNow ownership verification and automatic sitemap submission after verified live website deployments.
