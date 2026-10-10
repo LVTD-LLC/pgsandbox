@@ -98,5 +98,23 @@
       "information[ -]gain"
     ],
     "flags": "i"
+  },
+  {
+    "claim": "Testcontainers comparison states managed-local default and explicit expiry cleanup",
+    "paths": [
+      "site/src/content/blog/testcontainers-vs-disposable-postgres-sandboxes.md"
+    ],
+    "urls": [
+      "/blog/testcontainers-vs-disposable-postgres-sandboxes/"
+    ],
+    "must_not_match": [
+      "Postgres host you explicitly configure",
+      "Use a sandbox with TTL cleanup"
+    ],
+    "must_match": [
+      "Managed local PostgreSQL by default",
+      "cleanup_expired"
+    ],
+    "flags": "i"
   }
 ]

@@ -4,7 +4,7 @@ excerpt: "Compare Testcontainers Postgres with task-scoped disposable Postgres s
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-07-03"
-updatedAt: "2026-09-24T06:00:00Z"
+updatedAt: "2026-10-10T02:00:00Z"
 tags: ["Postgres", "Testcontainers", "database sandbox", "AI agents", "MCP"]
 category: "Engineering"
 metaTitle: "Testcontainers vs Postgres Sandboxes"
@@ -14,7 +14,7 @@ heroImageUrl: ""
 featured: false
 sortOrder: 70
 ---
-Testcontainers and disposable Postgres sandboxes both give software work a temporary database boundary. Use Testcontainers when the unit of isolation should be a whole service container attached to a test suite. Use a disposable Postgres sandbox when a coding agent needs one task database, one scoped role, bounded SQL tools, and a cleanup record inside Postgres you already control.
+Testcontainers and disposable Postgres sandboxes both give software work a temporary database boundary. Use Testcontainers when the unit of isolation should be a whole service container attached to a test suite. Use a disposable Postgres sandbox when a coding agent needs one task database, one scoped role, bounded SQL tools, and a cleanup record inside a managed local Postgres cluster or an explicit Postgres host you control.
 
 That distinction matters because an agent workflow is not the same as a normal integration test.
 
@@ -80,11 +80,15 @@ The useful comparison is not "containers vs databases." It is "which boundary ma
 | --- | --- | --- |
 | Primary owner | Test code or application harness | Agent task or MCP workflow |
 | Isolation unit | Containerized Postgres service | Database plus scoped role |
-| Runtime dependency | Docker-compatible container runtime | Postgres host you explicitly configure |
+| Runtime dependency | Docker-compatible container runtime | Managed local PostgreSQL by default; optional explicit external profile |
 | Best use | Integration tests with real dependencies | Agent SQL, migrations, schema proof, bug repros |
 | Credential shape | Connection details from the container | Scoped role for one sandbox database |
-| Cleanup model | Container lifecycle from test framework or manual code | Metadata-backed delete and TTL cleanup |
+| Cleanup model | Container lifecycle from test framework or manual code | Metadata-backed delete; explicit cleanup of expired sandboxes |
 | Proof artifact | Test result, logs, framework output | Sandbox id, role, SQL/command result, schema diff, cleanup status |
+
+For PGSandbox, you do not need to configure an external Postgres host to get started. Setup prepares the managed local cluster and can install missing PostgreSQL binaries through a supported package manager when available. If that installation path is unavailable, install the binaries manually. An external profile is optional; PGSandbox is not a hosted database service. Start with the [install guide](/docs/install/), then verify the runtime with `pgsandbox doctor` and `pgsandbox smoke-test`.
+
+TTL marks when a sandbox expires; it is not a background deletion timer. Call `cleanup_expired` explicitly or arrange a user-owned scheduler, and verify cleanup in the task proof.
 
 Neither side wins every row. Testcontainers is the better default when the test suite should own a realistic dependency graph. Disposable sandboxes are the better default when the agent needs a controlled place to execute database work and a reviewer needs task-level evidence.
 
@@ -147,7 +151,7 @@ Ask these questions before choosing the boundary:
 | Does the agent need to run SQL before a test harness exists? | Use a disposable sandbox. | Let the test harness own it. |
 | Does the workflow require Docker control? | Testcontainers may be appropriate. | Keep the boundary inside Postgres. |
 | Do you need a database-level proof record for a PR? | Use a sandbox with metadata. | A test result may be enough. |
-| Does state need to survive across several agent tool calls but disappear after the task? | Use a sandbox with TTL cleanup. | A per-test container may be cleaner. |
+| Does state need to survive across several agent tool calls but disappear after the task? | Use a sandbox with explicit cleanup after the task. | A per-test container may be cleaner. |
 | Are you validating several services together? | Use Testcontainers. | A Postgres-only sandbox may be simpler. |
 
 The main mistake is picking the tool because the keyword sounds close. "Disposable" appears in both patterns, but the disposable thing is different. In Testcontainers, the disposable thing is usually a service container. In PGSandbox, it is the database authority granted to a task.
