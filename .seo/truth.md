@@ -25,3 +25,7 @@ Published guides explain the technical benefit directly; they do not narrate int
 ## Claude client setup — verified 2026-10-09
 
 PGSandbox v0.5.0 writes Claude Desktop configuration with `setup --client claude-desktop`, user scope only. Its client selector does not accept `claude-code`. Claude Code can register the `pgsandbox mcp` stdio launch command through its own `claude mcp add` command. Source: `rust-src/setup.rs` at v0.5.0 and current main; https://code.claude.com/docs/en/mcp (checked 2026-10-09). This documents configuration compatibility, not a completed Claude Code end-to-end test.
+
+## Comparison runtime boundary — verified 2026-10-10
+
+Managed-local PostgreSQL is the default, not a separately configured external-host prerequisite. Setup prepares it through `ensure_setup_managed_local` and `ensure_started_with_optional_install(true)`; package-manager availability still conditions installation. External profiles are optional. TTL requires an explicit cleanup call or user-owned scheduler. Sources: `rust-src/cli.rs` setup flow and `rust-src/local.rs`, `README.md` at main `402dfa3` (2026-10-10).

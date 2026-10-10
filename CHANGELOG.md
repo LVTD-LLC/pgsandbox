@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-10-10
+
+- Corrected the Testcontainers comparison to describe managed-local PostgreSQL as the default, optional external profiles, and explicit expired-sandbox cleanup.
+- Added a direct installation and runtime-verification path without changing the comparison title or runtime behavior.
+
 ## 2026-10-09
 
 - Added a Claude Code stdio registration walkthrough to the install guide, distinguishing it from Claude Desktop setup and separating runtime checks from agent tool verification.
