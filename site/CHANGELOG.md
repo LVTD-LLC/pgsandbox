@@ -2,6 +2,8 @@
 
 ## 2026-10-16
 
+- Moved website deployment to the isolated self-hosted runner VM with a dedicated PGSandbox registration, main-only execution, read-only repository permissions, and a bounded job timeout.
+
 - Added an installation and runtime-readiness path to the extension-upgrade guide, distinguishing a smoke test from extension-specific compatibility proof.
 - Clarified that TTL requires explicit expired-sandbox cleanup or a user-owned scheduler; no runtime behavior changed.
 

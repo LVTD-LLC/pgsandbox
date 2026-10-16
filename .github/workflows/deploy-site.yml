@@ -16,9 +16,14 @@ concurrency:
   group: deploy-site
   cancel-in-progress: false
 
+permissions:
+  contents: read
+
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, linux, x64, pgsandbox]
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6.0.2
       - uses: actions/setup-node@v6.4.0
@@ -48,7 +53,7 @@ jobs:
           printf '%s\n' "$DEPLOY_REVISION" > site/dist/indexnow-deploy.txt
       - name: Package site for CapRover
         working-directory: site
-        run: tar --exclude=node_modules -czf /tmp/pgsandbox-mcp-site.tar.gz .
+        run: tar --exclude=node_modules -czf "${{ runner.temp }}/pgsandbox-mcp-site.tar.gz" .
       - name: Deploy to CapRover
         env:
           CAPROVER_URL: ${{ secrets.CAPROVER_PGSANDBOX_SITE_URL }}
@@ -60,7 +65,7 @@ jobs:
             --caproverUrl "$CAPROVER_URL" \
             --caproverApp "$CAPROVER_APP" \
             --appToken "$CAPROVER_APP_TOKEN" \
-            --tarFile /tmp/pgsandbox-mcp-site.tar.gz
+            --tarFile "${{ runner.temp }}/pgsandbox-mcp-site.tar.gz"
       - name: Notify IndexNow after live deployment
         timeout-minutes: 20
         env:
