@@ -4,7 +4,7 @@ excerpt: "Test PostgreSQL extension update paths, target schema state, applicati
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-07-20"
-updatedAt: "2026-07-20T06:00:00Z"
+updatedAt: "2026-10-16T02:00:00Z"
 tags: ["Postgres", "PostgreSQL extensions", "database migrations", "database testing", "coding agents"]
 category: "Engineering"
 metaTitle: "Test PostgreSQL Extension Upgrades Safely"
@@ -98,6 +98,19 @@ Target lane:  new database -> request target version    -> app migration
 The open-source [`pg_validate_extupgrade` project](https://github.com/rjuju/pg_validate_extupgrade) uses the same underlying testing idea for extension authors: explicit source and target versions, pre-update fixture queries, and comparisons between post-install and post-upgrade results. The workflow here adapts that principle for application teams and agent migration reviews.
 
 If the lanes do not produce equivalent schema and application results, the upgrade needs investigation even when both commands exit successfully.
+
+## Before you start: connect a disposable runtime
+
+If you want your coding agent to run this workflow, [install PGSandbox and configure your MCP client](/docs/install/) first. Managed-local PostgreSQL is the default; an external profile is optional. Setup can install missing PostgreSQL binaries through a supported package manager when available, but that does not install every extension package or reproduce your deployment environment.
+
+Check runtime readiness before building the two test lanes:
+
+```bash
+pgsandbox doctor
+pgsandbox smoke-test
+```
+
+The smoke test exercises a disposable database lifecycle; it does not prove that your extension's versions, update scripts, or required shared libraries are available. Restart your MCP client after setup and confirm that it exposes PGSandbox's tools. Then use the profile and extension checks below to establish the environment this particular upgrade needs. Keep production credentials out of the agent's configuration.
 
 ## 1. Match the target PostgreSQL profile
 
@@ -262,7 +275,7 @@ Delete both PGSandbox databases when the proof is complete. The known `databaseI
 }
 ```
 
-TTL is a fallback for interrupted work, not the successful completion path. Explicit deletion removes the tracked database and generated role together.
+TTL records expiry; it does not start a background deletion timer. After interrupted work, call `cleanup_expired` explicitly or arrange a user-owned scheduler to call it. The [expired-sandbox cleanup guide](/blog/cleanup-expired-vs-manual-postgres-cleanup/) explains how to inspect the selection before removal. On the successful path, explicitly delete each tracked database and its generated role.
 
 ## PR-ready extension upgrade proof packet
 
@@ -354,7 +367,7 @@ The comparison detects state that only one route creates or leaves behind. Expla
       "name": "How to Test PostgreSQL Extension Upgrades Safely",
       "description": "Test a PostgreSQL extension upgrade with path inspection, disposable twin sandboxes, application migration checks, schema convergence, recovery, and cleanup.",
       "datePublished": "2026-07-20",
-      "dateModified": "2026-07-20",
+      "dateModified": "2026-10-16",
       "step": [
         {"@type": "HowToStep", "position": 1, "name": "Match the target profile", "text": "Select the target PostgreSQL major and extension package set."},
         {"@type": "HowToStep", "position": 2, "name": "Create the upgrade lane", "text": "Create a disposable database and install the deployed source extension version."},

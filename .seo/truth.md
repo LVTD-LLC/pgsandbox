@@ -29,3 +29,7 @@ PGSandbox v0.5.0 writes Claude Desktop configuration with `setup --client claude
 ## Comparison runtime boundary — verified 2026-10-10
 
 Managed-local PostgreSQL is the default, not a separately configured external-host prerequisite. Setup prepares it through `ensure_setup_managed_local` and `ensure_started_with_optional_install(true)`; package-manager availability still conditions installation. External profiles are optional. TTL requires an explicit cleanup call or user-owned scheduler. Sources: `rust-src/cli.rs` setup flow and `rust-src/local.rs`, `README.md` at main `402dfa3` (2026-10-10).
+
+## Extension-upgrade readiness — verified 2026-10-16
+
+The runtime smoke test checks a disposable database lifecycle, not the availability or compatibility of a particular extension update path. Readers must verify the selected profile and extension package separately. TTL records expiry; explicit `cleanup_expired` or a user-owned scheduler performs expired cleanup. Sources: README.md verification and Expired Sandboxes Remain sections; docs/mcp-tools.md; rust-src/postgres.rs at main `448a487` (2026-10-16).
