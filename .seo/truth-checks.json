@@ -116,5 +116,23 @@
       "cleanup_expired"
     ],
     "flags": "i"
+  },
+  {
+    "claim": "Extension-upgrade guide separates runtime readiness from extension proof and explicit expiry cleanup",
+    "paths": [
+      "site/src/content/blog/test-postgres-extension-upgrades.md"
+    ],
+    "urls": [
+      "/blog/test-postgres-extension-upgrades/"
+    ],
+    "must_not_match": [
+      "TTL is a fallback for interrupted work"
+    ],
+    "must_match": [
+      "cleanup_expired",
+      "/docs/install/",
+      "pgsandbox smoke-test"
+    ],
+    "flags": "i"
   }
 ]

@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-10-16
+
+- Added an installation and runtime-readiness path to the extension-upgrade guide, distinguishing a smoke test from extension-specific compatibility proof.
+- Clarified that TTL requires explicit expired-sandbox cleanup or a user-owned scheduler; no runtime behavior changed.
+
 ## 2026-10-10
 
 - Corrected the Testcontainers comparison to describe managed-local PostgreSQL as the default, optional external profiles, and explicit expired-sandbox cleanup.
