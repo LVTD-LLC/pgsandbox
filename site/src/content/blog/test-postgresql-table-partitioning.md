@@ -4,7 +4,7 @@ excerpt: "Prove partition topology, boundary routing, row movement, pruning, mai
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-08-07"
-updatedAt: "2026-08-07T06:00:00Z"
+updatedAt: "2026-10-18T02:00:00Z"
 tags: ["Postgres", "table partitioning", "integration testing", "query plans", "coding agents"]
 category: "Engineering"
 metaTitle: "How to Test PostgreSQL Table Partitioning"
@@ -18,9 +18,9 @@ Test PostgreSQL table partitioning with a six-gate proof: declaration, exact bou
 
 A query returning the right rows does not prove the partition design is correct. The same result can hide an unintended default-partition route, a missing leaf, a boundary error, or a plan that scans every partition. A migration can also route inserts correctly while failing later when an update crosses a boundary or an operator attaches the next partition.
 
-This guide packages those checks into a six-gate **Partition Boundary Proof**: declaration, routing, movement, pruning, lifecycle, and cleanup. PGSandbox MCP supplies a task-scoped database and restricted role on your configured PostgreSQL server. PostgreSQL catalogs, `tableoid`, JSON query plans, exact state assertions, and the deletion result supply the evidence.
+This guide packages those checks into a six-gate **Partition Boundary Proof**: declaration, routing, movement, pruning, lifecycle, and cleanup. PGSandbox MCP supplies a task-scoped database and restricted role in managed-local PostgreSQL by default (or an explicitly configured external profile). PostgreSQL catalogs, `tableoid`, JSON query plans, exact state assertions, and the deletion result supply the evidence.
 
-*Published and last updated August 7, 2026.*
+*Published August 7, 2026. Updated October 18, 2026.*
 
 The complete workflow is:
 
@@ -639,7 +639,7 @@ Execute the prepared statement with `EXPLAIN (ANALYZE, FORMAT JSON)` against rep
       "headline": "How to Test PostgreSQL Table Partitioning",
       "description": "Test PostgreSQL partitioning with topology, boundary routing, row movement, pruning, maintenance, final-state, and cleanup checks.",
       "datePublished": "2026-08-07",
-      "dateModified": "2026-08-07",
+      "dateModified": "2026-10-18",
       "author": {"@type": "Organization", "name": "PGSandbox Team"},
       "publisher": {"@type": "Organization", "name": "PGSandbox MCP"},
       "mainEntityOfPage": "https://pgsandbox.dev/blog/test-postgresql-table-partitioning/"

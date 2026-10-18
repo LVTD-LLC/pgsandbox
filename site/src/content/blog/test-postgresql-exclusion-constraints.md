@@ -4,7 +4,7 @@ excerpt: "Prove the installed operator contract, allowed and rejected ranges, up
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-08-17"
-updatedAt: "2026-09-24T06:00:00Z"
+updatedAt: "2026-10-18T02:00:00Z"
 tags: ["Postgres", "exclusion constraints", "range types", "integration testing", "coding agents"]
 category: "Engineering"
 metaTitle: "How to Test PostgreSQL Exclusion Constraints"
@@ -18,9 +18,9 @@ Test PostgreSQL exclusion constraints with a six-part proof: installed definitio
 
 A single overlapping-insert test is too weak. It can pass while the migration uses the wrong range bounds, omits the resource key, checks only inserts, or defers failures to a transaction boundary the application does not handle. The constraint's catalog definition and its behavioral edges are both part of the contract.
 
-This guide packages those edges into an **Exclusion Boundary Proof**. PGSandbox MCP supplies a task-scoped database and role on your configured PostgreSQL server. PostgreSQL catalogs, deterministic timestamp ranges, transaction checkpoints, and sandbox deletion provide reviewable evidence.
+This guide packages those edges into an **Exclusion Boundary Proof**. PGSandbox MCP supplies a task-scoped database and role in managed-local PostgreSQL by default (or an explicitly configured external profile). PostgreSQL catalogs, deterministic timestamp ranges, transaction checkpoints, and sandbox deletion provide reviewable evidence.
 
-*Published and last updated August 17, 2026.*
+*Published August 17, 2026. Updated October 18, 2026.*
 
 The workflow is:
 

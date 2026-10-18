@@ -4,7 +4,7 @@ excerpt: "Prove the installed expression and storage kind, rejected direct write
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-08-05"
-updatedAt: "2026-09-24T06:00:00Z"
+updatedAt: "2026-10-18T02:00:00Z"
 tags: ["Postgres", "generated columns", "integration testing", "triggers", "coding agents"]
 category: "Engineering"
 metaTitle: "How to Test PostgreSQL Generated Columns"
@@ -18,9 +18,9 @@ Test PostgreSQL generated columns by proving five boundaries: the exact expressi
 
 A test that selects one expected value proves only one example. It can still pass when the migration installed the wrong expression, changed a stored column to virtual on PostgreSQL 18, accepts an unsupported server version, or interacts incorrectly with a trigger that rewrites a base column.
 
-This guide packages the checks into a five-part **Generation Boundary Proof**: declaration, write protection, derivation, execution boundary, and compatibility. PGSandbox MCP supplies a task-scoped database and restricted role on your configured PostgreSQL server. PostgreSQL catalogs and application assertions supply the proof.
+This guide packages the checks into a five-part **Generation Boundary Proof**: declaration, write protection, derivation, execution boundary, and compatibility. PGSandbox MCP supplies a task-scoped database and restricted role in managed-local PostgreSQL by default (or an explicitly configured external profile). PostgreSQL catalogs and application assertions supply the proof.
 
-*Published and last updated August 5, 2026.*
+*Published August 5, 2026. Updated October 18, 2026.*
 
 The complete workflow is:
 
@@ -416,7 +416,7 @@ The proof applies real migrations, deliberately sends a forbidden direct write, 
       "name": "How to Test PostgreSQL Generated Columns",
       "description": "Prove the installed generated-column declaration, direct-write rejection, derivation, trigger timing, version behavior, final state, and cleanup.",
       "datePublished": "2026-08-05",
-      "dateModified": "2026-08-05",
+      "dateModified": "2026-10-18",
       "mainEntityOfPage": "https://pgsandbox.dev/blog/test-postgresql-generated-columns/",
       "step": [
         {"@type": "HowToStep", "position": 1, "name": "Inspect the declaration", "text": "Apply the real migration and assert the generation expression plus stored or virtual catalog kind."},

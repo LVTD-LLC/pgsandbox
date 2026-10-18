@@ -134,5 +134,34 @@
       "pgsandbox smoke-test"
     ],
     "flags": "i"
+  },
+  {
+    "claim": "Disposable proof guides do not imply a mandatory preconfigured PostgreSQL server",
+    "paths": [
+      "site/src/content/blog/*.md"
+    ],
+    "urls": [
+      "/blog/*"
+    ],
+    "must_not_match": [
+      "on your configured PostgreSQL server"
+    ],
+    "flags": "i"
+  },
+  {
+    "claim": "Partial-index proof has first-run checks and explicit cleanup boundaries",
+    "paths": [
+      "site/src/content/blog/test-postgresql-partial-indexes.md"
+    ],
+    "urls": [
+      "/blog/test-postgresql-partial-indexes/"
+    ],
+    "must_match": [
+      "/docs/install/",
+      "pgsandbox doctor --postgres-version 18",
+      "pgsandbox smoke-test --postgres-version 18",
+      "cleanup_expired"
+    ],
+    "flags": "i"
   }
 ]

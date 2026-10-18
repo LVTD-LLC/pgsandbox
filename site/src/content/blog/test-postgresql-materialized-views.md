@@ -4,7 +4,7 @@ excerpt: "Prove the installed definition, stale-data boundary, refresh behavior,
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-08-10"
-updatedAt: "2026-09-20"
+updatedAt: "2026-10-18T02:00:00Z"
 tags: ["Postgres", "materialized views", "integration testing", "database migrations", "coding agents"]
 category: "Engineering"
 metaTitle: "How to Test PostgreSQL Materialized Views"
@@ -18,9 +18,9 @@ Test PostgreSQL materialized views with six independent checks: installed defini
 
 A passing `SELECT` from a materialized view proves very little by itself. The rows may have been populated by the migration and never refreshed again. A test can also miss a broken `CONCURRENTLY` path, an unsuitable unique index, or a deployment that created the right relation from the wrong query.
 
-This guide packages the checks into a **Materialized View Refresh Proof**. PGSandbox MCP supplies a task-scoped database and restricted role on your configured PostgreSQL server. PostgreSQL catalogs, deterministic source rows, explicit refresh commands, exact result assertions, and sandbox deletion supply the evidence.
+This guide packages the checks into a **Materialized View Refresh Proof**. PGSandbox MCP supplies a task-scoped database and restricted role in managed-local PostgreSQL by default (or an explicitly configured external profile). PostgreSQL catalogs, deterministic source rows, explicit refresh commands, exact result assertions, and sandbox deletion supply the evidence.
 
-*Published and last updated August 10, 2026.*
+*Published August 10, 2026. Updated October 18, 2026.*
 
 The workflow is:
 

@@ -4,7 +4,7 @@ excerpt: "Prove immediate checks, temporary invalid states, SET CONSTRAINTS chec
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-08-04"
-updatedAt: "2026-09-20"
+updatedAt: "2026-10-18T02:00:00Z"
 tags: ["Postgres", "deferrable constraints", "foreign keys", "integration testing", "coding agents"]
 category: "Engineering"
 metaTitle: "Test Deferrable Constraints in PostgreSQL"
@@ -18,9 +18,9 @@ Test PostgreSQL deferrable constraints by proving behavior at three distinct bou
 
 A test that only inserts rows in a convenient order does not exercise deferral. A test that expects an error without checking *when* it appears can also pass against the wrong constraint mode. The timing boundary is part of the schema contract.
 
-This guide packages the proof into a five-part **Deferral Boundary Proof**: declaration, immediate control, temporary invalidity, validation boundary, and final state. PGSandbox MCP supplies a disposable database and scoped role on your configured PostgreSQL server, so a coding agent can run commit-time failure tests without leaving shared development data in a failed transaction.
+This guide packages the proof into a five-part **Deferral Boundary Proof**: declaration, immediate control, temporary invalidity, validation boundary, and final state. PGSandbox MCP supplies a disposable database and scoped role in managed-local PostgreSQL by default (or an explicitly configured external profile), so a coding agent can run commit-time failure tests without leaving shared development data in a failed transaction.
 
-*Published and last updated August 4, 2026.*
+*Published August 4, 2026. Updated October 18, 2026.*
 
 The complete proof has five steps:
 
