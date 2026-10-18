@@ -4,7 +4,7 @@ excerpt: "Prove the installed trigger definition, firing paths, exact side effec
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-08-03"
-updatedAt: "2026-08-03T06:00:00Z"
+updatedAt: "2026-10-18T02:00:00Z"
 tags: ["Postgres", "triggers", "integration testing", "migration testing", "coding agents"]
 category: "Engineering"
 metaTitle: "How to Test PostgreSQL Triggers"
@@ -18,9 +18,9 @@ Test PostgreSQL triggers by checking the installed definition, exercising every 
 
 Checking that a trigger exists is not enough. A migration can install the wrong timing, event, condition, or function. A passing `INSERT` can also hide a missing audit row, an overly broad update, or a trigger error that leaves the transaction unusable.
 
-This guide packages those checks into a five-part **Trigger Proof Contract**: declaration, firing matrix, effect oracle, atomicity, and teardown. PGSandbox MCP supplies a task-scoped database and restricted role on your configured PostgreSQL server. PostgreSQL catalog queries and application-level assertions supply the trigger proof.
+This guide packages those checks into a five-part **Trigger Proof Contract**: declaration, firing matrix, effect oracle, atomicity, and teardown. PGSandbox MCP supplies a task-scoped database and restricted role in managed-local PostgreSQL by default (or an explicitly configured external profile). PostgreSQL catalog queries and application-level assertions supply the trigger proof.
 
-*Published and last updated August 3, 2026.*
+*Published August 3, 2026. Updated October 18, 2026.*
 
 The complete proof has five steps:
 
@@ -547,7 +547,7 @@ Only if the diff tool explicitly includes trigger definitions. PGSandbox's curre
       "headline": "How to Test PostgreSQL Triggers in a Disposable Database",
       "description": "Prove the installed trigger definition, firing paths, exact side effects, rollback behavior, SQLSTATE failures, and disposable cleanup.",
       "datePublished": "2026-08-03",
-      "dateModified": "2026-08-03",
+      "dateModified": "2026-10-18",
       "author": {"@type": "Organization", "name": "PGSandbox Team"},
       "publisher": {"@type": "Organization", "name": "PGSandbox MCP"},
       "mainEntityOfPage": "https://pgsandbox.dev/blog/test-postgresql-triggers/"

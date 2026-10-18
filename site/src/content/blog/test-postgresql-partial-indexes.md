@@ -4,7 +4,7 @@ excerpt: "Prove the installed predicate, indexed row set, positive and negative 
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-08-06"
-updatedAt: "2026-09-24T06:00:00Z"
+updatedAt: "2026-10-18T02:00:00Z"
 tags: ["Postgres", "partial indexes", "integration testing", "query plans", "coding agents"]
 category: "Engineering"
 metaTitle: "How to Test PostgreSQL Partial Indexes"
@@ -18,9 +18,9 @@ Test PostgreSQL partial indexes by proving five boundaries: the exact predicate 
 
 A single `EXPLAIN` screenshot is not enough. It can pass because the fixture is unusually small, the planner statistics are stale, or the query accidentally repeats the predicate while the application query does not. A unique partial index can also enforce the correct read path but fail on a status transition your test never exercised.
 
-This guide packages the checks into a five-part **Partial Index Proof**: declaration, membership, eligible plan, negative control, and mutation boundary. PGSandbox MCP supplies a task-scoped database and restricted role on your configured PostgreSQL server. PostgreSQL catalogs, JSON query plans, SQLSTATE assertions, and exact final rows supply the evidence.
+This guide packages the checks into a five-part **Partial Index Proof**: declaration, membership, eligible plan, negative control, and mutation boundary. PGSandbox MCP supplies a task-scoped database and restricted role in managed-local PostgreSQL by default (or an explicitly configured external profile). PostgreSQL catalogs, JSON query plans, SQLSTATE assertions, and exact final rows supply the evidence.
 
-*Published and last updated August 6, 2026.*
+*Published August 6, 2026. Updated October 18, 2026.*
 
 The complete workflow is:
 
@@ -375,6 +375,17 @@ The existing [Postgres EXPLAIN plan guide](/blog/postgres-explain-plan-agent-sql
 
 ## 4. Run the proof in a disposable database
 
+New to PGSandbox? Follow the [installation guide](/docs/install/) first. Managed-local PostgreSQL is the default; setup can install missing server binaries through a supported package manager when available. If that path is unavailable, install the binaries manually. An external admin profile is optional, not a prerequisite.
+
+Check the same PostgreSQL major used by the proof before running it:
+
+```bash
+pgsandbox doctor --postgres-version 18
+pgsandbox smoke-test --postgres-version 18
+```
+
+A successful smoke test checks that PGSandbox can create, query, and delete a disposable database. It does **not** prove your migration, partial-index predicate, or application query plan. Keep the five proof boundaries above as the acceptance criteria.
+
 Save the harness as `tests/postgres_partial_index_proof.py`, replace the fixture installer with the repository's real migration path, and run it through a one-shot PGSandbox session:
 
 ```bash
@@ -392,6 +403,8 @@ pgsandbox with-database \
 ```
 
 `with-database` creates a tracked database and scoped login role, injects the credential into the child process, captures bounded credential-redacted output, and applies the selected cleanup policy. The [one-shot integration-test guide](/blog/run-integration-tests-disposable-postgres-database/) explains the full session result contract, and the [PGSandbox MCP tool reference](/docs/mcp-tools/) covers the underlying lifecycle operations.
+
+`--cleanup always` requests cleanup after the child command finishes; inspect the returned cleanup result rather than assuming deletion succeeded. TTL records expiry, not a background deletion timer. For expired resources left by interrupted work, use an explicit `cleanup_expired` call or a user-owned scheduler.
 
 Do not print `PGSANDBOX_DATABASE_URL` in CI logs or PR comments. Record the PostgreSQL major or profile, migration identifier, predicate summary, qualifying-row count, positive and negative plan results, mutation assertions, child exit status, and cleanup result.
 
@@ -466,7 +479,7 @@ The proof applies real DDL, seeds a planner-relevant distribution, deliberately 
       "headline": "How to Test PostgreSQL Partial Indexes",
       "description": "Test PostgreSQL partial indexes with catalog checks, positive and negative plans, uniqueness transitions, exact final state, and cleanup.",
       "datePublished": "2026-08-06",
-      "dateModified": "2026-08-06",
+      "dateModified": "2026-10-18",
       "author": {"@type": "Organization", "name": "PGSandbox Team"},
       "publisher": {"@type": "Organization", "name": "PGSandbox"},
       "mainEntityOfPage": "https://pgsandbox.dev/blog/test-postgresql-partial-indexes/"

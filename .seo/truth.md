@@ -33,3 +33,7 @@ Managed-local PostgreSQL is the default, not a separately configured external-ho
 ## Extension-upgrade readiness — verified 2026-10-16
 
 The runtime smoke test checks a disposable database lifecycle, not the availability or compatibility of a particular extension update path. Readers must verify the selected profile and extension package separately. TTL records expiry; explicit `cleanup_expired` or a user-owned scheduler performs expired cleanup. Sources: README.md verification and Expired Sandboxes Remain sections; docs/mcp-tools.md; rust-src/postgres.rs at main `448a487` (2026-10-16).
+
+## Partial-index first-run boundary — verified 2026-10-18
+
+Managed-local PostgreSQL is the default; an explicit external profile is optional. Versioned `doctor` and `smoke-test` checks are supported. A smoke test proves the runtime lifecycle, not migration correctness or partial-index eligibility. `with-database --cleanup always` requests post-child cleanup; inspect its result. TTL alone does not schedule deletion. Sources: README.md Manual Runtime Checks, rust-src/cli.rs setup and with-database flows, docs/mcp-tools.md at main `49a6fc8` (2026-10-18).

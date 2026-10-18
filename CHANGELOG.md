@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-10-18
+
+- Added installation and versioned runtime checks to the partial-index testing guide, separating smoke-test readiness from index proof and making cleanup outcomes explicit.
+- Clarified the managed-local PostgreSQL default in nine related proof-guide introductions; external profiles remain optional. No SQL harness or runtime behavior changed.
+
 ## 2026-10-16
 
 - Build and push the website Docker image on the self-hosted runner, then deploy the commit-tagged image to CapRover instead of rebuilding there.

@@ -4,7 +4,7 @@ excerpt: "Prove ON DELETE and ON UPDATE CASCADE behavior, rollback atomicity, un
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-07-31"
-updatedAt: "2026-09-24T06:00:00Z"
+updatedAt: "2026-10-18T02:00:00Z"
 tags: ["Postgres", "foreign keys", "cascade testing", "migration testing", "coding agents"]
 category: "Engineering"
 metaTitle: "Test PostgreSQL Foreign Key Cascades"
@@ -18,9 +18,9 @@ Test PostgreSQL foreign key cascades by inspecting the installed constraint, mut
 
 Checking only that a parent `DELETE` succeeds is too weak. The database could be missing a child fixture, the migration could have installed `NO ACTION`, or an overly broad cleanup path could delete more than the intended graph. The final state is the contract.
 
-This guide packages the checks into a **Cascade Proof Contract**: declaration, propagation, boundary, atomicity, and cleanup. PGSandbox MCP supplies a disposable database and scoped role on your configured PostgreSQL server, so a coding agent can run destructive referential-action tests without changing shared development data.
+This guide packages the checks into a **Cascade Proof Contract**: declaration, propagation, boundary, atomicity, and cleanup. PGSandbox MCP supplies a disposable database and scoped role in managed-local PostgreSQL by default (or an explicitly configured external profile), so a coding agent can run destructive referential-action tests without changing shared development data.
 
-*Published and last updated July 31, 2026.*
+*Published July 31, 2026. Updated October 18, 2026.*
 
 The complete proof has five steps:
 

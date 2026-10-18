@@ -4,7 +4,7 @@ excerpt: "Prove Read Committed snapshot drift, Repeatable Read stability, and Se
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-07-30"
-updatedAt: "2026-07-30T06:00:00Z"
+updatedAt: "2026-10-18T02:00:00Z"
 tags: ["Postgres", "transaction isolation", "concurrency testing", "integration testing", "coding agents"]
 category: "Engineering"
 metaTitle: "Test PostgreSQL Transaction Isolation Levels"
@@ -18,9 +18,9 @@ Test PostgreSQL transaction isolation levels with controlled two-connection sche
 
 Those outcomes answer different questions. Snapshot stability tells you whether repeated reads can change. Serializable safety tells you whether the final committed state could have come from some one-at-a-time execution. Treating both as "stronger isolation" hides the application invariant you actually need.
 
-This guide packages the checks into an **Isolation Proof Matrix**: level, schedule, observation, classification, and cleanup. PGSandbox MCP creates a disposable database and scoped role on your configured PostgreSQL server so a coding agent can run the proof without sharing state with another task.
+This guide packages the checks into an **Isolation Proof Matrix**: level, schedule, observation, classification, and cleanup. PGSandbox MCP creates a disposable database and scoped role in managed-local PostgreSQL by default (or an explicitly configured external profile) so a coding agent can run the proof without sharing state with another task.
 
-*Published and last updated July 30, 2026.*
+*Published July 30, 2026. Updated October 18, 2026.*
 
 The complete proof has five steps:
 
