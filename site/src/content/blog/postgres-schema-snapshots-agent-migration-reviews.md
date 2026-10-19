@@ -4,7 +4,7 @@ excerpt: "A practical workflow for using Postgres schema snapshots and diffs as 
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-07-06"
-updatedAt: "2026-09-24T06:00:00Z"
+updatedAt: "2026-10-19T02:00:00Z"
 tags: ["Postgres", "schema diff", "database migrations", "AI agents", "MCP"]
 category: "Engineering"
 metaTitle: "Postgres Schema Snapshots for Agent Reviews"
@@ -26,7 +26,7 @@ The shortest safe loop is:
 4. Run the migration command the repo actually uses.
 5. Diff the saved snapshot against the current schema.
 6. Add targeted data checks for the risky cases.
-7. Delete the sandbox or leave a short TTL with a reason.
+7. Delete the sandbox and verify the cleanup result; if work is interrupted, explicitly run expired cleanup later.
 
 A schema diff is not enough by itself. For agent work, a review-grade schema snapshot ties the diff to a specific sandbox id, scoped role, command array, object counts, bounded output, and cleanup path. That is what lets a human reviewer distinguish "the agent says it ran the migration" from "the agent produced database evidence worth reviewing."
 
@@ -76,6 +76,19 @@ External tools reinforce the same pattern. Atlas describes `atlas migrate lint` 
 
 Those are strong schema-management tools. PGSandbox has a narrower job: give the coding agent a disposable Postgres target and a bounded evidence path. It does not replace your migration framework or your schema management tool. It gives the agent a safe place to run the framework and a compact way to show what changed.
 
+## Before you start: verify the runtime and MCP connection
+
+Use the [installation guide](/docs/install/) to install PGSandbox and configure your coding agent's MCP client. PGSandbox manages local PostgreSQL by default; an external profile is optional. If PostgreSQL binaries are missing, setup can install them through a supported package manager when available; otherwise install them manually.
+
+The current [runtime checks](/docs/install/) are:
+
+```bash
+pgsandbox doctor
+pgsandbox smoke-test
+```
+
+These commands check runtime readiness and a disposable database lifecycle. They do not prove that your agent can call MCP tools or that your migration is correct. In the connected client, create a disposable sandbox and use its returned `databaseId` throughout the snapshot workflow below. Never substitute a production connection or paste credentials into PR evidence.
+
 ## Step 1: create the sandbox that owns the proof
 
 Start with a [database sandbox](https://pgsandbox.dev/blog/what-is-database-sandbox/) rather than the shared development database.
@@ -94,7 +107,20 @@ The important rule is authority separation. The tool may need lifecycle authorit
 
 ## Step 2: capture the baseline snapshot
 
-After the sandbox has the pre-change schema, create a named snapshot.
+After the sandbox has the pre-change schema, create a named snapshot. The current [agent workflow examples](/docs/agent-workflows/) and [snapshot tool contract](/docs/mcp-tools/) use this tool-call shape. This is a request for your MCP client, not a shell command; replace `<databaseId>` with the id returned when you created the sandbox.
+
+```json
+{
+  "tool": "create_schema_snapshot",
+  "arguments": {
+    "databaseId": "<databaseId>",
+    "snapshotName": "before_agent_migration",
+    "notes": "baseline before repo migration command"
+  }
+}
+```
+
+Inspect the tool result before continuing. A failed snapshot is not a baseline.
 
 Use names that describe the review stage:
 
@@ -140,7 +166,19 @@ That makes the proof clearer and reduces accidental shell behavior. PGSandbox's 
 
 ## Step 4: diff the snapshot against the current schema
 
-After the migration command runs, diff the current sandbox schema against the named snapshot.
+After the migration command runs, diff the current sandbox schema against the named snapshot. Keep both the sandbox id and snapshot name unchanged; comparing another task's database would invalidate the evidence.
+
+```json
+{
+  "tool": "diff_schema_snapshot",
+  "arguments": {
+    "databaseId": "<databaseId>",
+    "snapshotName": "before_agent_migration"
+  }
+}
+```
+
+This uses the same current [snapshot contract](/docs/mcp-tools/). It compares a saved baseline with the current schema; it does not generate or apply a production migration.
 
 A useful diff groups changes by review object:
 
@@ -233,7 +271,7 @@ Schema snapshot validation
 - Changed objects: 1 table changed, 1 column added, 1 index added, 0 removed
 - Risk checks: no duplicate emails, no invalid indexes, no null payment statuses
 - Data output: bounded row counts only
-- Cleanup: sandbox deleted / TTL cleanup pending until <time>
+- Cleanup: delete_database result verified / cleanup_expired still required after <expiry>
 ```
 
 This block gives a reviewer a clear place to start. It also gives the agent a fail condition. If the diff shows an unexpected object, the migration is not ready for review. If cleanup did not happen, the PR should say why.
@@ -248,7 +286,9 @@ The third mistake is treating schema proof as data proof. A diff can show that a
 
 The fourth mistake is hiding the command. A before/after diff without the command leaves the reviewer guessing how the database got from one state to the other.
 
-The fifth mistake is leaving snapshots and sandboxes behind. A snapshot is a checkpoint for a task, not a permanent audit database. Delete it or let the tracked sandbox cleanup path handle it.
+The fifth mistake is leaving snapshots and sandboxes behind. A snapshot is a checkpoint for a task, not a permanent audit database. After saving secret-free review evidence, call `delete_schema_snapshot` with the same `databaseId` and `snapshotName` while the sandbox still exists, then call `delete_database` and inspect its result. The snapshot-deletion tool resolves the tracked sandbox before removing the local artifact, so do not postpone that step until after database deletion.
+
+TTL records expiry; it does not schedule background deletion. If normal teardown was interrupted, call `cleanup_expired` explicitly after expiry or use a user-owned scheduler, and record cleanup as pending until its result confirms removal. See the [expired cleanup workflow](/blog/cleanup-expired-vs-manual-postgres-cleanup/).
 
 ## FAQ
 

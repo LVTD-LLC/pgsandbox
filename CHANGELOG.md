@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-10-19
+
+- Added installation/runtime-readiness guidance and concrete MCP snapshot/diff requests to the schema-snapshot migration-review guide.
+- Clarified snapshot-before-database teardown and explicit expired cleanup, including the related migration-review evidence template; no runtime behavior changed.
+
 ## 2026-10-18
 
 - Added installation and versioned runtime checks to the partial-index testing guide, separating smoke-test readiness from index proof and making cleanup outcomes explicit.
