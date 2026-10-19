@@ -163,5 +163,27 @@
       "cleanup_expired"
     ],
     "flags": "i"
+  },
+  {
+    "claim": "Snapshot review gives executable MCP requests and explicit cleanup order",
+    "paths": [
+      "site/src/content/blog/postgres-schema-snapshots-agent-migration-reviews.md"
+    ],
+    "urls": [
+      "/blog/postgres-schema-snapshots-agent-migration-reviews/"
+    ],
+    "must_match": [
+      "/docs/install/",
+      "create_schema_snapshot",
+      "diff_schema_snapshot",
+      "delete_schema_snapshot",
+      "cleanup_expired"
+    ],
+    "must_not_match": [
+      "leave a short TTL with a reason",
+      "TTL cleanup pending until",
+      "let the tracked sandbox cleanup path handle it"
+    ],
+    "flags": "i"
   }
 ]

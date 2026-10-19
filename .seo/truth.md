@@ -37,3 +37,7 @@ The runtime smoke test checks a disposable database lifecycle, not the availabil
 ## Partial-index first-run boundary — verified 2026-10-18
 
 Managed-local PostgreSQL is the default; an explicit external profile is optional. Versioned `doctor` and `smoke-test` checks are supported. A smoke test proves the runtime lifecycle, not migration correctness or partial-index eligibility. `with-database --cleanup always` requests post-child cleanup; inspect its result. TTL alone does not schedule deletion. Sources: README.md Manual Runtime Checks, rust-src/cli.rs setup and with-database flows, docs/mcp-tools.md at main `49a6fc8` (2026-10-18).
+
+## Snapshot teardown order — verified 2026-10-19
+
+`delete_schema_snapshot` resolves a PGSandbox-owned database record before deleting the local artifact. Remove the named snapshot while that sandbox is tracked, then delete the database and inspect the result. TTL alone does not schedule cleanup. Sources: rust-src/postgres.rs `delete_schema_snapshot` and `get_owned_record`, docs/mcp-tools.md snapshot contract at main `d12f848` (2026-10-19). Snapshot/diff requests are MCP client tool requests, not CLI commands or a proof of migration correctness.

@@ -4,7 +4,7 @@ excerpt: "A practical workflow for validating Postgres migrations in a disposabl
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-07-05"
-updatedAt: "2026-09-24T06:00:00Z"
+updatedAt: "2026-10-19T02:00:00Z"
 tags: ["Postgres", "database migrations", "AI agents", "MCP", "schema validation"]
 category: "Engineering"
 metaTitle: "Database Migration Testing for Agent PRs"
@@ -176,7 +176,7 @@ Migration validation
 - Seed cases: null email, duplicate slug, existing paid subscription
 - Validation SQL: bounded row counts and targeted assertions
 - Result: passed / failed with SQLSTATE ...
-- Cleanup: deleted sandbox and role / TTL cleanup pending
+- Cleanup: delete_database result verified / explicit cleanup_expired still required after expiry
 ```
 
 Do not paste an unmasked connection string. Do not paste large row dumps. Do not ask the reviewer to trust "I tested it locally" when the agent can attach a compact proof record instead.
