@@ -4,7 +4,7 @@ excerpt: "Run a repository test command against a fresh Postgres database, prese
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-07-22"
-updatedAt: "2026-07-22T06:00:00Z"
+updatedAt: "2026-10-20T02:00:00Z"
 tags: ["Postgres", "integration testing", "test databases", "coding agents", "CI"]
 category: "Engineering"
 metaTitle: "Run Tests in a Disposable Postgres Database"
@@ -14,7 +14,7 @@ heroImageUrl: ""
 featured: false
 sortOrder: 144
 ---
-To run integration tests in a disposable Postgres database, create the database before the test process starts, inject its connection settings into that process, run the repository's real test command, preserve the command's exit status and bounded output, then delete or deliberately retain the database. A TTL should remain as a recovery backstop if the session is interrupted.
+To run integration tests in a disposable Postgres database, create the database before the test process starts, inject its connection settings into that process, run the repository's real test command, preserve the command's exit status and bounded output, then delete or deliberately retain the database. A TTL records when an interrupted or retained session becomes eligible for expired cleanup; it does not schedule deletion.
 
 PGSandbox packages that lifecycle into `pgsandbox with-database`. The command creates a fresh database and restricted login role, supplies standard connection variables to one child process, captures credential-redacted output, and applies an explicit cleanup policy. The application gets real PostgreSQL behavior without receiving the lifecycle credential that created the database.
 
@@ -33,7 +33,18 @@ This guide uses a **Session Proof Contract** with five fields: target, command, 
 
 ## Prerequisites
 
-Install and configure PGSandbox using the [setup guide](/docs/install/), make sure the selected managed PostgreSQL major or configured profile is available, and run `pgsandbox doctor` before the first session. Run the examples from the repository root unless you pass `--repo-path` explicitly.
+Install PGSandbox using the [setup guide](/docs/install/). Managed local PostgreSQL is the default; an explicitly configured external profile is optional. Setup can install missing PostgreSQL binaries through a supported package manager when available, but that installation path is not guaranteed.
+
+For the PostgreSQL 18 examples below, check the same major before running your suite:
+
+```bash
+pgsandbox doctor --postgres-version 18
+pgsandbox smoke-test --postgres-version 18
+```
+
+A successful smoke test creates, queries, and deletes its own disposable database. It checks runtime readiness, not your application's migrations, fixtures, or test assertions. For an external profile, verify the intended profile configuration and connection separately; a managed-local check is not proof of remote connectivity.
+
+Run the examples from the repository root unless you pass `--repo-path` explicitly.
 
 Set the sandbox TTL longer than the command timeout. Leave enough additional time for provisioning, cleanup, and any deliberate failure inspection. The primary complete-session examples below use a 30-minute TTL with a 15-minute command timeout; shorter snippets omit repeated flags for readability.
 
@@ -49,7 +60,7 @@ Use this sequence:
 6. Record the structured status, child exit code, elapsed time, and cleanup outcome.
 7. Inspect a retained failure or confirm deletion.
 
-PostgreSQL itself distinguishes tests against an installed server from tests using a temporary installation in its [regression-test documentation](https://www.postgresql.org/docs/current/regress-run.html). PGSandbox takes a narrower approach: it uses an existing local or private PostgreSQL server, but gives each test session a fresh database and role on that server. It does not install a new server for every test run.
+PostgreSQL itself distinguishes tests against an installed server from tests using a temporary installation in its [regression-test documentation](https://www.postgresql.org/docs/current/regress-run.html). PGSandbox takes a narrower approach: it uses the managed local PostgreSQL cluster by default, or an explicitly configured private server, and gives each test session a fresh database and role on that server. It does not install a new server for every test run.
 
 ## The Session Proof Contract
 
@@ -220,12 +231,12 @@ The cleanup policy is part of the test design:
 | Policy | Passing command | Failing command | Best use |
 | --- | --- | --- | --- |
 | `always` | Delete | Delete | CI and unattended agent loops |
-| `on-success` | Delete | Retain until manual deletion or TTL | Active debugging |
+| `on-success` | Delete | Retain until explicit deletion or expired cleanup | Active debugging |
 | `keep` | Retain | Retain | Deliberate inspection or benchmark work |
 
 Use `always` when nobody will inspect the database interactively. Use `on-success` when a failure is more useful with its database state preserved. Use `keep` only when the retained state is the point of the run.
 
-A retained sandbox remains bounded by its TTL and reports a safe database ID and expiry. TTL is the recovery path, not the normal cleanup path. The [sandbox TTL guide](/blog/postgres-sandbox-ttl-values/) shows how to combine expected runtime, review buffer, and recovery margin instead of copying one large timeout everywhere.
+A retained sandbox reports a safe database ID and expiry. TTL marks eligibility for `cleanup_expired`; it is not a background deletion timer. After expiry, call `cleanup_expired` explicitly or use a user-owned scheduler, then inspect its cleanup result. Keep the cleanup call scoped to the intended profile and resources. Normal session cleanup still follows the chosen `with-database` policy; inspect that result too. The [sandbox TTL guide](/blog/postgres-sandbox-ttl-values/) shows how to combine expected runtime, review buffer, and recovery margin instead of copying one large timeout everywhere.
 
 After inspecting a failure, close the loop with tracked deletion:
 
@@ -234,7 +245,7 @@ pgsandbox describe-schema --database-id <database-id>
 pgsandbox delete-database --database-id <database-id>
 ```
 
-Use the safe `databaseId` from the session result. Retrieve credentials only through the normal PGSandbox connection workflow and keep them out of logs, issues, and PR notes.
+Inspect the deletion result rather than treating the request as proof that cleanup succeeded. Use the safe `databaseId` from the session result. Retrieve credentials only through the normal PGSandbox connection workflow and keep them out of logs, issues, and PR notes.
 
 ## 6. Make the result machine-readable
 
@@ -304,7 +315,7 @@ Templates are also an optimization, not the correctness default. In the [same me
 | Django tries to create `test_...` | Framework adapter | Configure the suite to use the injected database instead of requiring `CREATEDB` |
 | Tests fail after a missing Redis or asset warning | Consumer prerequisite | Prepare the non-Postgres dependency, then rerun |
 | Exit `124` | Session timeout | Narrow or partition the suite, or set a measured larger timeout |
-| Passing tests but `cleanup-failed` | Lifecycle cleanup | Retry `delete-database` with the safe database ID or let TTL cleanup retry |
+| Passing tests but `cleanup-failed` | Lifecycle cleanup | Retry `delete-database` with the safe database ID or explicitly run scoped `cleanup_expired` after expiry and inspect the result |
 | Failed database disappeared before inspection | Cleanup policy | Use `on-success` with a sufficient TTL for the next debugging run |
 
 ## PR-ready session proof packet
@@ -336,7 +347,7 @@ No. PGSandbox uses an existing local or private PostgreSQL server and creates a 
 
 ### Which cleanup policy should CI use?
 
-Use `always` for CI and unattended agent runs. Use `on-success` during debugging when a failed database should remain available until manual deletion or TTL expiry.
+Use `always` for CI and unattended agent runs. Use `on-success` during debugging when a failed database should remain available until explicit deletion or an expired-cleanup call.
 
 ### Can Django use the injected sandbox database?
 
@@ -367,7 +378,7 @@ Only when the isolation or parallelism benefit repays repeated setup. Measure a 
       "mainEntity": [
         {"@type": "Question", "name": "What is a disposable Postgres database for integration tests?", "acceptedAnswer": {"@type": "Answer", "text": "It is a short-lived database created for one test session, with its own role, known PostgreSQL target, expiry, and cleanup path."}},
         {"@type": "Question", "name": "Does PGSandbox start a new Postgres server for every test?", "acceptedAnswer": {"@type": "Answer", "text": "No. PGSandbox uses an existing local or private PostgreSQL server and creates a disposable database and role on it."}},
-        {"@type": "Question", "name": "Which cleanup policy should CI use?", "acceptedAnswer": {"@type": "Answer", "text": "Use always for CI and unattended agent runs. Use on-success during debugging when a failed database should be retained until deletion or TTL expiry."}},
+        {"@type": "Question", "name": "Which cleanup policy should CI use?", "acceptedAnswer": {"@type": "Answer", "text": "Use always for CI and unattended agent runs. Use on-success during debugging when a failed database should be retained until explicit deletion or an expired-cleanup call."}},
         {"@type": "Question", "name": "Can Django use the injected sandbox database?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. Configure the repository's test settings to use the existing injected database instead of asking the restricted sandbox role to create another test database."}},
         {"@type": "Question", "name": "Should every test partition get a separate database?", "acceptedAnswer": {"@type": "Answer", "text": "Only when failure isolation, memory reduction, or parallelism repays repeated provisioning, migrations, and process startup. Measure both shapes on the same runner."}}
       ]

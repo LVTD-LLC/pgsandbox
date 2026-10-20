@@ -4,7 +4,7 @@ excerpt: "Reproduce PostgreSQL deadlocks and lock timeouts with two coordinated 
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-07-23"
-updatedAt: "2026-09-24T06:00:00Z"
+updatedAt: "2026-10-20T02:00:00Z"
 tags: ["Postgres", "deadlocks", "lock timeout", "integration testing", "coding agents"]
 category: "Engineering"
 metaTitle: "Postgres Deadlock Testing in a Disposable Database"
@@ -259,7 +259,7 @@ pgsandbox with-database \
 
 PGSandbox supplies the connection to the child. Do not print `PGSANDBOX_DATABASE_URL`, `DATABASE_URL`, `PGPASSWORD`, or a derived DSN. The structured session output carries safe database identity, child status, bounded redacted output, expiry, and cleanup state.
 
-Use `--cleanup always` for CI and unattended agent runs. During active debugging, `--cleanup on-success` can retain a failed sandbox until manual deletion or TTL expiry. The [sandbox TTL guide](/blog/postgres-sandbox-ttl-values/) explains how to choose enough review and recovery time without creating a long-lived test database.
+Use `--cleanup always` for CI and unattended agent runs. During active debugging, `--cleanup on-success` can retain a failed sandbox until explicit deletion or an expired-cleanup call. TTL marks eligibility for `cleanup_expired`; call it explicitly or use a user-owned scheduler, and inspect the cleanup result. The [sandbox TTL guide](/blog/postgres-sandbox-ttl-values/) explains how to choose enough review and recovery time without creating a long-lived test database.
 
 The outer 45-second timeout protects the runner if the coordination code breaks or the server has an unusual detector setting. It is not the assertion for either database error. The database-side SQLSTATE remains the classification evidence.
 

@@ -41,3 +41,7 @@ Managed-local PostgreSQL is the default; an explicit external profile is optiona
 ## Snapshot teardown order — verified 2026-10-19
 
 `delete_schema_snapshot` resolves a PGSandbox-owned database record before deleting the local artifact. Remove the named snapshot while that sandbox is tracked, then delete the database and inspect the result. TTL alone does not schedule cleanup. Sources: rust-src/postgres.rs `delete_schema_snapshot` and `get_owned_record`, docs/mcp-tools.md snapshot contract at main `d12f848` (2026-10-19). Snapshot/diff requests are MCP client tool requests, not CLI commands or a proof of migration correctness.
+
+## Integration-test session readiness and cleanup — verified 2026-10-20
+
+Versioned `doctor` and `smoke-test` checks target the managed-local major; they do not prove an external profile or an application's test suite. `with-database` reports its cleanup outcome; a retained database's expiry does not itself delete it. Use explicit tracked deletion, or explicit `cleanup_expired`/a user-owned scheduler after expiry, and inspect the result. Sources: README.md runtime checks, docs/agent-testing.md, rust-src/cli.rs doctor/smoke-test and cleanup-expired dispatch, rust-src/postgres.rs cleanup_expired at main `405e45b` (2026-10-20).
