@@ -185,5 +185,28 @@
       "let the tracked sandbox cleanup path handle it"
     ],
     "flags": "i"
+  },
+  {
+    "claim": "Integration-test guidance separates versioned readiness, suite proof and explicit expired cleanup",
+    "paths": [
+      "site/src/content/blog/run-integration-tests-disposable-postgres-database.md",
+      "site/src/content/blog/test-postgres-deadlocks-lock-timeouts.md",
+      "docs/agent-testing.md"
+    ],
+    "urls": [
+      "/blog/run-integration-tests-disposable-postgres-database/",
+      "/blog/test-postgres-deadlocks-lock-timeouts/"
+    ],
+    "must_not_match": [
+      "let TTL cleanup retry",
+      "until manual deletion or TTL expiry",
+      "until deletion or TTL expiry",
+      "TTL is the recovery path, not the normal cleanup path",
+      "remains bounded by its TTL"
+    ],
+    "must_match": [
+      "cleanup_expired"
+    ],
+    "flags": "i"
   }
 ]

@@ -124,7 +124,10 @@ pgsandbox with-database --postgres-version 18 --cleanup always -- make test
 - `child-failed`: inspect the bounded `stdout` and `stderr`; with
   `--cleanup on-success`, use the returned sandbox ID before its expiry.
 - `cleanup-failed`: the result retains the sandbox identity and expiry. Retry
-  `pgsandbox delete-database --database-id <id>` or let TTL cleanup retry.
+  `pgsandbox delete-database --database-id <id>` and inspect its result. TTL
+  records eligibility, not automatic deletion: after expiry, explicitly call
+  `cleanup_expired` or use a user-owned scheduler. Scope that cleanup to the
+  intended profile and resources, and inspect the result.
 - Missing Redis or assets: prepare those repository dependencies separately;
   they are outside PGSandbox's framework-neutral Postgres boundary.
 

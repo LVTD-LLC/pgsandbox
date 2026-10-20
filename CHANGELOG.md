@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-20
+
+- Added version-matched runtime readiness checks to the disposable integration-test guide, distinguishing a smoke test from application-suite proof.
+- Corrected retained-database TTL and cleanup instructions in the integration-test guide, related deadlock guide, and CLI recipe; no runtime behavior changed.
+- Updated SEO analytics locators to the existing PostHog project; historical observations are unchanged.
+
 ## 2026-10-19
 
 - Added installation/runtime-readiness guidance and concrete MCP snapshot/diff requests to the schema-snapshot migration-review guide.
