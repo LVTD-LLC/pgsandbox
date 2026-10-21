@@ -286,9 +286,13 @@ mod tests {
             .unwrap()
             .1;
         assert_eq!(batch["api_key"], "phc_test");
-        assert_eq!(batch["batch"].as_array().unwrap().len(), 3);
-        assert_eq!(batch["batch"][1]["event"], "$exception");
-        assert_eq!(batch["batch"][2]["event"], "$ai_span");
+        assert_eq!(batch["batch"].as_array().unwrap().len(), 2);
+        assert_eq!(batch["batch"][1]["event"], "$ai_span");
+        assert!(batch["batch"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|event| event["event"] != "$exception"));
         assert_eq!(batch["batch"][0]["properties"]["telemetry_test"], true);
         let trace = &requests
             .iter()

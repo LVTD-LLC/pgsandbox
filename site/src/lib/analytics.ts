@@ -33,7 +33,7 @@ if (enabled) {
     capture_dead_clicks: true,
     capture_heatmaps: true,
     capture_performance: { web_vitals: true },
-    capture_exceptions: true,
+    capture_exceptions: false,
     mask_all_text: true,
     mask_all_element_attributes: true,
     session_recording: { maskAllInputs: true, maskTextSelector: '*', recordCrossOriginIframes: false },
