@@ -54,7 +54,7 @@ for the public static site, not a SQL editor or application containing secrets.
 contains eight native charts: website visitors/pages/actions, MCP tools, CLI
 invocations, anonymous installations, failures, and p95 tool latency. QA events
 and `utm_source=analytics_qa` traffic are excluded. Installation UUIDs are not
-people and CLI/MCP installation series can overlap. Logs, Error Tracking, AI
+people and CLI/MCP installation series can overlap. Logs, AI
 Observability and Tracing remain separate PostHog product views in the same project.
 
 ## Verification and monitoring
@@ -78,12 +78,11 @@ and MCP tool completion emits an OTLP JSON operation log and a root operation sp
 CLI events do not generate a second log/trace. Logs preserve existing stderr/stdout
 behavior; no arbitrary console, process, PostgreSQL, or SQL logs are exported.
 
-Failures emit `$exception` with a synthetic, handled `PGSandboxOperationFailed`
-exception grouped by surface/operation. The message is generated from the
-allowlisted operation name, never from the original error. This gives operation
-failure counts, **not** production stack traces or panic/crash coverage. Inspect
-local diagnostics for the original error. Browser exceptions retain SDK stacks;
-the deploy build uploads private source maps and removes them before packaging.
+PostHog error tracking is disabled: failures do not emit `$exception` events, and
+the website initializes posthog-js with `capture_exceptions: false`. Operation
+failures remain visible through the `success` property on product events and the
+ERROR severity/status on the operation log and span. Inspect local diagnostics
+for the original error.
 
 MCP completions additionally emit `$ai_span` with operation name, elapsed seconds,
 success and a shared trace ID. These are independent root tool spans: the MCP
@@ -112,6 +111,5 @@ site. Local/PR builds without that secret skip uploads.
 
 References: [OTLP traces](https://posthog.com/docs/distributed-tracing/start-here),
 [OTLP logs](https://posthog.com/docs/logs/installation/other),
-[manual exceptions](https://posthog.com/docs/error-tracking/installation/manual),
 [AI spans](https://posthog.com/docs/ai-observability/installation/manual-capture),
 [Vite source maps](https://posthog.com/docs/error-tracking/upload-source-maps/vite).

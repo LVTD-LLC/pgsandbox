@@ -102,20 +102,6 @@ pub fn operation_signals(
         }]
     }]}]});
     let mut events = Vec::new();
-    if !success {
-        let mut error = safe.clone();
-        // Intentionally synthetic: no raw error messages or filesystem stack paths.
-        error.insert(
-            "$exception_list".into(),
-            json!([{
-                "type": "PGSandboxOperationFailed", "value": format!("{name} failed"),
-                "mechanism": {"type": "generic", "handled": true, "synthetic": true}
-            }]),
-        );
-        error.insert("$exception_fingerprint".into(), json!(name));
-        error.insert("$exception_level".into(), json!("error"));
-        events.push(("$exception", error));
-    }
     if surface == "mcp" {
         safe.insert("$ai_trace_id".into(), json!(trace_id));
         safe.insert("$ai_session_id".into(), Value::Null);
@@ -163,14 +149,18 @@ mod tests {
         assert_eq!(span["status"]["code"], 2);
         assert_eq!(log["traceId"], span["traceId"]);
         assert_eq!(log["spanId"], span["spanId"]);
-        assert_eq!(signals.events.len(), 2);
-        assert_eq!(signals.events[1].1["$ai_trace_id"], span["traceId"]);
-        assert_eq!(signals.events[1].1["$ai_latency"], 0.025);
+        // PostHog error tracking is disabled: failures emit no `$exception` event.
+        assert_eq!(signals.events.len(), 1);
+        assert_eq!(signals.events[0].0, "$ai_span");
+        assert_eq!(signals.events[0].1["$ai_trace_id"], span["traceId"]);
+        assert_eq!(signals.events[0].1["$ai_latency"], 0.025);
+        assert_eq!(signals.events[0].1["$ai_is_error"], true);
         assert_eq!(signals.events[0].1["surface"], "mcp");
         assert_eq!(signals.events[0].1["telemetry_test"], true);
         let serialized = format!("{}{}{:?}", signals.logs, signals.traces, signals.events);
         assert!(!serialized.contains("SECRET"));
         assert!(!serialized.contains("$ai_generation"));
+        assert!(!serialized.contains("$exception"));
     }
 
     #[test]

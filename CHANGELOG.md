@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-10-21
+
+- Removed PostHog error tracking: runtime failures no longer emit `$exception` events and the website disables posthog-js exception autocapture. Product analytics, logs, traces, AI spans, and session replay are unchanged.
+
 ## 2026-10-20
 
 - Added version-matched runtime readiness checks to the disposable integration-test guide, distinguishing a smoke test from application-suite proof.
