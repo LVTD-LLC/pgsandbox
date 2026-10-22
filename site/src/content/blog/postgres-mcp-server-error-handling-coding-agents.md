@@ -4,7 +4,7 @@ excerpt: "Handle Postgres MCP server errors by branching on stable error codes, 
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-07-09"
-updatedAt: "2026-09-24T06:00:00Z"
+updatedAt: "2026-10-22T02:00:00Z"
 tags: ["Postgres", "MCP", "error handling", "AI agents", "SQL"]
 category: "Engineering"
 metaTitle: "Postgres MCP Server Error Handling for Agents"
@@ -117,7 +117,7 @@ This table is the practical routing layer. Start here before asking a human to d
 | `invalid_extensions` | `validation` | Requested extension names are invalid or unavailable. | Call `list_extensions` and request only extensions available on that target profile. |
 | `extension_setup_required` | `validation` | Extension needs server-level setup. | Configure the Postgres profile first; do not hide server setup inside an agent retry. |
 
-This is product-led SEO in practice: the page is not a keyword wrapper. It is a reusable operating surface for agents that need to decide what to do after a database tool fails.
+Use the code to choose the next tool call; keep the category and SQLSTATE alongside it when recording the recovery.
 
 ## How to handle SQL repair errors
 
@@ -135,6 +135,90 @@ Use this loop:
 6. Summarize the fix and evidence in the PR.
 
 Do not treat `syntax_error` as an environment problem. A syntax error means the SQL needs revision. `doctor` is useful for profile and connectivity diagnostics, not for a misspelled keyword.
+
+## Worked recovery: fix a missing column without enabling writes
+
+A missing-column error needs schema evidence, not a connectivity check or a write-enabled retry. This example creates synthetic data, deliberately asks for the wrong column, and then proves the corrected read with a result cap.
+
+PGSandbox verified this sequence on **October 22, 2026**, using the installed **0.5.0 CLI tool dispatcher** and **managed-local PostgreSQL 15** in an isolated test cluster. It exercises the named tool handlers; it is not a Cursor, Claude Code, or other MCP-client end-to-end test. The request fields follow the [PGSandbox MCP contracts](/docs/mcp-tools/), checked against the repository on that date. PostgreSQL 15 documents `42703` as [`undefined_column`](https://www.postgresql.org/docs/15/errcodes-appendix.html).
+
+### 1. Create a disposable target and synthetic fixture
+
+If PGSandbox is not installed, start with the [installation guide](/docs/install/). Choose a PostgreSQL major available on your machine; `15` is the tested target here, not a requirement for every sandbox.
+
+Send this `create_database` request through your tool client:
+
+```json
+{
+  "postgresVersion": "15",
+  "nameHint": "error-recovery-demo",
+  "ttlMinutes": 15
+}
+```
+
+Save the returned `result.databaseId`. Replace `YOUR_DATABASE_ID` in every following request with that exact value. Keep `postgresVersion` the same. Do not request or paste connection credentials.
+
+Call `run_sql` with this fixture request. This is the **only write-enabled step**: it intentionally creates a table and inserts three synthetic rows in the new disposable database.
+
+```json
+{
+  "databaseId": "YOUR_DATABASE_ID",
+  "postgresVersion": "15",
+  "sql": "CREATE TABLE public.recovery_demo (id integer PRIMARY KEY, display_name text NOT NULL); INSERT INTO public.recovery_demo VALUES (1, 'Ada'), (2, 'Lin'), (3, 'Sam');",
+  "readonly": false
+}
+```
+
+Check `ok: true` before continuing. Do not run this fixture against a shared application database.
+
+### 2. Read the error, then inspect the schema
+
+Call `run_sql` with a deliberately incorrect column name:
+
+```json
+{
+  "databaseId": "YOUR_DATABASE_ID",
+  "postgresVersion": "15",
+  "sql": "SELECT id, name FROM public.recovery_demo ORDER BY id;",
+  "readonly": true,
+  "rowLimit": 2
+}
+```
+
+The observed response had `ok: false`, `errors[0].code: "undefined_column"`, `category: "sql_analysis"`, and `sqlstate: "42703"`. Its hint directed the caller to `describe_schema` or identifier spelling/casing. Do not blindly retry the same SQL or switch off readonly mode: neither repairs the missing column.
+
+Call `describe_schema` with the same selector:
+
+```json
+{
+  "databaseId": "YOUR_DATABASE_ID",
+  "postgresVersion": "15"
+}
+```
+
+Check `ok`, then inspect `result.columns` for `tableSchema: "public"` and `tableName: "recovery_demo"`. The observed column names were `id` (`integer`) and `display_name` (`text`), not `name`.
+
+### 3. Correct the read and preserve its limits
+
+Call `run_sql` again, changing only the selected column:
+
+```json
+{
+  "databaseId": "YOUR_DATABASE_ID",
+  "postgresVersion": "15",
+  "sql": "SELECT id, display_name FROM public.recovery_demo ORDER BY id;",
+  "readonly": true,
+  "rowLimit": 2
+}
+```
+
+The successful response returned Ada and Lin, with `returnedRowCount: 2`, `truncated: true`, and `totalRowCountKnown: false`. Those fields belong to `result`; they are not a claim that the table contains only two rows. The fixture inserted three. This proves the repaired read returned a bounded sample, not that every row or application behavior was validated.
+
+### 4. Delete the sandbox explicitly
+
+Call `delete_database` with the same selector used for `describe_schema`, and inspect the deletion response. In the verification run, deletion completed successfully and the isolated test cluster was stopped afterward. If any earlier step fails unexpectedly, still attempt tracked deletion and record its result.
+
+The 15-minute TTL records expiry; it does not schedule deletion. A retained or interrupted sandbox needs explicit deletion, or an explicit `cleanup_expired` call or user-owned scheduler after expiry. Keep the error code, schema correction, bounded-result flags, and cleanup outcome in your proof summary—not credentials or a raw database transcript.
 
 ## How to handle readonly failures
 
