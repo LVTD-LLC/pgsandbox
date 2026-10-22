@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-10-22
+
+- Added a verified missing-column recovery walkthrough to the existing MCP error-handling guide: schema inspection, corrected readonly query, bounded-result interpretation, and explicit sandbox deletion. No runtime or analytics behavior changed.
+
 ## 2026-10-21
 
 - Removed PostHog error tracking: runtime failures no longer emit `$exception` events and the website disables posthog-js exception autocapture. Product analytics, logs, traces, AI spans, and session replay are unchanged.
