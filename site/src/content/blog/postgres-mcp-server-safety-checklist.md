@@ -4,7 +4,7 @@ excerpt: "A practical checklist for giving AI coding agents Postgres access thro
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-06-29"
-updatedAt: "2026-06-29T15:34:00Z"
+updatedAt: "2026-10-23T02:00:00Z"
 tags: ["postgres", "mcp", "ai-agents", "database-security", "developer-tools"]
 category: "Engineering"
 metaTitle: "Postgres MCP Server Safety Checklist"
@@ -21,6 +21,25 @@ Model Context Protocol (MCP) gives AI applications a standard way to connect to 
 The same capability is also the risk. The MCP specification says servers can expose tools as functions for the model to execute, and its trust-and-safety section explicitly warns that tools can represent arbitrary code execution paths that require user consent and caution (https://modelcontextprotocol.io/specification/2025-06-18). A database tool is not just context. It is a path into state.
 
 Use this checklist before giving a coding agent a Postgres MCP server.
+
+## Choose read-only inspection or disposable writes first
+
+Use read-only Postgres MCP access to inspect an existing database. Use a disposable database when the task must change schema or data. These solve different problems; a read-only query option does not make an entire MCP server read-only.
+
+An existing-database connector can be the better fit when you need:
+
+- **The current schema and authorized records**, without preparing a separate copy. Read permission still exposes data to the client; restrict columns and results as well as writes.
+- **The existing workload's evidence**, rather than performance conclusions from a small synthetic fixture. For example, [Postgres MCP Pro's documented tools](https://github.com/crystaldba/postgres-mcp#mcp-server-api) include query plans, workload/index analysis, and database health checks. Check its extension requirements and access-mode configuration for the tools you intend to use; this is documented scope, not a security certification.
+- **Inspection without another database lifecycle**, when the question needs no migration, seed, or destructive reproduction. You still own credential management and access review, but do not need a disposable copy merely to answer that question.
+
+A writable sandbox is the better fit for applying a proposed migration, testing a constraint failure, or reproducing a bug with synthetic rows. Follow this boundary:
+
+1. [Install PGSandbox and verify the local runtime](/docs/install/) before using it for a task. Managed local PostgreSQL is the default; external profiles are optional.
+2. Create a tracked database and use its sandbox role for migrations and seeds. Do not promote the agent's existing-database reader to an administrator just because a test needs writes.
+3. Inspect the result with bounded `run_sql` calls. Set `readonly: true` for those inspection calls, not for the migration itself. The [detailed MCP tool contract](https://github.com/LVTD-LLC/pgsandbox/blob/main/docs/mcp-tools.md) describes the read-only transaction and rollback; it does not disable the server's create/delete tools.
+4. Delete the tracked database and inspect the cleanup result. TTL records expiry; `cleanup_expired` or your own scheduler must perform expired cleanup.
+
+[PostgreSQL 15's transaction reference](https://www.postgresql.org/docs/15/sql-set-transaction.html) explains which commands a read-only transaction disallows. Transaction mode, database privileges, exposed tools, and data disclosure are separate checks. A disposable fixture can prove behavior on that fixture; it does not prove production performance or authorize copying sensitive data.
 
 ## The short checklist
 
