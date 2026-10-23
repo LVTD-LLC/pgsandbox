@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-10-23
+
+- Added a read-only inspection versus disposable-write decision guide to the existing Postgres MCP safety checklist, including honest existing-database tradeoffs and a scoped install-to-cleanup path. No runtime or analytics behavior changed.
+
 ## 2026-10-22
 
 - Added a verified missing-column recovery walkthrough to the existing MCP error-handling guide: schema inspection, corrected readonly query, bounded-result interpretation, and explicit sandbox deletion. No runtime or analytics behavior changed.
