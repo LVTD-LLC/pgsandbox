@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-10-24
+
+- Added a source-aware first-clone walkthrough to the existing Postgres clone guide: runtime/client readiness, schema-only request, bounded destination verification, and explicit cleanup. Clarified that schema-only copying is not sanitization and corrected TTL-only deletion wording in the clone guide and related local-extension guide. No runtime behavior changed.
+
 ## 2026-10-23
 
 - Added a read-only inspection versus disposable-write decision guide to the existing Postgres MCP safety checklist, including honest existing-database tradeoffs and a scoped install-to-cleanup path. No runtime or analytics behavior changed.

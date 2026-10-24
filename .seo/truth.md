@@ -45,3 +45,7 @@ Managed-local PostgreSQL is the default; an explicit external profile is optiona
 ## Integration-test session readiness and cleanup — verified 2026-10-20
 
 Versioned `doctor` and `smoke-test` checks target the managed-local major; they do not prove an external profile or an application's test suite. `with-database` reports its cleanup outcome; a retained database's expiry does not itself delete it. Use explicit tracked deletion, or explicit `cleanup_expired`/a user-owned scheduler after expiry, and inspect the result. Sources: README.md runtime checks, docs/agent-testing.md, rust-src/cli.rs doctor/smoke-test and cleanup-expired dispatch, rust-src/postgres.rs cleanup_expired at main `405e45b` (2026-10-20).
+
+## Clone workflow boundary — verified 2026-10-24
+
+Current main `2aecc2f`, docs/mcp-tools.md and rust-src/postgres.rs: sourceDatabaseUrl names the source; profile/postgresVersion select the destination. schemaOnly omits table data, not schema definitions or comments; there are no masking or row-filter inputs. pg_dump and pg_restore must be on PATH; source major newer than target is rejected. TTL records expiry and explicit deletion or cleanup_expired removes tracked resources. PostgreSQL15 pg_restore documents that restoring source-defined code is not safe for untrusted sources, including partial restores. Source: https://www.postgresql.org/docs/15/app-pgrestore.html (read October24).
