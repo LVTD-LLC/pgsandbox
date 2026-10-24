@@ -4,7 +4,7 @@ excerpt: "Test PostgreSQL extension availability, installation, behavior, migrat
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-07-19"
-updatedAt: "2026-09-21T06:00:00Z"
+updatedAt: "2026-10-24"
 tags: ["Postgres", "PostgreSQL extensions", "database testing", "MCP", "coding agents"]
 category: "Engineering"
 metaTitle: "Test PostgreSQL Extensions Locally in Sandboxes"
@@ -44,7 +44,7 @@ Extension testing becomes clearer when you separate five gates that are often co
 | Installation | Can the lifecycle admin install the profile-allowed extension in a new database? | `create_database.installedExtensions` and sandbox-scoped `list_extensions` |
 | Behavior | Does the exact function, type, operator, or index needed by the application work? | Small deterministic `run_sql` assertion |
 | Migration compatibility | Can the real migration, schema clone, or restore reproduce the dependency? | Repo command result plus schema digest or diff |
-| Cleanup | Did the test remove its database and generated role without touching unrelated resources? | `delete_database` result or intentional TTL record |
+| Cleanup | Did the test remove its database and generated role without touching unrelated resources? | `delete_database` result; retained resources need an explicit later cleanup plan |
 
 This framework is the information-gain layer missing from most extension installation guides. An extension can pass availability and fail installation because it needs more privilege. It can pass installation and fail behavior because the application assumes a different version. It can pass a hand-written smoke test and fail a clone because the source archive carries a server-specific extension entry.
 
@@ -275,7 +275,7 @@ Delete the known sandbox when the proof is complete:
 
 This `delete_database` call removes the tracked database and generated role through the lifecycle boundary. Do not manually drop only the database and leave the role or PGSandbox metadata behind.
 
-TTL is a recovery control, not the normal completion path. A 45-minute TTL can clean up after an interrupted agent session, but a successful workflow should still delete its known resource. Shared profiles should also attach a stable owner and low-cardinality labels so cleanup remains scoped.
+TTL is a recovery control, not the normal completion path. A 45-minute TTL records when an interrupted task becomes eligible for `cleanup_expired`; it does not delete the resource automatically. Call expired cleanup explicitly or use a user-owned scheduler. A successful workflow should still delete its known resource. Shared profiles should also attach a stable owner and low-cardinality labels so cleanup remains scoped.
 
 The cleanup gate is part of extension correctness because extension tests often fail during environment setup. A workflow that proves the SQL but leaves a trail of failed databases is not production-ready automation.
 

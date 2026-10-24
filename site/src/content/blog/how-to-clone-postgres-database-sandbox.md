@@ -4,7 +4,7 @@ excerpt: "Clone a Postgres database into a disposable sandbox when a coding agen
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-06-30"
-updatedAt: "2026-06-30"
+updatedAt: "2026-10-24"
 tags: ["Postgres", "database cloning", "AI agents", "MCP", "sandboxes"]
 category: "Engineering"
 metaTitle: "Postgres Clone Database Into a Safe Sandbox"
@@ -28,6 +28,8 @@ PGSandbox's clone model is deliberately narrow:
 6. Clean up the destination sandbox if restore fails.
 7. Let the agent run validation SQL only against the destination.
 
+With no explicit external profile, the destination uses PGSandbox's managed local PostgreSQL cluster. The source URL is separate from the destination profile; choosing a local target does not make a remote source local.
+
 The result is not a database branch. It is a [database sandbox](https://pgsandbox.dev/blog/what-is-database-sandbox/) with a copy of the source shape the agent can safely inspect, mutate, and throw away.
 
 ## When to clone a Postgres database
@@ -47,6 +49,58 @@ Do not clone by default. A schema-only sandbox or small fixture is often enough.
 PostgreSQL's own `pg_dump` documentation describes `pg_dump` as a utility for exporting a single database, and notes that it makes consistent exports while the database is being used concurrently without blocking readers or writers (https://www.postgresql.org/docs/current/app-pgdump.html). That makes logical dumps a practical baseline for portable cloning.
 
 But a dump is still a copy of data. If the source contains sensitive rows, use a masked source, a reduced source, or a schema-only clone before you hand the sandbox to an agent.
+
+## First clone: verify the runtime, then copy only what you need
+
+Start with the [install guide](/docs/install/), then check the runtime and the dump tools on the machine running PGSandbox:
+
+```bash
+pgsandbox --version
+pgsandbox doctor --postgres-version 15
+pgsandbox smoke-test --postgres-version 15
+pg_dump --version
+pg_restore --version
+```
+
+Replace `15` with your intended PostgreSQL major. The smoke test checks a disposable runtime lifecycle, not whether your source can be cloned. `clone_database` additionally needs `pg_dump` and `pg_restore` on `PATH`. Prefer matching client tools and a matching target major for the first attempt; PGSandbox rejects a source newer than its target, and incompatible dump settings can still prevent restore. See the [clone tool contract](/docs/mcp-tools/#clone_database) for version and extension diagnostics.
+
+For a schema-only first attempt, give the tool this request through a local input mechanism that can supply the approved source credential:
+
+```json
+{
+  "sourceDatabaseUrl": "<approved source URL supplied privately>",
+  "postgresVersion": "15",
+  "nameHint": "schema clone rehearsal",
+  "schemaOnly": true,
+  "ttlMinutes": 30,
+  "timeoutSeconds": 120
+}
+```
+
+The placeholder is not a usable connection string. Do not paste a real source credential into a shared prompt or tracked JSON file. For CLI use, `pgsandbox clone-database --input-file` accepts that same object from a private local file. PGSandbox does not resolve secret references in `sourceDatabaseUrl` for you. Save the returned `result.databaseId`; subsequent `describe_schema`, `run_sql`, and `delete_database` calls must target that destination id, not the source URL.
+
+Check the MCP response's `ok` field before continuing. A successful schema-only clone should contain the expected tables without their source rows. For an approved synthetic table named `clone_probe`, a bounded check is:
+
+```json
+{
+  "databaseId": "<returned destination id>",
+  "sql": "SELECT count(*) AS copied_rows FROM public.clone_probe;",
+  "readonly": true,
+  "rowLimit": 1
+}
+```
+
+Only switch `schemaOnly` to `false` when the task requires rows and the source is approved for copying. Run a small destination-only mutation, verify the original source is unchanged through your trusted source-access path, then call `delete_database` with the destination id. The clone operation reads the source; it does not revoke source credentials or stop an agent using another connection to write there.
+
+### What the local rehearsal verified
+
+On October 24, 2026, we ran PGSandbox 0.5.0 with PostgreSQL 15 against one synthetic source table containing one row and a table comment. The schema-only clone had zero rows; the full clone had one. Both retained the comment. Inserting a destination-only row into each clone left the source at one row, and explicit deletion succeeded for both clones and the synthetic source. This is a two-clone functional check, not a benchmark or a guarantee about arbitrary sources, extensions, or client configurations.
+
+### Schema-only is not sanitization
+
+`schemaOnly: true` omits table data; it does not certify that the remaining schema is free of private information. Review comments, function bodies, defaults, object names, and other definitions before exposing them to an agent. Masking and row reduction must happen in the approved source workflow: `clone_database` has no automatic masking or row-filter input.
+
+PostgreSQL also warns that [restoring a dump executes code defined by the source](https://www.postgresql.org/docs/15/app-pgrestore.html), including with partial dumps or restores. A scoped destination role is not a reason to restore an untrusted source. This workflow is for trusted, approved sources, not arbitrary database archives.
 
 ## The safe clone architecture
 
@@ -157,7 +211,7 @@ The point is to keep the clone as a proof environment, not a new source of unbou
 
 Cleanup is part of cloning, not an afterthought.
 
-A clone created for an agent task should have an owner, a purpose, a TTL, and a deletion path. If restore fails, the destination should be deleted or reported clearly. If the agent finishes, the sandbox should be deleted explicitly or by expiry.
+A clone created for an agent task should have an owner, a purpose, a TTL, and a deletion path. If restore fails, the destination should be deleted or reported clearly. If the agent finishes, call `delete_database` explicitly. TTL records when the clone expires; it does not run a background deletion timer. Use `cleanup_expired` or a user-owned scheduled call to remove expired tracked resources.
 
 PGSandbox's `clone_database` notes say that if restore fails, PGSandbox attempts to delete the newly created sandbox (https://pgsandbox.dev/docs/mcp-tools/). The broader cleanup model is metadata-backed: `delete_database` deletes a database and role created by PGSandbox, while `cleanup_expired` deletes expired resources with dry-run support.
 
@@ -200,7 +254,7 @@ Postgres dumps can carry ownership and privilege assumptions from the source env
 
 ### Leaving clones behind
 
-Every clone should have a cleanup path. If the restore fails, delete the destination. If the task finishes, delete the destination. If the session is interrupted, expire it.
+Every clone should have a cleanup path. If the restore fails, delete the destination. If the task finishes, delete the destination. If the session is interrupted, use `cleanup_expired` after its recorded expiry; do not assume the TTL deleted it.
 
 ## A safe default prompt for agents
 

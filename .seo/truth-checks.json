@@ -208,5 +208,25 @@
       "cleanup_expired"
     ],
     "flags": "i"
+  },
+  {
+    "claim": "Clone and extension guides distinguish expiry from deletion",
+    "paths": [
+      "site/src/content/blog/how-to-clone-postgres-database-sandbox.md",
+      "site/src/content/blog/test-postgres-extensions-locally.md"
+    ],
+    "urls": [
+      "/blog/how-to-clone-postgres-database-sandbox/",
+      "/blog/test-postgres-extensions-locally/"
+    ],
+    "must_not_match": [
+      "deleted explicitly or by expiry",
+      "If the session is interrupted, expire it",
+      "A 45-minute TTL can clean up after an interrupted agent session"
+    ],
+    "must_match": [
+      "cleanup_expired"
+    ],
+    "flags": "i"
   }
 ]
