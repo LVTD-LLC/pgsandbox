@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-10-25
+
+- Added version-matched runtime readiness and an explicit retained-sandbox recovery path to the serialization-retry guide. Clarified expiry versus deletion across related test guides and the owner-label evidence template; titles and SQL harnesses are unchanged. No runtime behavior changed.
+
 ## 2026-10-24
 
 - Added a source-aware first-clone walkthrough to the existing Postgres clone guide: runtime/client readiness, schema-only request, bounded destination verification, and explicit cleanup. Clarified that schema-only copying is not sanitization and corrected TTL-only deletion wording in the clone guide and related local-extension guide. No runtime behavior changed.

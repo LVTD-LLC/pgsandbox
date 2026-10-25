@@ -4,7 +4,7 @@ excerpt: "Prove registration, commit delivery, rollback silence, payload identit
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-08-24"
-updatedAt: "2026-09-24T06:00:00Z"
+updatedAt: "2026-10-25T02:00:00Z"
 tags: ["Postgres", "LISTEN NOTIFY", "integration testing", "Psycopg", "coding agents"]
 category: "Engineering"
 metaTitle: "How to Test PostgreSQL LISTEN/NOTIFY Workflows"
@@ -215,7 +215,7 @@ pgsandbox with-database \
 
 PGSandbox creates a fresh database and scoped login role, injects `PGSANDBOX_DATABASE_URL` and standard libpq variables into the child process, bounds its output, and removes the database according to the cleanup policy. The application test never needs the admin connection that created the sandbox. See the [MCP tool contract](/docs/mcp-tools/) and [resource model](/docs/architecture/) for that authority boundary.
 
-Use `--cleanup on-success` temporarily when a failed test needs database inspection. Keep a TTL as the recovery backstop, and never print the injected connection URL in test output or PR evidence.
+Use `--cleanup on-success` temporarily when a failed test needs database inspection. Delete the retained sandbox explicitly after inspection and inspect the result. TTL marks eligibility for `cleanup_expired`, not automatic deletion. After expiry, invoke that cleanup explicitly or through a user-owned scheduler, scoped to the intended profile and resources. Never print the injected connection URL in test output or PR evidence.
 
 ## Test operational boundaries separately
 

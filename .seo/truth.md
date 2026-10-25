@@ -49,3 +49,7 @@ Versioned `doctor` and `smoke-test` checks target the managed-local major; they 
 ## Clone workflow boundary — verified 2026-10-24
 
 Current main `2aecc2f`, docs/mcp-tools.md and rust-src/postgres.rs: sourceDatabaseUrl names the source; profile/postgresVersion select the destination. schemaOnly omits table data, not schema definitions or comments; there are no masking or row-filter inputs. pg_dump and pg_restore must be on PATH; source major newer than target is rejected. TTL records expiry and explicit deletion or cleanup_expired removes tracked resources. PostgreSQL15 pg_restore documents that restoring source-defined code is not safe for untrusted sources, including partial restores. Source: https://www.postgresql.org/docs/15/app-pgrestore.html (read October24).
+
+## Retained test-session cleanup — verified 2026-10-25
+
+A failed child retained by `--cleanup on-success` and a failed deletion are distinct outcomes. Inspect status, cleanup policy/attempted/retained/deleted/errorCode; close child connections and explicitly delete a retained sandbox by safe ID in the same profile. TTL records eligibility for cleanup_expired, not background deletion. Scope expired cleanup and inspect the result. Versioned doctor/smoke-test readiness is not proof of serialization retry correctness. Sources: docs/agent-testing.md Troubleshooting; rust-src/cli.rs delete-database and with-database; rust-src/postgres.rs cleanup_expired at main7c7e76a (2026-10-25).
