@@ -4,7 +4,7 @@ excerpt: "Prove Read Committed snapshot drift, Repeatable Read stability, and Se
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-07-30"
-updatedAt: "2026-10-18T02:00:00Z"
+updatedAt: "2026-10-25T02:00:00Z"
 tags: ["Postgres", "transaction isolation", "concurrency testing", "integration testing", "coding agents"]
 category: "Engineering"
 metaTitle: "Test PostgreSQL Transaction Isolation Levels"
@@ -312,7 +312,7 @@ pgsandbox with-database \
 
 One child process is important. Separate MCP `run_sql` calls do not preserve two open physical sessions across requests. The same process boundary appears in the [disposable Postgres integration-test guide](/blog/run-integration-tests-disposable-postgres-database/), which explains how to keep repository setup, test execution, and cleanup in one bounded session.
 
-Use `--cleanup always` for CI and unattended coding-agent work. The sandbox TTL is a recovery backstop, not the primary cleanup mechanism. If you retain a failed sandbox for diagnosis, keep its safe database ID and never print its connection URL.
+Use `--cleanup always` for CI and unattended coding-agent work. Inspect the cleanup result. If you retain a failed sandbox for diagnosis, keep its safe database ID and delete it explicitly after inspection; never print its connection URL. TTL marks eligibility for `cleanup_expired`, not automatic deletion. After expiry, invoke that cleanup explicitly or through a user-owned scheduler, scope it to the intended profile and resources, and inspect its result.
 
 ## 3. Interpret the isolation proof
 

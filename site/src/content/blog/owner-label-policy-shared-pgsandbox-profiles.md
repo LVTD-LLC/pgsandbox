@@ -4,7 +4,7 @@ excerpt: "Design a stable owner and label policy for PGSandbox cleanup so shared
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-07-13"
-updatedAt: "2026-09-24T06:00:00Z"
+updatedAt: "2026-10-25T02:00:00Z"
 tags: ["Postgres", "MCP", "cleanup", "database sandbox", "agent safety"]
 category: "Engineering"
 metaTitle: "PGSandbox Owner and Label Policy"
@@ -294,8 +294,9 @@ If cleanup is skipped, say why:
 PGSandbox cleanup:
 - owner: codex
 - labels: repo=pgsandbox-mcp, task=pr-184, workflow=migration
-- skipped: sandbox retained until TTL for reviewer inspection
+- skipped: sandbox intentionally retained for reviewer inspection; explicit deletion required
 - expiresAt: 2026-07-13T08:30:00Z
+- follow-up: delete after inspection; expiry only marks eligibility for cleanup_expired
 ```
 
 This is the difference between "the agent cleaned up" and "the reviewer can see the cleanup boundary."

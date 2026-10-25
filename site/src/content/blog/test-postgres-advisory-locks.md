@@ -4,7 +4,7 @@ excerpt: "Prove advisory-lock contention, session and transaction lifetime, cata
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-07-29"
-updatedAt: "2026-07-29T06:00:00Z"
+updatedAt: "2026-10-25T02:00:00Z"
 tags: ["Postgres", "advisory locks", "concurrency testing", "integration testing", "coding agents"]
 category: "Engineering"
 metaTitle: "Test Postgres Advisory Locks Safely"
@@ -250,7 +250,7 @@ pgsandbox with-database \
 
 `with-database` creates a tracked database and scoped login role, injects `PGSANDBOX_DATABASE_URL`, captures bounded credential-redacted output, and applies the requested cleanup policy. The [agent test-session guide](/blog/run-integration-tests-disposable-postgres-database/) explains the versioned result and cleanup fields.
 
-Use `--cleanup always` for CI and unattended agent runs. During active debugging, `--cleanup on-success` can retain a failed sandbox until its TTL, but delete it explicitly after inspection.
+Use `--cleanup always` for CI and unattended agent runs. During active debugging, `--cleanup on-success` can retain a failed sandbox, but delete it explicitly after inspection. TTL records eligibility for `cleanup_expired`; expiry alone does not delete the database. After expiry, invoke that cleanup explicitly or through a user-owned scheduler, scope it to the intended profile and resources, and inspect its result.
 
 ## 3. Read the proof from `pg_locks`
 

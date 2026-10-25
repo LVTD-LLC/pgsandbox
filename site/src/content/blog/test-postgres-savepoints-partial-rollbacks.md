@@ -4,7 +4,7 @@ excerpt: "Force a statement error, roll back only the failed unit, preserve earl
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-07-27"
-updatedAt: "2026-09-24T06:00:00Z"
+updatedAt: "2026-10-25T02:00:00Z"
 tags: ["Postgres", "savepoints", "partial rollback", "transaction testing", "coding agents"]
 category: "Engineering"
 metaTitle: "Test Postgres Savepoints and Partial Rollbacks"
@@ -228,7 +228,7 @@ pgsandbox with-database \
 
 PGSandbox creates a task database and scoped login role, injects `PGSANDBOX_DATABASE_URL` and standard connection variables, supervises the child, redacts generated credentials from captured output, and applies the chosen cleanup policy. The [one-shot disposable database guide](/blog/run-integration-tests-disposable-postgres-database/) explains the complete session result and failure states.
 
-Use `--cleanup always` for unattended CI and coding-agent runs. Use `--cleanup on-success` only when a failed database will actually be inspected. A retained database still needs a short TTL as a backstop.
+Use `--cleanup always` for unattended CI and coding-agent runs. Use `--cleanup on-success` only when a failed database will actually be inspected. Delete the retained database explicitly after inspection and inspect the result. A short TTL records eligibility for `cleanup_expired`, not automatic deletion; after expiry, invoke that cleanup explicitly or through a user-owned scheduler, scoped to the intended profile and resources.
 
 The [PGSandbox architecture](/docs/architecture/) separates lifecycle authority from task SQL. The harness receives the sandbox role, not the administration credential that created the database.
 

@@ -228,5 +228,43 @@
       "cleanup_expired"
     ],
     "flags": "i"
+  },
+  {
+    "claim": "Retained test-session guidance distinguishes expiry from explicit cleanup",
+    "paths": [
+      "site/src/content/blog/test-postgres-serialization-failure-retries.md",
+      "site/src/content/blog/test-postgres-row-level-security.md",
+      "site/src/content/blog/test-postgres-advisory-locks.md",
+      "site/src/content/blog/test-postgresql-triggers.md",
+      "site/src/content/blog/test-postgres-transaction-isolation-levels.md",
+      "site/src/content/blog/test-postgresql-listen-notify-workflows.md",
+      "site/src/content/blog/test-postgres-savepoints-partial-rollbacks.md",
+      "site/src/content/blog/test-postgresql-table-partitioning.md",
+      "site/src/content/blog/owner-label-policy-shared-pgsandbox-profiles.md"
+    ],
+    "urls": [
+      "/blog/test-postgres-serialization-failure-retries/",
+      "/blog/test-postgres-row-level-security/",
+      "/blog/test-postgres-advisory-locks/",
+      "/blog/test-postgresql-triggers/",
+      "/blog/test-postgres-transaction-isolation-levels/",
+      "/blog/test-postgresql-listen-notify-workflows/",
+      "/blog/test-postgres-savepoints-partial-rollbacks/",
+      "/blog/test-postgresql-table-partitioning/",
+      "/blog/owner-label-policy-shared-pgsandbox-profiles/"
+    ],
+    "must_not_match": [
+      "allowed to expire",
+      "until its TTL",
+      "TTL remain the recovery backstop",
+      "TTL is a recovery backstop",
+      "TTL as a recovery backstop",
+      "TTL-bounded debugging window",
+      "sandbox retained until TTL"
+    ],
+    "must_match": [
+      "cleanup_expired"
+    ],
+    "flags": "i"
   }
 ]

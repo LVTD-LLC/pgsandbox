@@ -4,7 +4,7 @@ excerpt: "Prove that Postgres RLS filters tenant reads, rejects cross-tenant wri
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-07-28"
-updatedAt: "2026-09-24T06:00:00Z"
+updatedAt: "2026-10-25T02:00:00Z"
 tags: ["Postgres", "row-level security", "RLS testing", "multi-tenant databases", "coding agents"]
 category: "Engineering"
 metaTitle: "Test Postgres Row-Level Security in a Sandbox"
@@ -324,7 +324,7 @@ pgsandbox with-database \
 
 The [disposable Postgres integration-test workflow](/blog/run-integration-tests-disposable-postgres-database/) explains the session envelope. PGSandbox creates the database and scoped login, injects `PGSANDBOX_DATABASE_URL`, captures bounded redacted output, and applies the requested cleanup policy.
 
-Use `--cleanup always` in CI. During investigation, `--cleanup on-success` keeps a failed sandbox until its TTL so an operator can inspect the safe database identifier returned by PGSandbox. Do not print or save the injected database URL.
+Use `--cleanup always` in CI and inspect its result. During investigation, `--cleanup on-success` can retain a failed sandbox for inspection using the safe database identifier returned by PGSandbox. Delete it explicitly after inspection. TTL marks eligibility for `cleanup_expired`, not automatic deletion; after expiry, invoke that cleanup explicitly or through a user-owned scheduler and inspect its result. Keep cleanup scoped to the intended profile and resources. Do not print or save the injected database URL.
 
 If you use the MCP lifecycle tools instead of the CLI, call `create_database`, obtain the task connection through the configured secret-handling path, run the harness as one process, then call `delete_database`. The [MCP tool contract](/docs/mcp-tools/) keeps lifecycle authority separate from task SQL.
 

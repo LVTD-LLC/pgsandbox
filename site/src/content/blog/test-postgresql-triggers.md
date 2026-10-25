@@ -4,7 +4,7 @@ excerpt: "Prove the installed trigger definition, firing paths, exact side effec
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-08-03"
-updatedAt: "2026-10-18T02:00:00Z"
+updatedAt: "2026-10-25T02:00:00Z"
 tags: ["Postgres", "triggers", "integration testing", "migration testing", "coding agents"]
 category: "Engineering"
 metaTitle: "How to Test PostgreSQL Triggers"
@@ -416,7 +416,7 @@ This is stronger than catching an error on an autocommit connection. It proves t
 
 ### Teardown
 
-The child result should identify whether provisioning, the command, or cleanup failed. `--cleanup always` requests database deletion after either a passing or failing child process. The TTL is a recovery backstop, not the normal cleanup mechanism.
+The child result should identify whether provisioning, the command, or cleanup failed. `--cleanup always` requests database deletion after either a passing or failing child process. TTL records eligibility for `cleanup_expired`, not automatic deletion. Explicitly delete a retained sandbox after inspection; after expiry, invoke expired cleanup explicitly or through a user-owned scheduler, scoped to the intended profile and resources, and inspect its result.
 
 If cleanup fails, keep the safe database ID and error category for a reviewed retry. Do not print or commit the injected connection URL.
 
@@ -561,7 +561,7 @@ Only if the diff tool explicitly includes trigger definitions. PGSandbox's curre
         {"@type": "HowToStep", "position": 2, "name": "Exercise the firing matrix", "text": "Run every intended event plus a negative path through real INSERT, UPDATE, DELETE, or statement-level DML."},
         {"@type": "HowToStep", "position": 3, "name": "Assert exact effects", "text": "Compare ordered target rows, trigger side-effect rows, exact counts, and an unrelated control row."},
         {"@type": "HowToStep", "position": 4, "name": "Prove atomicity", "text": "Recover from the expected SQLSTATE inside a savepoint, then roll back the outer transaction and verify every successful transactional effect disappears."},
-        {"@type": "HowToStep", "position": 5, "name": "Delete the sandbox", "text": "Record the pinned PostgreSQL target and structured command result, then remove the disposable database with TTL as a recovery backstop."}
+        {"@type": "HowToStep", "position": 5, "name": "Delete the sandbox", "text": "Record the pinned PostgreSQL target and structured command result, then explicitly delete the disposable database and inspect the result; expiry alone does not delete it."}
       ]
     },
     {

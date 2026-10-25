@@ -4,7 +4,7 @@ excerpt: "Prove partition topology, boundary routing, row movement, pruning, mai
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-08-07"
-updatedAt: "2026-10-18T02:00:00Z"
+updatedAt: "2026-10-25T02:00:00Z"
 tags: ["Postgres", "table partitioning", "integration testing", "query plans", "coding agents"]
 category: "Engineering"
 metaTitle: "How to Test PostgreSQL Table Partitioning"
@@ -524,7 +524,7 @@ With PGSandbox MCP, the workflow is:
 2. Obtain the sandbox connection through `get_connection_string` and inject it as `PGSANDBOX_DATABASE_URL` without logging the value.
 3. Apply the repository's migration and run the partition harness.
 4. Collect bounded schema, routing, plan, and final-state evidence.
-5. Call `delete_database` in a `finally` path; retain a failed sandbox only when a human needs the TTL-bounded debugging window.
+5. Call `delete_database` in a `finally` path; retain a failed sandbox only for intentional inspection, then explicitly delete it. TTL marks eligibility for `cleanup_expired`, not automatic deletion; after expiry, invoke that cleanup explicitly or through a user-owned scheduler, scoped to the intended profile and resources, and inspect its result.
 
 The [MCP tool contract](/docs/mcp-tools/) separates lifecycle authority from SQL executed by the scoped sandbox role. For a repository test command, the [disposable integration-test workflow](/blog/run-integration-tests-disposable-postgres-database/) shows the one-shot alternative:
 

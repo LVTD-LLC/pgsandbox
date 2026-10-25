@@ -4,7 +4,7 @@ excerpt: "Force SQLSTATE 40001 with two coordinated transactions, retry the comp
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-07-25"
-updatedAt: "2026-07-25T06:00:00Z"
+updatedAt: "2026-10-25T02:00:00Z"
 tags: ["Postgres", "serialization failures", "transaction retries", "integration testing", "coding agents"]
 category: "Engineering"
 metaTitle: "Test Postgres Serialization Failures and Retries"
@@ -301,7 +301,17 @@ Do not make five timing-policy cases depend on a live concurrency race. Use the 
 
 ## 3. Run the proof in a disposable Postgres database
 
-Run the harness as one supervised child process:
+[Install PGSandbox](/docs/install/) first, then verify the same PostgreSQL major used by the harness:
+
+```bash
+pgsandbox --version
+pgsandbox doctor --postgres-version 18
+pgsandbox smoke-test --postgres-version 18
+```
+
+Resolve readiness failures before running the proof. The smoke test checks the disposable runtime lifecycle; it does not prove your retry policy or application invariant. Managed-local PostgreSQL is the default; an explicit external profile is optional. Use the same selected profile for readiness, the proof, and cleanup.
+
+Save the harness in your repository, then run it as one supervised child process:
 
 ```bash
 pgsandbox with-database \
@@ -319,7 +329,7 @@ pgsandbox with-database \
 
 The child owns both connections, which is necessary for the barrier and open transactions. Separate PGSandbox `run_sql` calls are bounded request/response operations and do not preserve two transaction sessions across calls. The [deadlock and lock-timeout guide](/blog/test-postgres-deadlocks-lock-timeouts/) uses the same one-child-process boundary for a different concurrency condition.
 
-Use `--cleanup always` for CI and unattended coding-agent work. Use `--cleanup on-success` only during active debugging when a retained failure will actually be inspected and then deleted or allowed to expire. The [sandbox TTL guide](/blog/postgres-sandbox-ttl-values/) explains how to size that recovery window.
+Use `--cleanup always` for CI and unattended coding-agent work. Use `--cleanup on-success` only during active debugging when a retained failure will actually be inspected and then explicitly deleted. Expiry only makes the sandbox eligible for `cleanup_expired`; it does not delete it. The [sandbox TTL guide](/blog/postgres-sandbox-ttl-values/) explains how to size that recovery window.
 
 Do not print the injected URL, `PGPASSWORD`, derived DSNs, or driver exception strings that may contain connection details. The harness emits a fixed JSON proof with counts and SQLSTATE only. PGSandbox's structured result carries safe lifecycle evidence.
 
@@ -341,7 +351,19 @@ The child proof appears inside `command.stdout` in the version 1 session result.
 }
 ```
 
-If `cleanup.deleted` is false, fail or flag the CI job, retain the safe database ID for diagnosis, and let the TTL remain the recovery backstop. Never copy the connection string into the artifact.
+### Recover a retained sandbox or failed cleanup
+
+A successful retry proof and successful cleanup are separate results. If `cleanup.deleted` is false, fail or flag the CI job and inspect `status`, `cleanup.attempted`, `cleanup.retained`, and `cleanup.errorCode`. A deliberate `on-success` retention is not the same as a failed deletion. Keep only the safe database ID and selected profile for follow-up; never copy the connection string into an artifact.
+
+After closing both test connections and finishing inspection, explicitly delete the sandbox:
+
+```bash
+pgsandbox delete-database --database-id <safe-database-id>
+```
+
+Replace the placeholder with the returned sandbox ID and use the same profile selection as the original session. Inspect the deletion result rather than assuming that running the command removed the database. If deletion fails, preserve its stable error code and resolve that failure before calling cleanup complete. Do not bypass the metadata-owned lifecycle with a broad database-drop script.
+
+TTL records when the retained database becomes eligible for expired cleanup; it is not a deletion timer. After expiry, explicitly call `cleanup_expired` or use an existing user-owned scheduler, scope it to the intended profile and resources, and inspect its result. The [cleanup comparison](/blog/cleanup-expired-vs-manual-postgres-cleanup/) explains manual deletion versus expired cleanup. This follows the [versioned session troubleshooting contract](https://github.com/LVTD-LLC/pgsandbox/blob/7c7e76a4889c238441fda0a247c6f250445176a6/docs/agent-testing.md#troubleshooting).
 
 ## 4. Assert the conflict, replay, and final state
 
