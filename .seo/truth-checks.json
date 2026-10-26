@@ -266,5 +266,25 @@
       "cleanup_expired"
     ],
     "flags": "i"
+  },
+  {
+    "claim": "Pool/cancellation proof closeout requires explicit retained cleanup, not expiry-only deletion",
+    "paths": [
+      "site/src/content/blog/test-postgres-connection-pool-failures.md",
+      "site/src/content/blog/test-postgres-statement-timeouts-query-cancellation.md",
+      "docs/agent-testing.md"
+    ],
+    "urls": [
+      "/blog/test-postgres-connection-pool-failures/",
+      "/blog/test-postgres-statement-timeouts-query-cancellation/"
+    ],
+    "must_not_match": [
+      "before its TTL expires",
+      "remain bounded by their TTL"
+    ],
+    "must_match": [
+      "cleanup_expired"
+    ],
+    "flags": "i"
   }
 ]

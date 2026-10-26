@@ -53,3 +53,7 @@ Current main `2aecc2f`, docs/mcp-tools.md and rust-src/postgres.rs: sourceDataba
 ## Retained test-session cleanup — verified 2026-10-25
 
 A failed child retained by `--cleanup on-success` and a failed deletion are distinct outcomes. Inspect status, cleanup policy/attempted/retained/deleted/errorCode; close child connections and explicitly delete a retained sandbox by safe ID in the same profile. TTL records eligibility for cleanup_expired, not background deletion. Scope expired cleanup and inspect the result. Versioned doctor/smoke-test readiness is not proof of serialization retry correctness. Sources: docs/agent-testing.md Troubleshooting; rust-src/cli.rs delete-database and with-database; rust-src/postgres.rs cleanup_expired at main7c7e76a (2026-10-25).
+
+## Connection-pool proof closeout — verified 2026-10-26
+
+A pool harness tests the repository driver; versioned doctor/smoke-test commands only establish runtime readiness. Session status and cleanup fields distinguish a child pass from successful deletion. Retained databases require explicit deletion or cleanup_expired after expiry; TTL alone does not remove them. Sources: README.md runtime checks, docs/agent-testing.md version1 result, rust-src/cli.rs and rust-src/postgres.rs at b5a50b4 (2026-10-26). No new runtime proof or driver compatibility certification is implied.

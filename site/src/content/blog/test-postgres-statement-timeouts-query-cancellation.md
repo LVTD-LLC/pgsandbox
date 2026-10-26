@@ -4,7 +4,7 @@ excerpt: "Force SQLSTATE 57014 with a server timeout and an explicit client canc
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-07-26"
-updatedAt: "2026-09-24T06:00:00Z"
+updatedAt: "2026-10-26T02:00:00Z"
 tags: ["Postgres", "statement timeout", "query cancellation", "integration testing", "coding agents"]
 category: "Engineering"
 metaTitle: "Test Postgres Statement Timeouts and Query Cancellation"
@@ -353,7 +353,7 @@ The control boundaries stay explicit:
 - PostgreSQL owns statement execution, cancel processing, SQLSTATE, and transaction state.
 - The outer 30-second deadline owns the "test itself is stuck" failure.
 
-Use `--cleanup always` in CI and unattended agent work. `--cleanup on-success` is useful only when a human plans to inspect a failed sandbox before its TTL expires. The [sandbox TTL guide](/blog/postgres-sandbox-ttl-values/) shows how to bound that retention window.
+Use `--cleanup always` in CI and unattended agent work, and inspect the cleanup result rather than only the child exit code. Use `--cleanup on-success` only during active debugging, then explicitly delete the retained sandbox by its safe ID in the same profile and inspect that result. TTL records eligibility for `cleanup_expired`, not automatic deletion. After expiry, call expired cleanup explicitly or through an existing user-owned scheduler, scoped to the intended resources. The [sandbox TTL guide](/blog/postgres-sandbox-ttl-values/) explains expiry; the [pool proof closeout](/blog/test-postgres-connection-pool-failures/#4-run-the-proof-in-a-disposable-database) shows the session fields and explicit deletion step.
 
 Do not print either injected database URL. The child output above contains only control names, timeout values, SQLSTATEs, and boolean recovery assertions. Use the PGSandbox session result for a safe database identifier and cleanup status.
 

@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-10-26
+
+- Added version-matched first-run checks and explicit session/retained-database closeout to the connection-pool failure guide. Clarified expiry versus deletion in the cancellation guide and CLI recipe; existing driver harnesses, titles, and runtime behavior are unchanged.
+
 ## 2026-10-25
 
 - Added version-matched runtime readiness and an explicit retained-sandbox recovery path to the serialization-retry guide. Clarified expiry versus deletion across related test guides and the owner-label evidence template; titles and SQL harnesses are unchanged. No runtime behavior changed.

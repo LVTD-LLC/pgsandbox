@@ -4,7 +4,7 @@ excerpt: "Reproduce pool acquisition timeouts and broken idle connections agains
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-07-24"
-updatedAt: "2026-07-24T06:00:00Z"
+updatedAt: "2026-10-26T02:00:00Z"
 tags: ["Postgres", "connection pools", "integration testing", "Node.js", "coding agents"]
 category: "Engineering"
 metaTitle: "Test Postgres Connection Pool Failures Safely"
@@ -285,7 +285,17 @@ This is narrower than a full outage test. It does not prove DNS failure, TLS rot
 
 ## 4. Run the proof in a disposable database
 
-Use the repository's existing node-postgres dependency, or add it to the repository once with `npm install --save-dev pg`. Then run the harness as the child of `pgsandbox with-database`:
+Install PGSandbox with the [setup guide](/docs/install/). Check the installed CLI and the managed-local major before starting the pool test:
+
+```bash
+pgsandbox --version
+pgsandbox doctor --postgres-version 18
+pgsandbox smoke-test --postgres-version 18
+```
+
+These commands follow the [versioned CLI contract](https://github.com/LVTD-LLC/pgsandbox/blob/b5a50b40a1ec9c1fe774cacce5253b23c91cb782/README.md#manual-runtime-checks). `doctor` checks readiness; `smoke-test` checks a disposable create/query/delete lifecycle. Neither proves pool saturation or backend recovery. If that major is unavailable, follow the install guide rather than silently testing a different server. Package-manager installation is conditional; manual PostgreSQL installation may be necessary. An external profile is optional and needs its own connectivity check.
+
+Use the repository's locked node-postgres dependency, or add it once with `npm install --save-dev pg`. Record `node --version` and `npm ls pg` with the proof so another developer can reproduce the driver behavior. Save the harness above in the repository, then run it as the child of `pgsandbox with-database`:
 
 ```bash
 pgsandbox with-database \
@@ -297,11 +307,19 @@ pgsandbox with-database \
   -- node tests/postgres_pool_failure_proof.mjs
 ```
 
-Install and configure PGSandbox first with the [setup guide](/docs/install/). The example selects PostgreSQL 18; use a configured `--profile` or another installed major when that better matches the repository under test.
+The example selects PostgreSQL 18; use a configured `--profile` or another installed major when that matches the repository under test. Apply the same selector to readiness, the proof, and any later deletion. Do not put an admin connection URL in the test or its logs.
 
-PGSandbox creates the database and restricted role, injects `DATABASE_URL`, `PGSANDBOX_DATABASE_URL`, and standard libpq variables, supervises the child process, redacts its captured output, and applies the selected cleanup policy. The [agent test-session docs](https://github.com/LVTD-LLC/pgsandbox-mcp/blob/e1810ef5777491d340a0166dd0ef67c15246b206/docs/agent-testing.md) define the result fields and exit behavior.
+PGSandbox creates the database and restricted role, injects `DATABASE_URL`, `PGSANDBOX_DATABASE_URL`, and standard libpq variables, supervises the child process, redacts its captured output, and applies the selected cleanup policy. The [agent test-session docs](https://github.com/LVTD-LLC/pgsandbox/blob/b5a50b40a1ec9c1fe774cacce5253b23c91cb782/docs/agent-testing.md) define the result fields and exit behavior.
 
-Use `--cleanup always` in CI and unattended agent work. Use `--cleanup on-success` only when a human will inspect a failed database before its TTL expires. The [sandbox TTL guide](/blog/postgres-sandbox-ttl-values/) explains how to bound that recovery window.
+Use `--cleanup always` in CI and unattended agent work, then inspect the session result. A successful child is not enough: require `status: "succeeded"`, a zero child exit code, and confirmed cleanup. Inspect `cleanup.attempted`, `cleanup.deleted`, `cleanup.alreadyAbsent`, `cleanup.retained`, and `cleanup.errorCode`; `cleanup-failed` is not a completed proof closeout.
+
+Use `--cleanup on-success` only during active debugging. If the child fails, inspect its bounded output and the safe `sandbox.databaseId`, close any remaining test connections, then explicitly delete that tracked database with the same version/profile selector:
+
+```bash
+pgsandbox delete-database --database-id <safe-database-id> --postgres-version 18
+```
+
+The angle-bracket value is a placeholder from the session result, not a database URL. Inspect the deletion result before marking cleanup complete. TTL records when a retained sandbox becomes eligible for `cleanup_expired`; expiry does not delete the database or role. After expiry, invoke that cleanup explicitly or through an existing user-owned scheduler, scoped to the intended resources. See the [manual versus expired cleanup workflow](/blog/cleanup-expired-vs-manual-postgres-cleanup/) and [sandbox TTL guide](/blog/postgres-sandbox-ttl-values/).
 
 `with-database` is the product-led boundary that makes this useful:
 
