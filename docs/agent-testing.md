@@ -69,8 +69,11 @@ pgsandbox with-database \
 The selected profile must allow every requested extension. A denied extension
 fails before privileged SQL; an unavailable extension fails provisioning and
 rolls back partial resources. `on-success` deletes a passing database and keeps
-a failing one for inspection. `keep` retains every database. Retained databases
-remain bounded by their TTL, and the result reports their safe ID and expiry.
+a failing one for inspection. `keep` retains every database. The result reports
+retained databases by safe ID and expiry. TTL records
+eligibility for `cleanup_expired`, not automatic deletion. Explicitly delete a
+retained sandbox after inspection, or invoke expired cleanup after expiry
+through an explicit call or a user-owned scheduler, and inspect the result.
 
 Use `always` in CI and unattended agent loops. Use `on-success` during active
 debugging, then delete the retained sandbox when finished.
