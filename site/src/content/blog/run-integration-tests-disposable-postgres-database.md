@@ -4,7 +4,7 @@ excerpt: "Run a repository test command against a fresh Postgres database, prese
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-07-22"
-updatedAt: "2026-10-20T02:00:00Z"
+updatedAt: "2026-10-27T02:00:00Z"
 tags: ["Postgres", "integration testing", "test databases", "coding agents", "CI"]
 category: "Engineering"
 metaTitle: "Run Tests in a Disposable Postgres Database"
@@ -221,6 +221,79 @@ pgsandbox with-database \
   --cleanup always \
   -- uv run python -m pytest apps/core/tests/test_signals.py
 ```
+
+### Run pytest-django without granting CREATEDB
+
+Use a test-only settings module that reads the injected `PG*` variables, and replace pytest-django's database-creation fixture. Migrate the database PGSandbox already created; let PGSandbox delete it after the child exits. Do not fix a `permission denied to create database` error by handing the tests an admin URL or granting `CREATEDB`.
+
+This recipe follows pytest-django 4.11.1's documented [existing-database fixture](https://pytest-django.readthedocs.io/en/stable/database.html#using-an-existing-external-database-for-tests) and Django 5.2's [test-database boundary](https://docs.djangoproject.com/en/5.2/topics/testing/overview/#the-test-database). A single local synthetic check used PGSandbox 0.5.0, PostgreSQL 15, Python 3.11, Django 5.2.7, pytest 8.4.2, pytest-django 4.11.1, and psycopg 3.2.10. Treat other versions and your application's migrations as a separate verification, not an implied pass.
+
+In a dedicated settings module, keep your application's installed apps and other test settings, but replace the default database configuration:
+
+```python
+# settings_sandbox.py: import your application's test settings first.
+import os
+
+if not os.environ.get("PGSANDBOX_DATABASE_URL"):
+    raise RuntimeError("Run only inside pgsandbox with-database")
+
+DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": os.environ["PGDATABASE"],
+        "USER": os.environ["PGUSER"],
+        "PASSWORD": os.environ["PGPASSWORD"],
+        "HOST": os.environ["PGHOST"],
+        "PORT": os.environ["PGPORT"],
+    }
+}
+```
+
+Place the following fixture in a **dedicated sandbox test directory's** `conftest.py`, not unconditionally in a shared or production test configuration:
+
+```python
+import os
+import pytest
+from django.core.management import call_command
+from django.db import connections
+
+@pytest.fixture(scope="session")
+def django_db_setup(django_db_blocker):
+    if not os.environ.get("PGSANDBOX_DATABASE_URL"):
+        raise RuntimeError("Run only inside pgsandbox with-database")
+    with django_db_blocker.unblock():
+        with connections["default"].cursor() as cursor:
+            cursor.execute(
+                "SELECT current_database(), rolcreatedb, rolsuper "
+                "FROM pg_roles WHERE rolname = current_user"
+            )
+            database, createdb, superuser = cursor.fetchone()
+        if database != os.environ["PGDATABASE"] or createdb or superuser:
+            raise RuntimeError("Expected the injected restricted sandbox role")
+        call_command("migrate", database="default", interactive=False, verbosity=0)
+    yield
+    connections.close_all()
+```
+
+The override deliberately does **not** request the original `django_db_setup` fixture: that would invoke the database creation being avoided. `django_db_blocker.unblock()` permits setup SQL; it does not isolate tests. Keep `@pytest.mark.django_db` or the `db` fixture on database tests so pytest-django still applies test-level isolation. Migrations run once for this fresh session, before test execution. Never point this adapter at a valuable existing database: migrations and transactional tests can modify or flush it. The environment guard prevents an accidental ordinary invocation, but is not authentication or proof that a database is disposable.
+
+With those files in the consuming repository, use the repository's environment and settings-module path. For example, after installing the project's locked dependencies:
+
+```bash
+pgsandbox with-database \
+  --postgres-version 15 \
+  --ttl-minutes 15 \
+  --cleanup always \
+  --timeout-seconds 120 \
+  --result-format json \
+  -- python -m pytest --ds=settings_sandbox tests/sandbox
+```
+
+Replace `settings_sandbox` and `tests/sandbox` with your actual module and directory. Keep the settings module importable through `python -m pytest`. Use a PostgreSQL major supported by your app and checked with `doctor`/`smoke-test`; 15 is the version of this recipe's check, not a universal recommendation.
+
+The check exercised an ORM insert, rollback isolation between tests, and a transactional test with migrated Django auth/contenttypes tables; the wrapper then reported successful deletion. It was not an application-suite, performance, parallel-worker, multi-database, or `manage.py test` validation. Start with one worker and one database. Do not add `-n auto`: this override bypasses pytest-django's normal worker-database creation, so concurrent workers could share and flush one sandbox. Allocate a separate PGSandbox session per worker before extending the adapter.
+
+`--reuse-db` alone is not this adapter: it still follows pytest-django's normal test-database setup and may need to create a database. Likewise, `--no-migrations` does not migrate the sandbox in this custom fixture. Read the session's child status **and** `cleanup.deleted`; passing tests do not prove deletion. On cleanup failure, use the reported safe database ID and the explicit closeout steps below.
 
 Do not print the injected connection variables. PGSandbox redacts its generated credentials from captured child output, but application logs should still treat database URLs and passwords as secrets.
 
