@@ -4,7 +4,7 @@ excerpt: "A practical workflow for validating Postgres migrations in a disposabl
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-07-05"
-updatedAt: "2026-10-19T02:00:00Z"
+updatedAt: "2026-10-30T02:00:00Z"
 tags: ["Postgres", "database migrations", "AI agents", "MCP", "schema validation"]
 category: "Engineering"
 metaTitle: "Database Migration Testing for Agent PRs"
@@ -29,7 +29,7 @@ The useful workflow is:
 4. Seed or clone only the state needed to test the risky part.
 5. Run validation queries with bounded output.
 6. Save the proof in the PR notes.
-7. Delete the sandbox or let TTL cleanup catch it.
+7. Delete the sandbox and inspect the result. TTL only marks eligibility for an explicit `cleanup_expired` call or user-owned scheduler; it does not schedule deletion.
 
 PGSandbox turns that into an MCP workflow instead of a pile of shell commands. A migration is not "tested" because the agent ran something. It is tested when the reviewer can see what changed in a real Postgres database, under a task-scoped role, with cleanup accounted for.
 
@@ -143,6 +143,60 @@ Seed the smallest set of rows that can break the migration:
 This is where an agent can do useful work before review. It can read the migration, infer the risky cases, create a seed command, run the migration, and query the result. But the output must be bounded. A proof needs row counts, representative rows, and failing cases, not a transcript-sized table dump.
 
 If the migration depends on production-shaped data, do not copy production rows casually. Use a schema-only clone, masked data, or a reduced approved source. The [Postgres clone database sandbox guide](https://pgsandbox.dev/blog/how-to-clone-postgres-database-sandbox/) covers the safer clone path: read from the source, restore into a tracked destination sandbox, run task SQL only against that destination, and clean up when finished.
+
+### Run a backfill assertion that can actually fail
+
+A successful SQL command does not mean the resulting data is correct. Make the expected result executable, then prove that removing the backfill makes the check fail.
+
+This small **synthetic fixture**, not an application migration, uses ordinary PostgreSQL without a testing extension. Install [PGSandbox](/docs/install/) and have `psql` for the selected PostgreSQL version on your `PATH`. The example was checked with PGSandbox 0.5.0 and PostgreSQL/psql 15. If you use another major version, select it explicitly and rerun both cases.
+
+Save this as `migration-check.sql` in a scratch directory:
+
+```sql
+CREATE TABLE orders (
+    id integer PRIMARY KEY,
+    total_cents integer NOT NULL,
+    discount_cents integer
+);
+INSERT INTO orders VALUES (1, 1000, NULL), (2, 1000, 250);
+ALTER TABLE orders ADD COLUMN payable_cents integer;
+UPDATE orders
+SET payable_cents = total_cents - COALESCE(discount_cents, 0);
+
+DO $$
+BEGIN
+    IF (SELECT count(*) FROM orders) <> 2 OR EXISTS (
+        SELECT 1 FROM orders
+        WHERE id NOT IN (1, 2) OR payable_cents IS DISTINCT FROM
+            CASE id WHEN 1 THEN 1000 WHEN 2 THEN 750 END
+    ) THEN
+        RAISE EXCEPTION 'FAIL: backfill values or retained row set differ';
+    END IF;
+END
+$$;
+SELECT 'PASS: two legacy rows retained; both backfill cases match' AS result;
+```
+
+The primary key and count check preserve the two-row fixture; the value check catches an omitted backfill and incorrect handling of the nullable discount. `IS DISTINCT FROM` makes a remaining `NULL` fail rather than disappear into SQL's three-valued logic. This is a deliberately tiny contract, not a complete set of business invariants.
+
+From that directory, run:
+
+```bash
+pgsandbox with-database --postgres-version 15 \
+  --name-hint migration-assertion --ttl-minutes 15 \
+  --cleanup always --timeout-seconds 60 --result-format json \
+  -- psql -X --set ON_ERROR_STOP=1 --file migration-check.sql
+```
+
+The session injects libpq connection variables into `psql`; there is no need to put a connection URL or password in the command arguments. `-X` ignores a personal psql startup file. PostgreSQL documents that [ON_ERROR_STOP stops a script on a SQL error and returns exit code 3](https://www.postgresql.org/docs/15/app-psql.html#APP-PSQL-VARIABLES). Without that setting, later successful commands can hide an earlier error from a command-level result.
+
+Now copy the file to `migration-broken.sql`, remove only the two-line `UPDATE orders ...` statement, and rerun the same command with `--file migration-broken.sql`. Keep the assertion unchanged. Each invocation creates a fresh database, so the negative control cannot borrow the first run's corrected rows.
+
+In the checked fixture, the correct backfill returned exit **0**; the omitted backfill raised the exception and returned exit **3**. Both session results reported `cleanup.deleted: true`. Inspect the command and cleanup fields separately: an assertion failure is expected in the negative control, but a cleanup failure still needs recovery. Use the [session result and retained-database recovery instructions](/blog/run-integration-tests-disposable-postgres-database/#6-make-the-result-machine-readable) if deletion did not complete. Expiry alone will not remove it.
+
+For a real migration, keep the same shape but replace the synthetic DDL/backfill with the repository's actual prior-schema setup, seed fixture, migration command, and explicit postconditions. Do not replace the framework's migration path with this sample. Neither result proves production lock duration, rollout safety, application compatibility, or performance.
+
+If the repository already uses pgTAP, retain its suite and a TAP-aware runner such as [pg_prove](https://pgtap.org/pg_prove.html), which parses the emitted test results. A failed pgTAP assertion is not necessarily a SQL error; `ON_ERROR_STOP` alone is not a TAP verdict. Also verify that pgTAP is available and allowed on the selected profile before requesting it. PGSandbox is the disposable database lifecycle, not an automatic installer for every testing extension.
 
 ## Step 5: check rollback or forward-fix behavior deliberately
 
