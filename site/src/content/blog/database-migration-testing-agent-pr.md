@@ -4,7 +4,7 @@ excerpt: "A practical workflow for validating Postgres migrations in a disposabl
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-07-05"
-updatedAt: "2026-10-30T02:00:00Z"
+updatedAt: "2026-11-01T02:00:00Z"
 tags: ["Postgres", "database migrations", "AI agents", "MCP", "schema validation"]
 category: "Engineering"
 metaTitle: "Database Migration Testing for Agent PRs"
@@ -73,7 +73,7 @@ Use a short TTL. For a PR-prep task, 60 to 240 minutes is usually enough. If the
 
 The migration test should run the command the repo actually expects.
 
-For Prisma, that might be `npx prisma migrate deploy` in CI-like mode or `npx prisma migrate dev` in a development-only flow. Prisma's docs say `migrate deploy` compares applied migrations with migration history, applies pending migrations, and updates the migrations table (https://www.prisma.io/docs/orm/prisma-migrate/understanding-prisma-migrate/mental-model). The same docs say `migrate dev` is intended for development with a disposable database, and Prisma uses a shadow database to detect drift and evaluate data-loss risk (https://www.prisma.io/docs/orm/prisma-migrate/understanding-prisma-migrate/shadow-database).
+For a repository pinned to Prisma 6, use its installed CLI: `prisma migrate deploy` applies committed migrations, while `prisma migrate dev` is a development workflow that uses a shadow database for drift and migration-generation checks. The [Prisma 6 CLI reference](https://www.prisma.io/docs/orm/v6/reference/prisma-cli-reference) describes the distinction. Check the repository's Prisma major before choosing a command; the scoped recipe below is not a latest-version installation guide.
 
 For Rails, Django, Ecto, Flyway, Atlas, Knex, Drizzle, or a custom SQL runner, the same rule holds: do not invent a one-off command just because the agent can run SQL. Use the repository's migration path so the proof exercises the code that will run later.
 
@@ -82,6 +82,38 @@ PGSandbox's repo workflow tools are built for this. `prepare_for_repo` writes a 
 If the repository's migration command runs inside Docker Compose while PostgreSQL stays on the host, use the [Docker-to-host PostgreSQL connection guide](/blog/docker-connect-host-postgres/) to choose the container URL, verify the listener and HBA path, and keep the sandbox credential out of tracked Compose files.
 
 The command should be an argv array, not a shell string. That keeps the proof boring in the best way: the agent cannot smuggle extra shell behavior into the validation command, and the reviewer can see the exact program and arguments.
+
+### Prisma 6: give the shadow database its own sandbox
+
+For a repository pinned to Prisma 6, `migrate dev` needs more than a target connection. PGSandbox task roles do not have `CREATEDB`; automatic shadow creation can fail with `P3014`. Do not solve that by giving the migration command the lifecycle admin credential.
+
+Allocate **two fresh sandboxes** in the same intended Postgres profile: one target and one expendable shadow. Use [the PGSandbox create/connection/delete contracts](https://github.com/LVTD-LLC/pgsandbox/blob/main/docs/mcp-tools.md) to retain both database IDs and obtain their scoped connection strings privately. Check the actual database identities, not just whether URL strings differ: two URLs can point at the same database. Never use production, staging, a shared development database, or the target itself as the shadow.
+
+The following datasource belongs in an existing `schema.prisma` for **Prisma 6.19.3**. It follows the [Prisma 6 shadow-database configuration](https://www.prisma.io/docs/orm/v6/prisma-migrate/understanding-prisma-migrate/shadow-database). Keep the repository's models and migration history; inject `DATABASE_URL` and `SHADOW_DATABASE_URL` into the child environment without printing or committing their values.
+
+```prisma
+datasource db {
+  provider          = "postgresql"
+  url               = env("DATABASE_URL")
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
+}
+```
+
+Prisma resets the explicitly configured shadow and replays migration history there. That database is disposable input to the check, not a backup. For **Prisma 7**, the shadow URL configuration moves to `prisma.config.ts`; this is not a Prisma 7 or latest-version recipe.
+
+For an existing Prisma **6.19.3** repository with committed migrations and its local CLI installed, these commands follow the [versioned CLI reference](https://www.prisma.io/docs/orm/v6/reference/prisma-cli-reference). Run them only in the disposable checkout with the two scoped URLs injected:
+
+```bash
+./node_modules/.bin/prisma --version
+./node_modules/.bin/prisma migrate deploy
+./node_modules/.bin/prisma migrate dev --skip-generate --name sandbox_check
+```
+
+`migrate deploy` applies committed migrations; it does not need a shadow database and is not a drift check. `migrate dev` is the development check and can create or apply migrations. Inspect its exit status and any generated files; a reset request or failed replay is not a pass. Do not add automatic reset acceptance to an unattended agent command.
+
+In a synthetic rehearsal on November 1, 2026, PGSandbox 0.5.0, PostgreSQL 15 and Prisma 6.19.3 reproduced the automatic-shadow permission failure. An explicit second sandbox allowed history replay while preserving a row in the target. A manually added column triggered the drift control, and an invalid migration failed shadow replay. This validates that narrow fixture, not your application's migrations, another Prisma major, or a production rollout.
+
+Close database connections and explicitly delete **both tracked sandbox IDs**, including after a failed engine command. Inspect each deletion result independently; a successful migration does not prove cleanup. The selected shadow is reset by Prisma but still belongs to the PGSandbox lifecycle. TTL only makes it eligible for `cleanup_expired`; expiry does not schedule deletion.
 
 ## Step 3: capture the before and after schema
 
