@@ -4,7 +4,7 @@ excerpt: "Use Postgres EXPLAIN plans to review agent-generated SQL before execut
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-07-07"
-updatedAt: "2026-09-24T06:00:00Z"
+updatedAt: "2026-11-02T02:00:00Z"
 tags: ["Postgres", "EXPLAIN", "query plans", "AI agents", "MCP"]
 category: "Engineering"
 metaTitle: "Postgres EXPLAIN Plans for Agent SQL Review"
@@ -27,9 +27,68 @@ The agent-safe sequence is:
 5. Fix the query or schema if the plan contradicts the task.
 6. Run [`run_sql` with bounded Postgres results](https://pgsandbox.dev/blog/postgres-run-sql-bounded-results/) using `readonly: true` and a small `rowLimit` for read proof.
 7. Use an intentional mutation path only after review.
-8. Delete the sandbox or let TTL cleanup handle it.
+8. Delete the sandbox and verify deletion; TTL expiry alone does not remove it.
 
 For agent work, a Postgres EXPLAIN plan is not just a tuning artifact. It is a pre-execution safety record: what the agent intended to ask Postgres to do, which relations Postgres planned to touch, and whether that plan is narrow enough to continue.
+
+## Try a plan-to-result proof in one disposable database
+
+Start with the [installation guide](/docs/install/) if `pgsandbox` is not available. Run `pgsandbox --version` and `pgsandbox local status --postgres-version 15` before this example. If PostgreSQL 15 is not ready, use the documented `ensure_postgres` flow; installation depends on supported package-manager availability. This example was checked with PGSandbox **0.5.0 and PostgreSQL 15**. It is a synthetic SQL exercise, not an application benchmark or proof of production performance.
+
+The requests below use the [documented MCP tools](/docs/mcp-tools/). From a terminal, the equivalent is `pgsandbox tool <tool-name> --input '<JSON>'`. Start with `create_database`:
+
+```json
+{"postgresVersion":"15","nameHint":"explain-review","ttlMinutes":30}
+```
+
+Keep the returned `databaseId` and replace `<id>` below. Send this fixture to `run_sql`. Setup intentionally writes only to the new disposable database:
+
+```json
+{
+  "postgresVersion": "15",
+  "databaseId": "<id>",
+  "sql": "CREATE TABLE plan_review_orders (id integer PRIMARY KEY, account_id integer NOT NULL, total_cents integer NOT NULL); INSERT INTO plan_review_orders SELECT n, n % 100, 1000 + n FROM generate_series(1, 10000) AS n; CREATE INDEX plan_review_orders_account_idx ON plan_review_orders(account_id); ANALYZE plan_review_orders;",
+  "rowLimit": 0
+}
+```
+
+This uses ordinary PostgreSQL 15 SQL. `ANALYZE plan_review_orders` collects fixture statistics; it is **not** `EXPLAIN ANALYZE` executing the later query. PostgreSQL's [plan-reading guide](https://www.postgresql.org/docs/15/using-explain.html) explains why statistics, estimated output rows, and cost units need separate interpretation.
+
+Call `explain_query` with the statement itself, without an `EXPLAIN` prefix:
+
+```json
+{
+  "postgresVersion": "15",
+  "databaseId": "<id>",
+  "sql": "SELECT id, total_cents FROM plan_review_orders WHERE account_id = 42 ORDER BY id LIMIT 3"
+}
+```
+
+Inspect `summary.relations`, `summary.nodeTypes`, and `summary.planRows`, then the full `plan`. The top-level row estimate describes output at that node, not every row visited underneath it. Do not make an exact cost or one particular scan node a portable test assertion.
+
+For a negative control, ask `explain_query` to plan `SELECT id, total_cents FROM plan_review_orders` in the same sandbox. Removing the predicate and limit changes the review question to the whole fixture. A successful plan response does not mean that broader query matches the task.
+
+Now send the original selective query to `run_sql`:
+
+```json
+{
+  "postgresVersion": "15",
+  "databaseId": "<id>",
+  "sql": "SELECT id, total_cents FROM plan_review_orders WHERE account_id = 42 ORDER BY id LIMIT 3",
+  "readonly": true,
+  "rowLimit": 3
+}
+```
+
+The fixture's expected IDs are `42`, `142`, and `242`, with totals `1042`, `1142`, and `1242`. Check the returned rows and `truncated`, not just tool success. In the checked run, the selective query returned those rows with `truncated: false`. The broad ordered read, `SELECT id, total_cents FROM plan_review_orders ORDER BY id`, with the same `rowLimit: 3` returned `truncated: true`. The response cap did not add the missing filter or prove cheap execution.
+
+Finish with `delete_database`, including after a failed intermediate step:
+
+```json
+{"postgresVersion":"15","databaseId":"<id>"}
+```
+
+Verify `deleted: true` separately from the query result. TTL records expiry; it does not run deletion by itself. If immediate deletion fails, retain the ID and retry explicit deletion or invoke `cleanup_expired` after expiry on the same profile. Do not report cleanup as complete until its result confirms it.
 
 ## What does a Postgres EXPLAIN plan show?
 
@@ -257,7 +316,7 @@ Database proof:
 - Plan: explain_query on <query name>; node types <...>; relations <...>; estimated rows <...>
 - Read proof: run_sql readonly=true, rowLimit=<n>; result <summary>; truncated=<true/false>
 - Mutation proof, if any: <repo command or intentional SQL path>
-- Cleanup: delete_database succeeded or TTL cleanup scheduled
+- Cleanup: delete_database returned deleted=true; otherwise record pending explicit cleanup
 ```
 
 For a query-only patch, the mutation line should often be "none." That is a useful answer. It tells the reviewer the agent did not need broad write access to prove the work.

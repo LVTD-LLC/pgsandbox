@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-11-02
+
+- Added a checked PostgreSQL 15 plan-to-result walkthrough to the existing EXPLAIN guide: scoped fixture, selective/broad plan control, bounded-read interpretation, and verified explicit teardown. Clarified that TTL expiry alone does not delete databases; no runtime behavior changed.
+
 ## 2026-11-01
 
 - Added a checked Prisma 6 shadow-database workflow to the existing migration-testing guide: separate scoped target/shadow sandboxes, versioned configuration, permission/drift/replay failure controls, and independent cleanup. Clarified Prisma command-version boundaries; no runtime behavior changed.
