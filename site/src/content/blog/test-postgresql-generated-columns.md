@@ -4,7 +4,7 @@ excerpt: "Prove the installed expression and storage kind, rejected direct write
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-08-05"
-updatedAt: "2026-10-18T02:00:00Z"
+updatedAt: "2026-11-04T02:00:00Z"
 tags: ["Postgres", "generated columns", "integration testing", "triggers", "coding agents"]
 category: "Engineering"
 metaTitle: "How to Test PostgreSQL Generated Columns"
@@ -20,7 +20,7 @@ A test that selects one expected value proves only one example. It can still pas
 
 This guide packages the checks into a five-part **Generation Boundary Proof**: declaration, write protection, derivation, execution boundary, and compatibility. PGSandbox MCP supplies a task-scoped database and restricted role in managed-local PostgreSQL by default (or an explicitly configured external profile). PostgreSQL catalogs and application assertions supply the proof.
 
-*Published August 5, 2026. Updated October 18, 2026.*
+*Published August 5, 2026. Updated November 4, 2026.*
 
 The complete workflow is:
 
@@ -336,10 +336,8 @@ pgsandbox with-database \
   --name-hint "generated column proof" \
   --ttl-minutes 30 \
   --owner "agent-pr-482" \
-  --label "suite=generated-columns" \
   --cleanup always \
   --result-format json \
-  --env-var PGSANDBOX_DATABASE_URL \
   -- python tests/postgres_generated_column_proof.py
 ```
 
