@@ -499,7 +499,6 @@ pgsandbox with-database \
   --label "suite=partial-indexes" \
   --cleanup always \
   --result-format json \
-  --env-var PGSANDBOX_DATABASE_URL \
   -- uv run --with 'psycopg[binary]' \
        python tests/postgres_partial_index_proof.py
 ```
