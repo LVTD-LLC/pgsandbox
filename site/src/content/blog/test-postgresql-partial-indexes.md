@@ -4,7 +4,7 @@ excerpt: "Prove the installed predicate, indexed row set, positive and negative 
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-08-06"
-updatedAt: "2026-10-18T02:00:00Z"
+updatedAt: "2026-11-04T02:00:00Z"
 tags: ["Postgres", "partial indexes", "integration testing", "query plans", "coding agents"]
 category: "Engineering"
 metaTitle: "How to Test PostgreSQL Partial Indexes"
@@ -20,7 +20,7 @@ A single `EXPLAIN` screenshot is not enough. It can pass because the fixture is 
 
 This guide packages the checks into a five-part **Partial Index Proof**: declaration, membership, eligible plan, negative control, and mutation boundary. PGSandbox MCP supplies a task-scoped database and restricted role in managed-local PostgreSQL by default (or an explicitly configured external profile). PostgreSQL catalogs, JSON query plans, SQLSTATE assertions, and exact final rows supply the evidence.
 
-*Published August 6, 2026. Updated October 18, 2026.*
+*Published August 6, 2026. Updated November 4, 2026.*
 
 The complete workflow is:
 
@@ -37,6 +37,7 @@ The complete workflow is:
 - [Inspect the installed predicate](#1-inspect-the-installed-partial-index)
 - [Run a deterministic harness](#2-run-a-deterministic-partial-index-test)
 - [Keep plan assertions honest](#3-avoid-brittle-or-misleading-plan-tests)
+- [Check named application queries](#check-a-named-node-postgres-query-in-one-session)
 - [Run with PGSandbox](#4-run-the-proof-in-a-disposable-database)
 - [Record review evidence](#pr-ready-partial-index-proof)
 - [Answer common questions](#postgresql-partial-index-testing-faq)
@@ -372,6 +373,107 @@ Do not seed ten rows and treat an index scan as mandatory. A sequential scan may
 Do not use `EXPLAIN ANALYZE` on a modifying statement unless the test wraps it in a transaction and rolls it back. PostgreSQL executes the statement when `ANALYZE` is requested. For simple eligibility checks, plain `EXPLAIN (FORMAT JSON)` avoids side effects and makes the proof cheaper.
 
 The existing [Postgres EXPLAIN plan guide](/blog/postgres-explain-plan-agent-sql/) covers bounded plan evidence for agent SQL review. The partial-index proof adds the schema predicate, negative control, and write-transition boundaries that a general query-plan check does not cover.
+
+### Check a named node-postgres query in one session
+
+A literal plan does not prove a named application query's plan. The [node-postgres query documentation](https://node-postgres.com/features/queries) scopes named prepared statements to each connection. Keep one checked-out client for the repetitions, plan inspection, and result assertions; separate calls through a pool need not reach the same session.
+
+This synthetic example was checked with **node-postgres 8.23.1, Node.js 24, PostgreSQL 15, and PGSandbox 0.5.0** on November 4, 2026. It is a client-path test, not a benchmark or evidence about your ORM. PostgreSQL 15's [PREPARE reference](https://www.postgresql.org/docs/15/sql-prepare.html) explains the automatic custom/generic choice and `EXPLAIN EXECUTE`; its [prepared-statement view](https://www.postgresql.org/docs/15/view-pg-prepared-statements.html) provides the plan counters. The [partial-index reference](https://www.postgresql.org/docs/15/indexes-partial.html) supplies the predicate-implication rule.
+
+The driver configuration and connection closeout follow the [node-postgres Pool API](https://node-postgres.com/apis/pool) and [Client API](https://node-postgres.com/apis/client). Save this as `partial-prepared-proof.mjs` in a scratch directory with `pg@8.23.1` installed. Run it only in a **fresh disposable database**: it creates its own synthetic table, not your application's migration.
+
+```js
+import assert from 'node:assert/strict';
+import pg from 'pg';
+
+const pool = new pg.Pool({
+  connectionString: process.env.PGSANDBOX_DATABASE_URL,
+  max: 1,
+  connectionTimeoutMillis: 5_000,
+  statement_timeout: 10_000,
+});
+const client = await pool.connect();
+const indexName = 'parameter_orders_queued_idx';
+const indexes = (node) => [
+  ...(node['Index Name'] ? [node['Index Name']] : []),
+  ...(node.Plans ?? []).flatMap(indexes),
+];
+try {
+  await client.query(`
+    CREATE TABLE parameter_orders (id integer PRIMARY KEY, status text NOT NULL);
+    INSERT INTO parameter_orders
+      SELECT n, CASE WHEN n <= 100 THEN 'queued' ELSE 'done' END
+      FROM generate_series(1, 10000) AS n;
+    CREATE INDEX parameter_orders_queued_idx ON parameter_orders (id)
+      WHERE status = 'queued';
+    ANALYZE parameter_orders;
+  `);
+  const query = {
+    name: 'queued_by_status',
+    text: 'SELECT id FROM parameter_orders WHERE status = $1',
+    values: ['queued'],
+  };
+  const expected = Array.from({ length: 100 }, (_, i) => i + 1);
+  const checkRows = async () => {
+    const result = await client.query(query);
+    assert.deepEqual(result.rows.map((r) => r.id).sort((a, b) => a - b), expected);
+  };
+  await client.query('SET plan_cache_mode = auto');
+  for (let i = 0; i < 8; i++) await checkRows();
+  console.log((await client.query(`
+    SELECT name, generic_plans, custom_plans FROM pg_prepared_statements
+    WHERE name = 'queued_by_status'
+  `)).rows);
+
+  for (const mode of ['force_custom_plan', 'force_generic_plan']) {
+    // mode is an application-owned constant, never user input.
+    await client.query(`SET plan_cache_mode = ${mode}`);
+    await checkRows();
+    const result = await client.query(`
+      EXPLAIN (FORMAT JSON) EXECUTE queued_by_status('queued')
+    `);
+    const plan = result.rows[0]['QUERY PLAN'][0].Plan;
+    assert.equal(indexes(plan).includes(indexName), mode === 'force_custom_plan');
+    console.log({ mode, scan: plan['Node Type'], indexes: indexes(plan) });
+  }
+  const negative = await client.query({ ...query, values: ['done'] });
+  assert.deepEqual(
+    negative.rows.map((r) => r.id).sort((a, b) => a - b),
+    Array.from({ length: 9900 }, (_, i) => i + 101),
+  );
+  await client.query({
+    name: 'queued_fixed_predicate',
+    text: "SELECT id FROM parameter_orders WHERE status = 'queued' AND id = $1",
+    values: [7],
+  }).then((result) => assert.deepEqual(result.rows, [{ id: 7 }]));
+  const fixed = await client.query(`
+    EXPLAIN (FORMAT JSON) EXECUTE queued_fixed_predicate(7)
+  `);
+  assert.ok(indexes(fixed.rows[0]['QUERY PLAN'][0].Plan).includes(indexName));
+} finally {
+  client.release();
+  await pool.end();
+}
+```
+
+Run the file with the [one-shot session command](https://github.com/LVTD-LLC/pgsandbox/blob/main/docs/agent-testing.md) documented for PGSandbox 0.5.0. It injects `PGSANDBOX_DATABASE_URL`; the script closes its pool before the session requests deletion:
+
+```bash
+pgsandbox with-database \
+  --postgres-version 15 \
+  --name-hint "named query proof" \
+  --ttl-minutes 30 \
+  --cleanup always \
+  --timeout-seconds 60 \
+  --result-format json \
+  -- node partial-prepared-proof.mjs
+```
+
+Inspect **both** the child exit status and `cleanup.deleted`; do not publish the injected credential. [Install and check the runtime](/docs/install/) first if needed.
+
+In PGSandbox's checked synthetic fixture, eight automatic executions used custom plans. That is **not** a promise that the ninth will, or that every application switches to a generic plan after five executions. The forced modes separately showed the eligibility boundary: a generic `status = $1` plan could not use this partial index, while a fixed `status = 'queued'` predicate still allowed it with a bound `id` parameter. Both paths checked returned rows, not just plan labels.
+
+Keep forced modes out of production-performance acceptance. Repeat the proof with the real migration, application query, parameter distribution, driver configuration, and PostgreSQL major before drawing an application conclusion. Do not substitute literal values into untrusted SQL to make a plan test pass.
 
 ## 4. Run the proof in a disposable database
 

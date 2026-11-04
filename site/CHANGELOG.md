@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-11-04
+
+- Added a checked same-session node-postgres prepared-query proof to the existing partial-index guide: automatic plan counters, forced diagnostic controls, exact result checks, and explicit session cleanup. Linked it from the EXPLAIN guide; no runtime behavior changed.
+
 ## 2026-11-02
 
 - Added a checked PostgreSQL 15 plan-to-result walkthrough to the existing EXPLAIN guide: scoped fixture, selective/broad plan control, bounded-read interpretation, and verified explicit teardown. Clarified that TTL expiry alone does not delete databases; no runtime behavior changed.
