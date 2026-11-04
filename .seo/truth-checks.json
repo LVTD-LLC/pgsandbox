@@ -286,5 +286,19 @@
       "cleanup_expired"
     ],
     "flags": "i"
+  },
+  {
+    "claim": "The partial-index one-shot recipe uses supported CLI flags and default credential injection",
+    "paths": [
+      "site/src/content/blog/test-postgresql-partial-indexes.md"
+    ],
+    "urls": [
+      "/blog/test-postgresql-partial-indexes/"
+    ],
+    "must_not_match": [
+      "--env-var\\b",
+      "--label\\b"
+    ],
+    "flags": "i"
   }
 ]

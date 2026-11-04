@@ -496,7 +496,6 @@ pgsandbox with-database \
   --name-hint "partial index proof" \
   --ttl-minutes 30 \
   --owner "agent-pr-483" \
-  --label "suite=partial-indexes" \
   --cleanup always \
   --result-format json \
   -- uv run --with 'psycopg[binary]' \

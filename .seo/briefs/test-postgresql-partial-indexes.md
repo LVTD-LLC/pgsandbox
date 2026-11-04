@@ -39,7 +39,7 @@ Recheck driver/server syntax when updating the pinned example. Durable research,
 measurement, action state and outcomes stay in the existing private Rowset store
 identified by `.seo/config.json`, not in this brief.
 
-The older Psycopg session example included unsupported `--env-var`; removed it.
+The older Psycopg session example included unsupported `--env-var` and `--label`; removed both.
 Both current CLI dispatch and `database_command_env` confirm that
 `PGSANDBOX_DATABASE_URL` is injected by default. The new one-shot rehearsal
 uses that default and verifies the child can connect.
