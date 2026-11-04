@@ -4,7 +4,7 @@ excerpt: "Use Postgres EXPLAIN plans to review agent-generated SQL before execut
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-07-07"
-updatedAt: "2026-11-02T02:00:00Z"
+updatedAt: "2026-11-04T02:00:00Z"
 tags: ["Postgres", "EXPLAIN", "query plans", "AI agents", "MCP"]
 category: "Engineering"
 metaTitle: "Postgres EXPLAIN Plans for Agent SQL Review"
@@ -271,7 +271,7 @@ Use the migration workflow first:
 
 The [database migration testing workflow](https://pgsandbox.dev/blog/database-migration-testing-agent-pr/) covers that PR gate. The [schema snapshot guide](https://pgsandbox.dev/blog/postgres-schema-snapshots-agent-migration-reviews/) goes deeper on named before/after checkpoints and compact diffs.
 
-When the migration adds a filtered access path, use the [PostgreSQL partial-index testing guide](/blog/test-postgresql-partial-indexes/) to inspect the installed predicate, compare eligible and ineligible plans, and exercise writes that cross the predicate. That proof keeps index existence, planner selection, and partial uniqueness as separate review claims.
+When the migration adds a filtered access path, use the [PostgreSQL partial-index testing guide](/blog/test-postgresql-partial-indexes/) to inspect the installed predicate, compare eligible and ineligible plans, and exercise writes that cross the predicate. That proof keeps index existence, planner selection, and partial uniqueness as separate review claims. For a named parameterized application query, use the [same-session node-postgres proof](/blog/test-postgresql-partial-indexes/#check-a-named-node-postgres-query-in-one-session); a literal plan alone does not establish its cached-plan behavior.
 
 EXPLAIN fits inside that workflow when the review question is performance or access path:
 

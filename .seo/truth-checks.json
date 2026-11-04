@@ -286,5 +286,27 @@
       "cleanup_expired"
     ],
     "flags": "i"
+  },
+  {
+    "claim": "Corrected one-shot recipes use supported CLI flags and default credential injection",
+    "paths": [
+      "site/src/content/blog/test-postgresql-partial-indexes.md",
+      "site/src/content/blog/test-postgresql-generated-columns.md",
+      "site/src/content/blog/test-postgres-deferrable-constraints.md",
+      "site/src/content/blog/test-postgres-two-phase-commit.md",
+      "site/src/content/blog/test-postgres-foreign-key-cascades.md"
+    ],
+    "urls": [
+      "/blog/test-postgresql-partial-indexes/",
+      "/blog/test-postgresql-generated-columns/",
+      "/blog/test-postgres-deferrable-constraints/",
+      "/blog/test-postgres-two-phase-commit/",
+      "/blog/test-postgres-foreign-key-cascades/"
+    ],
+    "must_not_match": [
+      "--env-var\\b",
+      "--label\\b"
+    ],
+    "flags": "i"
   }
 ]

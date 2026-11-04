@@ -4,7 +4,7 @@ excerpt: "Prove prepare-state invisibility, pg_prepared_xacts identity, cross-se
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-08-01"
-updatedAt: "2026-09-20"
+updatedAt: "2026-11-04T02:00:00Z"
 tags: ["Postgres", "two-phase commit", "prepared transactions", "integration testing", "coding agents"]
 category: "Engineering"
 metaTitle: "Test PostgreSQL Two-Phase Commit"
@@ -263,10 +263,9 @@ Run the harness against the prepared-transaction-enabled profile:
 ```bash
 pgsandbox with-database \
   --profile prepared-tx-test \
-  --label postgres-2pc-proof \
+  --name-hint "postgres-2pc-proof" \
   --ttl-minutes 30 \
   --cleanup on-success \
-  --env-var PGSANDBOX_DATABASE_URL \
   -- python tests/postgres_two_phase_commit_proof.py
 ```
 
