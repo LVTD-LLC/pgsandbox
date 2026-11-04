@@ -263,7 +263,7 @@ Run the harness against the prepared-transaction-enabled profile:
 ```bash
 pgsandbox with-database \
   --profile prepared-tx-test \
-  --label postgres-2pc-proof \
+  --name-hint "postgres-2pc-proof" \
   --ttl-minutes 30 \
   --cleanup on-success \
   -- python tests/postgres_two_phase_commit_proof.py

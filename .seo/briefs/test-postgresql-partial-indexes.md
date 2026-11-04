@@ -43,3 +43,10 @@ The older Psycopg session example included unsupported `--env-var` and `--label`
 Both current CLI dispatch and `database_command_env` confirm that
 `PGSANDBOX_DATABASE_URL` is injected by default. The new one-shot rehearsal
 uses that default and verifies the child can connect.
+
+A bounded duplicate check found unsupported flags in the foreign-key cascade,
+two-phase-commit, deferrable-constraint and generated-column recipes. Corrected
+only the one-shot blocks and modification dates; retained the two short purpose
+names with supported `--name-hint`. All published bash `with-database` option
+names were checked against current CLI dispatch. Existing SQL/Python harnesses
+were not changed or re-executed.

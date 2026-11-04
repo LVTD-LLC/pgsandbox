@@ -381,7 +381,7 @@ Then run the proof through a one-shot PGSandbox session:
 
 ```bash
 pgsandbox with-database \
-  --label foreign-key-cascade-proof \
+  --name-hint "foreign-key-cascade-proof" \
   --ttl-minutes 30 \
   -- python tests/postgres_cascade_proof.py
 ```

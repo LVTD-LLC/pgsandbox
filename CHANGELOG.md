@@ -2,7 +2,7 @@
 
 ## 2026-11-04
 
-- Added a checked same-session node-postgres prepared-query proof to the existing partial-index guide: automatic plan counters, forced diagnostic controls, exact result checks, and explicit session cleanup. Linked it from the EXPLAIN guide and removed unsupported label and redundant environment-variable flags from the older session example; no runtime behavior changed.
+- Added a checked same-session node-postgres prepared-query proof to the existing partial-index guide: automatic plan counters, forced diagnostic controls, exact result checks, and explicit session cleanup. Linked it from the EXPLAIN guide and removed unsupported label and redundant environment-variable flags from older session examples in five guides; retained the two short purpose names through supported name hints. No runtime behavior changed.
 
 ## 2026-11-02
 
