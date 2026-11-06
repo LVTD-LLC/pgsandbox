@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-11-06
+
+- Clarified platform-specific release availability in the installation guide, Homebrew documentation, README, and shared agent setup prompt. Added a pinned, locked source-build fallback and separate binary/runtime verification steps for Linux users when a release archive is missing. No installer, runtime, analytics, or workflow behavior changed.
+
 ## 2026-11-04
 
 - Added a checked same-session node-postgres prepared-query proof to the existing partial-index guide: automatic plan counters, forced diagnostic controls, exact result checks, and explicit session cleanup. Linked it from the EXPLAIN guide and removed unsupported label and redundant environment-variable flags from older session examples in five guides; retained the two short purpose names through supported name hints. No runtime behavior changed.

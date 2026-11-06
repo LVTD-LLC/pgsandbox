@@ -21,7 +21,8 @@ import { agentSetupPrompt } from '../../lib/agentSetupPrompt';
   <p>Copy this prompt into your coding agent if you want it to install and configure PGSandbox for you:</p>
   <pre class="shell"><code>{agentSetupPrompt}</code></pre>
 
-  <h2>Homebrew</h2>
+  <h2>Homebrew (macOS ARM64)</h2>
+  <p>The current <a href="https://github.com/LVTD-LLC/homebrew-tap/blob/main/Formula/pgsandbox.rb">tap formula</a> requires macOS and disables Intel installs. On Linux or Intel macOS, use the <a href="#from-source">source build</a>.</p>
   <pre class="shell"><code>brew install LVTD-LLC/tap/pgsandbox
 pgsandbox setup --client codex
 pgsandbox doctor</code></pre>
@@ -30,10 +31,53 @@ pgsandbox doctor</code></pre>
     repository, which Homebrew addresses as <code>LVTD-LLC/tap</code>.
   </p>
 
-  <h2>From source</h2>
-  <pre class="shell"><code>cargo install --path .
+  <h2 id="binary-availability">Check binary availability before installing</h2>
+  <p>
+    The GitHub installer needs a release archive matching your operating system,
+    CPU architecture, and Linux libc. Check the
+    <a href="https://github.com/LVTD-LLC/pgsandbox/releases/tag/v0.5.0">release assets</a>
+    before choosing this path. As of November 6, 2026, v0.5.0 has a macOS ARM64
+    archive but no Linux archive. A supported target in the installer does not
+    mean a binary for that target has been published.
+  </p>
+  <p>
+    If the installer reports <code>could not download</code> for a missing
+    platform archive, use a source build below. Changing the install directory,
+    skipping checksums, or selecting a macOS archive will not fix a missing Linux
+    binary. Homebrew also depends on the formula's available platform artifacts.
+  </p>
+
+  <h2 id="from-source">From source</h2>
+  <p>
+    This path requires Git, Cargo, and a compatible Rust toolchain. On Linux,
+    also provide a C build toolchain, <code>pkg-config</code>, and OpenSSL
+    development headers. For example, Debian and Ubuntu package these as
+    <code>build-essential</code>, <code>pkg-config</code>, and
+    <code>libssl-dev</code>. PostgreSQL server binaries are a separate runtime
+    prerequisite, not part of the Rust build.
+  </p>
+  <p>
+    Build the v0.5.0 source revision with its committed dependency lockfile;
+    this does not require cloning the repository first:
+  </p>
+  <pre class="shell"><code>cargo install --git https://github.com/LVTD-LLC/pgsandbox --rev 540cb5653460b345c3382d26465de54a8670666f --locked
+pgsandbox --version
 pgsandbox setup --client codex
-pgsandbox doctor</code></pre>
+pgsandbox doctor
+pgsandbox smoke-test</code></pre>
+  <p>
+    Ensure Cargo's binary directory (usually <code>~/.cargo/bin</code>) is on
+    <code>PATH</code>. Confirm that <code>pgsandbox --version</code> reports
+    <code>0.5.0</code>; an older binary earlier on <code>PATH</code> can hide the
+    new installation. Choose your actual MCP client below instead of
+    <code>codex</code> when needed. The smoke test checks create/query/delete
+    readiness, not the application's tests or the MCP client's connection.
+  </p>
+  <p>
+    If you already have a checkout, run <code>cargo install --path . --locked</code>
+    from its repository root. This builds that checkout, which may differ from
+    the pinned release above.
+  </p>
 
   <h2>Update</h2>
   <p>
@@ -55,6 +99,7 @@ pgsandbox setup --client codex
 pgsandbox doctor</code></pre>
 
   <h3>GitHub install script</h3>
+  <p>Use this only when a <a href="#binary-availability">matching platform archive</a> is published. Otherwise, use the <a href="#from-source">source build</a>.</p>
   <pre class="shell"><code>curl -fsSL https://raw.githubusercontent.com/LVTD-LLC/pgsandbox/main/scripts/install.sh | sh
 pgsandbox --version
 pgsandbox setup --client codex

@@ -11,12 +11,21 @@ Do the following:
    is clearly running inside one supported MCP client, configure that client
    without asking. If several clients are installed, prefer the active client and
    ask only if you cannot infer where config should be written.
-2. Install pgsandbox. Prefer:
+2. Install pgsandbox. The current Homebrew formula is macOS ARM64 only;
+   on that platform prefer:
    brew install LVTD-LLC/tap/pgsandbox
-   If Homebrew is unavailable, use:
+   Before a binary install, check release assets for a matching platform archive
+   (OS, CPU, and Linux libc); installer support is not proof an asset exists.
+   As of November 6, 2026, v0.5.0 has no Linux archive.
+   If Homebrew is unavailable and a matching platform archive exists, use:
    curl -fsSL https://raw.githubusercontent.com/LVTD-LLC/pgsandbox/main/scripts/install.sh | sh
-   If the install script uses ~/.local/bin, make sure pgsandbox is available
-   in the current shell PATH before continuing.
+   If the platform archive is missing, do not retry it or select another OS.
+   With Git, a compatible Rust/C toolchain, pkg-config, and OpenSSL development
+   headers available, build the pinned v0.5.0 source instead:
+   cargo install --git https://github.com/LVTD-LLC/pgsandbox --rev 540cb5653460b345c3382d26465de54a8670666f --locked
+   If build prerequisites are missing, report them before installing packages.
+   Ensure the chosen binary directory (~/.local/bin for the script, usually
+   ~/.cargo/bin for Cargo) is in the current shell PATH before continuing.
 3. Run:
    pgsandbox --version
    If another pgsandbox appears earlier in PATH and is missing, broken, or a
