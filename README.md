@@ -106,14 +106,13 @@ this repository, install Rust, or run Cargo for the standard setup.
 
 ### 1. Install PGSandbox
 
-Homebrew is the recommended install path:
+Homebrew is the recommended install path on macOS ARM64. The current tap formula requires macOS and disables Intel installs. On Linux or Intel macOS, use the [pinned source-build instructions](https://pgsandbox.dev/docs/install/#from-source).
 
 ```bash
 brew install LVTD-LLC/tap/pgsandbox
 ```
 
-If you do not use Homebrew, install the latest GitHub release binary with the
-hosted installer:
+If you do not use Homebrew, first check the [release assets](https://github.com/LVTD-LLC/pgsandbox/releases) for a matching OS, CPU, and Linux libc archive. As of November 6, 2026, v0.5.0 has no Linux archive. When a matching archive is available, use the hosted installer:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/LVTD-LLC/pgsandbox/main/scripts/install.sh | sh
@@ -1418,10 +1417,9 @@ The MCP server is intended to run locally or on a private trusted machine as a
 stdio process launched by an MCP client. It is not a public web service in this
 repository.
 
-### Install Released Binary With Homebrew
+### Install Released Binary With Homebrew (macOS ARM64)
 
-This is the same recommended packaged path shown in
-[Getting Started](#getting-started).
+This is the same packaged path shown in [Getting Started](#getting-started). The current formula requires macOS and disables Intel installs; use the [source build](https://pgsandbox.dev/docs/install/#from-source) for Linux or Intel macOS.
 
 Recommended user flow:
 
@@ -1446,6 +1444,8 @@ curl -fsSL https://raw.githubusercontent.com/LVTD-LLC/pgsandbox/main/scripts/ins
 pgsandbox setup --client codex
 pgsandbox doctor
 ```
+
+A supported installer target is not proof a release asset exists: check the [release assets](https://github.com/LVTD-LLC/pgsandbox/releases) first. The current v0.5.0 release has no Linux archive; use the [source build](https://pgsandbox.dev/docs/install/#from-source) on Linux.
 
 The script downloads a platform-specific release archive, verifies checksums
 when the release includes `pgsandbox-<version>-checksums.txt`, and installs

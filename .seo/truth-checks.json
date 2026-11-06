@@ -308,5 +308,17 @@
       "--label\\b"
     ],
     "flags": "i"
+  },
+  {
+    "claim": "Installation copy distinguishes target support from published platform archives and provides a locked source fallback",
+    "paths": [
+      "site/src/pages/docs/install.astro",
+      "site/src/lib/agentSetupPrompt.ts"
+    ],
+    "must_match": [
+      "matching platform archive",
+      "540cb5653460b345c3382d26465de54a8670666f --locked"
+    ],
+    "flags": "i"
   }
 ]

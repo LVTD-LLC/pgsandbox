@@ -57,3 +57,9 @@ A failed child retained by `--cleanup on-success` and a failed deletion are dist
 ## Connection-pool proof closeout — verified 2026-10-26
 
 A pool harness tests the repository driver; versioned doctor/smoke-test commands only establish runtime readiness. Session status and cleanup fields distinguish a child pass from successful deletion. Retained databases require explicit deletion or cleanup_expired after expiry; TTL alone does not remove them. Sources: README.md runtime checks, docs/agent-testing.md version1 result, rust-src/cli.rs and rust-src/postgres.rs at b5a50b4 (2026-10-26). No new runtime proof or driver compatibility certification is implied.
+
+## Platform release availability — verified 2026-11-06
+
+Installer target detection is not evidence that a matching archive exists. The v0.5.0 release asset list contains an aarch64-apple-darwin archive, a legacy generic archive, and checksums; no Linux archive. Current scripts/install.sh requests an exact platform filename and fails when absent. A source build uses the selected revision and its prerequisites, not a downloaded cross-platform binary. Sources: GitHub release v0.5.0 assets and scripts/install.sh at main 216bc557; pinned source revision 540cb5653460b345c3382d26465de54a8670666f. Recheck release assets before changing this dated observation.
+
+The current Homebrew tap formula requires macOS and disables Intel installs (macOS ARM64 only). Source: LVTD-LLC/homebrew-tap Formula/pgsandbox.rb, read 2026-11-06.

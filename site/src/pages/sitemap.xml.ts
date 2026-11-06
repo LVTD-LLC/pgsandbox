@@ -14,7 +14,9 @@ const staticPages = [
 ];
 
 const staticPageModified: Record<string, string> = {
-  '/': '2026-09-20',
+  '/': '2026-11-06',
+  '/docs/install/': '2026-11-06',
+  '/docs/homebrew/': '2026-11-06',
   '/docs/architecture/': '2026-09-20',
   '/changelog/': '2026-09-21'
 };
