@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-11-08
+
+- Added a version-scoped result-and-cleanup acceptance pattern to the existing disposable Postgres integration-test guide: preserve process exits, use a fresh private artifact per attempt, reject incomplete results, and distinguish locally checked behavior from hosted-runner guarantees. No runtime, workflow, or analytics behavior changed.
+
 ## 2026-11-06
 
 - Clarified platform-specific release availability in the installation guide, Homebrew documentation, README, and shared agent setup prompt. Added a pinned, locked source-build fallback and separate binary/runtime verification steps for Linux users when a release archive is missing. No installer, runtime, analytics, or workflow behavior changed.
