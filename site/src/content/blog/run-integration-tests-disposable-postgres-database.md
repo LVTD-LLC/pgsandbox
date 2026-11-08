@@ -4,7 +4,7 @@ excerpt: "Run a repository test command against a fresh Postgres database, prese
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-07-22"
-updatedAt: "2026-10-27T02:00:00Z"
+updatedAt: "2026-11-08T02:00:00Z"
 tags: ["Postgres", "integration testing", "test databases", "coding agents", "CI"]
 category: "Engineering"
 metaTitle: "Run Tests in a Disposable Postgres Database"
@@ -336,23 +336,72 @@ pgsandbox with-database \
 
 The version 1 result reports a status such as `succeeded`, `provision-failed`, `child-spawn-failed`, `child-failed`, `timed-out`, `interrupted`, `cleanup-failed`, or `retained`. It also includes the safe sandbox identity, requested extensions, command exit and timing data, bounded redacted output, expiry, and cleanup state. PGSandbox does not place credentials in structured fields and redacts the exact generated URL and password from captured output. Child processes must still avoid logging transformed URLs or unrelated secrets.
 
-In CI, preserve the JSON artifact and the CLI exit code separately:
+### Require both a passing process and confirmed cleanup
+
+Preserve the JSON artifact and the CLI exit code separately. A green test summary is not proof that a database was deleted. For an unattended session using `--cleanup always`, accept success only when the process exits zero **and** the versioned artifact reports a successful child and completed deletion.
+
+The following consumer-side check follows PGSandbox 0.5.0's [version 1 JSON contract](https://github.com/LVTD-LLC/pgsandbox/blob/cda20e8e331337101a1a2109926f0e55d5a901b1/docs/agent-testing.md#version-1-json-contract). Save it in your test repository as `check-session.py`; it is not an additional PGSandbox command:
+
+```python
+import json
+import pathlib
+import sys
+
+
+def verified_pass(path):
+    try:
+        result = json.loads(pathlib.Path(path).read_text())
+        return (
+            type(result["schemaVersion"]) is int
+            and result["schemaVersion"] == 1
+            and result["status"] == "succeeded"
+            and bool(result["sandbox"]["databaseId"])
+            and type(result["command"]["exitCode"]) is int
+            and result["command"]["exitCode"] == 0
+            and result["command"]["timedOut"] is False
+            and result["cleanup"]["policy"] == "always"
+            and result["cleanup"]["attempted"] is True
+            and result["cleanup"]["deleted"] is True
+            and result["cleanup"]["retained"] is False
+            and result["cleanup"].get("errorCode") is None
+        )
+    except (OSError, ValueError, KeyError, TypeError):
+        return False
+
+
+if __name__ == "__main__":
+    session_exit = int(sys.argv[2])
+    # Never turn a failed process green because its artifact looks successful.
+    sys.exit(session_exit if session_exit else
+             (0 if verified_pass(sys.argv[1]) else 1))
+```
+
+Then run this Bash example from the repository root, with Python 3 and your real `make test-integration` target available. Check the selected PostgreSQL 15 runtime with `doctor` and `smoke-test` first, as in the prerequisites. Use a fresh private directory for **every attempt**, including each concurrent partition: a previous successful artifact must never stand in for a result that was not produced.
 
 ```bash
+set -e
+umask 077
+result_dir=$(mktemp -d)
 set +e
 pgsandbox with-database \
-  --postgres-version 18 \
+  --postgres-version 15 \
   --ttl-minutes 40 \
   --cleanup always \
   --timeout-seconds 1200 \
   --result-format json \
-  -- make test-integration > pgsandbox-session.json
+  -- make test-integration > "$result_dir/session.json"
 session_exit=$?
 set -e
 
-# Upload pgsandbox-session.json with your CI artifact mechanism.
-exit "$session_exit"
+# Preserve this attempt's artifact using your CI's private artifact mechanism.
+python3 check-session.py "$result_dir/session.json" "$session_exit"
 ```
+
+The gate preserves nonzero process exits and fails closed for missing or malformed JSON, unknown schema versions, absent command data, or unconfirmed cleanup. Keep the artifact from this exact attempt with the job result; if artifact preservation itself fails, report that failure rather than hiding it with `|| true`. Review captured output before sharing: generated credentials are redacted, but unrelated application secrets are not guaranteed to be.
+
+This pattern was checked locally with PGSandbox 0.5.0, PostgreSQL 15, Python 3.11, and a small `psql` child fixture on Debian 12. Success, child failure, timeout, and SIGTERM cases preserved their process outcomes and reported deletion. Mutated artifacts checked that the consumer gate rejects failed-cleanup data, an unknown schema, a missing command, and truncated or missing JSON. Those mutations are **not** a real cleanup-failure fault injection; the fixture is not your application suite or a hosted-runner certification.
+
+Leave time outside the session timeout for provisioning, cleanup, and artifact preservation. GitHub's [job timeout](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idtimeout-minutes) cancels the job; do not assume this script or an upload step survives SIGKILL, runner loss, or a job-level timeout. A missing result means cleanup is unconfirmed, not successful. Recover through the safe tracked database ID when available and the explicit cleanup path above. Validate your runner, PostgreSQL major, artifact access/retention, and application command before adopting this as a CI gate.
 
 Use the status before reading the child output:
 
