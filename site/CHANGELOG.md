@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-11-09
+
+- Corrected the CLI session JSON contract: `cleanup.errorCode` is optional and omitted when no error is reported, not a required nullable key. Clarified that absence alone does not prove deletion and linked the existing result-and-cleanup acceptance example. No runtime behavior changed.
+
 ## 2026-11-08
 
 - Added a version-scoped result-and-cleanup acceptance pattern to the existing disposable Postgres integration-test guide: preserve process exits, use a fresh private artifact per attempt, reject incomplete results, and distinguish locally checked behavior from hosted-runner guarantees. No runtime, workflow, or analytics behavior changed.

@@ -39,13 +39,23 @@ tool envelope.
 | `sandbox` | object or null | Safe `databaseId`, `databaseName`, `profile`, `postgresVersion`, and `expiresAt`; null when provisioning never produced a sandbox. |
 | `requestedExtensions` | string array | Normalized extensions requested for the session. |
 | `command` | object or null | `exitCode`, `signal`, `timedOut`, `elapsedMs`, redacted `stdout`/`stderr`, and their truncation flags; null when the child never started. |
-| `cleanup` | object | `policy`, `attempted`, `deleted`, `retained`, `alreadyAbsent`, and nullable `errorCode`. Policies are `always`, `on-success`, and `keep`. |
+| `cleanup` | object | `policy`, `attempted`, `deleted`, `retained`, `alreadyAbsent`, and optional `errorCode` (omitted when no cleanup error occurred). Policies are `always`, `on-success`, and `keep`. |
 | `provisionErrorCode` | string, omitted on success | Stable provisioning category without raw driver text. |
 | `commandErrorCode` | string, omitted when command execution produced a result | `repo_not_found`, `unclear_command`, `invalid_env_alias`, `too_many_env_aliases`, `invalid_connection_mode`, or `child_spawn_failed`. |
 
-Optional error-code fields are omitted rather than serialized as null. Nullable
-fields inside `sandbox`, `command`, and `cleanup` remain present so consumers
-can distinguish an absent value from an omitted phase.
+Optional error-code fields (`provisionErrorCode`, `commandErrorCode`, and
+`cleanup.errorCode`) are omitted rather than serialized as null when no error
+is reported. In particular, successful cleanup need not include an `errorCode`
+key. Nullable command fields such as `exitCode` and `signal` remain present.
+The `sandbox` and `command` phase objects may themselves be null as described
+above.
+
+Do not use an absent `cleanup.errorCode` as proof of deletion: inspect the
+session status and `cleanup.attempted`, `cleanup.deleted`, and
+`cleanup.retained` separately. For a successful `--cleanup always` session,
+require both child success and confirmed deletion; the integration-test
+[acceptance example](https://pgsandbox.dev/blog/run-integration-tests-disposable-postgres-database/#require-both-a-passing-process-and-confirmed-cleanup)
+shows a fail-closed consumer check.
 
 The command accepts `--profile`, `--postgres-version`, `--name-hint`,
 `--ttl-minutes`, `--owner`, repeated `--extension`, `--cleanup`,

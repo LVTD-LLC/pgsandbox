@@ -320,5 +320,21 @@
       "540cb5653460b345c3382d26465de54a8670666f --locked"
     ],
     "flags": "i"
+  },
+  {
+    "claim": "Session cleanup error code is omitted when absent, not required nullable deletion proof",
+    "paths": [
+      "docs/agent-testing.md"
+    ],
+    "must_match": [
+      "optional `errorCode`",
+      "`cleanup.errorCode`",
+      "confirmed deletion"
+    ],
+    "must_not_match": [
+      "and nullable `errorCode`",
+      "fields inside `sandbox`, `command`, and `cleanup` remain present"
+    ],
+    "flags": "i"
   }
 ]
