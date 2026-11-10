@@ -4,7 +4,7 @@ excerpt: "A practical workflow for using Postgres schema snapshots and diffs as 
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-07-06"
-updatedAt: "2026-10-19T02:00:00Z"
+updatedAt: "2026-11-10T02:00:00Z"
 tags: ["Postgres", "schema diff", "database migrations", "AI agents", "MCP"]
 category: "Engineering"
 metaTitle: "Postgres Schema Snapshots for Agent Reviews"
@@ -42,6 +42,25 @@ That is useful, but it is not the whole story for Postgres review. PostgreSQL-sp
 
 In PGSandbox, a schema snapshot is a named local checkpoint for a PGSandbox-owned sandbox. It stores a compact schema digest and metadata under the local PGSandbox state directory. It is explicit by design: create a new snapshot when you want a review baseline, diff it when the migration has run, and delete it when it no longer has a job.
 
+## What does PGSandbox actually compare?
+
+An empty PGSandbox snapshot diff means **no difference in the captured metadata**, not “the migration did nothing.” Check the object coverage before using it as a review gate.
+
+The [snapshot collector in the current source](https://github.com/LVTD-LLC/pgsandbox/blob/341854dae1cfc13b75c39aee63dfaca1143d212c/rust-src/postgres.rs#L4607) captures relation kinds and view-definition hashes; column types, position, nullability, defaults and generated expressions; constraint-definition hashes; index-definition hashes; and installed extension names and versions. It does not collect function bodies, user-defined triggers, row-level security policies, grants, or table rows. It is not a complete database drift detector.
+
+A synthetic local check with PGSandbox **0.5.0 and PostgreSQL 15**, using one named baseline, produced these results:
+
+| Change after the baseline | Snapshot diff | Additional evidence |
+| --- | --- | --- |
+| No change | Empty, not truncated | Confirms the unchanged control. |
+| Update one existing row | Empty, not truncated | A bounded assertion confirmed the new value. |
+| Add a standalone SQL function | Empty, not truncated | Calling that function confirmed its result. |
+| Add a nullable text column | One added column, not truncated | The diff named the expected column. |
+
+The named snapshot was removed before the sandbox; database deletion returned `deleted: true`. This is a version-scoped synthetic check, not evidence that every migration or PostgreSQL version behaves identically.
+
+For a function, trigger, policy, or privilege migration, add an object-specific check and a behavior assertion under the intended application role. PostgreSQL stores [routines in `pg_proc`](https://www.postgresql.org/docs/15/catalog-pg-proc.html), [triggers in `pg_trigger`](https://www.postgresql.org/docs/15/catalog-pg-trigger.html), and [RLS policies in `pg_policy`](https://www.postgresql.org/docs/15/catalog-pg-policy.html); those are separate from the snapshot's selected relation metadata. The [trigger-testing](/blog/test-postgresql-triggers/) and [row-level security](/blog/test-postgres-row-level-security/) guides cover behavior that a structural fingerprint cannot certify.
+
 ## When should an agent use schema snapshots?
 
 Use schema snapshots when the pull request changes database structure and a human reviewer needs a compact before/after record.
@@ -49,7 +68,7 @@ Use schema snapshots when the pull request changes database structure and a huma
 Good fits include:
 
 1. A migration adds or removes tables.
-2. A migration changes column type, nullability, default, identity, or generated expression.
+2. A migration changes a captured column type, nullability, default, or generated expression. Check identity and sequence behavior separately.
 3. A migration adds indexes, unique constraints, foreign keys, or checks.
 4. A migration changes views or materialized views.
 5. A bug fix depends on a specific schema shape.
@@ -224,7 +243,7 @@ Other review-sensitive changes include:
 6. An extension being added or removed.
 7. A table rewrite or lock-sensitive operation that belongs in a rollout plan.
 
-The snapshot catches the schema side. Targeted SQL catches the data side.
+The snapshot catches its supported structural metadata. Targeted SQL and application-role checks cover data, permissions, and uncaptured behavior.
 
 ## Step 6: add data checks only for the risky cases
 
@@ -306,7 +325,7 @@ No. Use snapshots for database-structure changes. A UI-only or docs-only PR does
 
 ### What if the diff is empty?
 
-An empty diff can be useful if the task was supposed to be data-only or idempotent. If the PR claims to change schema and the diff is empty, the agent probably ran the wrong command, targeted the wrong database, or produced a migration that did not apply.
+An empty diff means no difference in the metadata PGSandbox captures. It can be expected for data-only or idempotent work, but also for changes to uncaptured objects such as function bodies, triggers, policies, or grants. Check object coverage, then verify the command, database target, and an object-specific behavior assertion before judging the migration.
 
 ### Does PGSandbox replace migration lint tools?
 
@@ -346,7 +365,7 @@ No. Use migration lint tools when they fit your stack. PGSandbox gives agents a 
       "name": "What if the diff is empty?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "An empty diff can be useful if the task was supposed to be data-only or idempotent. If the PR claims to change schema and the diff is empty, the agent probably ran the wrong command, targeted the wrong database, or produced a migration that did not apply."
+        "text": "An empty diff means no difference in the metadata PGSandbox captures. It can be expected for data-only or idempotent work, but also for changes to uncaptured objects such as function bodies, triggers, policies, or grants. Check object coverage, then verify the command, database target, and an object-specific behavior assertion before judging the migration."
       }
     },
     {
