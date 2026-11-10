@@ -336,5 +336,20 @@
       "fields inside `sandbox`, `command`, and `cleanup` remain present"
     ],
     "flags": "i"
+  },
+  {
+    "claim": "Snapshot guide distinguishes captured metadata from complete migration proof",
+    "paths": [
+      "site/src/content/blog/postgres-schema-snapshots-agent-migration-reviews.md"
+    ],
+    "must_match": [
+      "no difference in the captured metadata",
+      "function bodies",
+      "not a complete database drift detector"
+    ],
+    "must_not_match": [
+      "agent probably ran the wrong command"
+    ],
+    "flags": "i"
   }
 ]

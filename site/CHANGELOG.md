@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-11-10
+
+- Clarified snapshot object coverage and empty-diff interpretation in the existing migration-review guide, with version-scoped no-op, data-only, standalone-function, and added-column controls. Added links to targeted trigger and RLS checks; no runtime behavior changed.
+
 ## 2026-11-09
 
 - Corrected the CLI session JSON contract: `cleanup.errorCode` is optional and omitted when no error is reported, not a required nullable key. Clarified that absence alone does not prove deletion and linked the existing result-and-cleanup acceptance example. No runtime behavior changed.

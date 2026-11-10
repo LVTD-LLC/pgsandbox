@@ -67,3 +67,7 @@ The current Homebrew tap formula requires macOS and disables Intel installs (mac
 ## Session cleanup error-code serialization — verified 2026-11-09
 
 `SessionCleanupOutput.error_code` uses `skip_serializing_if = "Option::is_none"`; JSON `cleanup.errorCode` is omitted when absent. Command `exitCode`/`signal` remain nullable; sandbox/command phase objects may be null. An absent cleanup error is not deletion proof: require the appropriate status, child outcome and deletion fields independently. Sources: rust-src/postgres.rs SessionCleanupOutput and SessionCommandOutput at main 544268c951b1b0c72d9232497edcd77ae5068251, docs/agent-testing.md. No runtime or installed-release change is implied.
+
+## Snapshot coverage — verified 2026-11-10
+
+Named snapshots use collect_schema_digest / WorkflowSchemaDigest, not the separate schema_digest response shape. Captured relation, column, constraint, index and extension metadata excludes function bodies, user triggers, RLS policies, grants and rows; an empty non-truncated diff is not complete migration or drift proof. Source: rust-src/postgres.rs collect_schema_digest at main341854d. Installed0.5.0/PG15 synthetic no-op, row-update and standalone-function controls stayed empty; added nullable column appeared. Snapshot then tracked database deletion confirmed. No runtime change or cross-version guarantee.
