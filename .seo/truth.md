@@ -71,3 +71,8 @@ The current Homebrew tap formula requires macOS and disables Intel installs (mac
 ## Snapshot coverage — verified 2026-11-10
 
 Named snapshots use collect_schema_digest / WorkflowSchemaDigest, not the separate schema_digest response shape. Captured relation, column, constraint, index and extension metadata excludes function bodies, user triggers, RLS policies, grants and rows; an empty non-truncated diff is not complete migration or drift proof. Source: rust-src/postgres.rs collect_schema_digest at main341854d. Installed0.5.0/PG15 synthetic no-op, row-update and standalone-function controls stayed empty; added nullable column appeared. Snapshot then tracked database deletion confirmed. No runtime change or cross-version guarantee.
+
+
+## Migration workflow diff coverage — verified 2026-11-16
+
+At main304fdcaa, validate_schema_change_workflow calls collect_schema_digest_for_url before and after the command and diff_workflow_schema_digests, the same collector used by named snapshots. Its metadata does not include function bodies, user triggers, RLS policies, grants or rows. Empty captured metadata is not complete migration proof. Function definition inspection and fail-capable behavior assertions are separate checks; no new runtime execution is claimed. Sources: rust-src/postgres.rs validate_schema_change_workflow and collect_schema_digest; PostgreSQL15 functions-info pg_get_functiondef.

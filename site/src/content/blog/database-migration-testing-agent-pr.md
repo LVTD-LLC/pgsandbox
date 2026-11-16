@@ -4,7 +4,7 @@ excerpt: "A practical workflow for validating Postgres migrations in a disposabl
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-07-05"
-updatedAt: "2026-11-01T02:00:00Z"
+updatedAt: "2026-11-16T15:48:48Z"
 tags: ["Postgres", "database migrations", "AI agents", "MCP", "schema validation"]
 category: "Engineering"
 metaTitle: "Database Migration Testing for Agent PRs"
@@ -140,7 +140,18 @@ If the migration adds or changes a derived field, use the [PostgreSQL generated-
 
 For a version transition, the [PostgreSQL extension upgrade workflow](/blog/test-postgres-extension-upgrades/) adds a source-version fixture, update-path proof, and an upgrade-versus-new-database comparison before the migration is accepted.
 
-That diff is the proof artifact the PR needs. A human reviewer can compare it against the migration file and ask better questions:
+### An empty schema diff is not a migration verdict
+
+The compact diff is one part of the proof, not a complete database drift detector. In the [current implementation](https://github.com/LVTD-LLC/pgsandbox/blob/304fdcaa539eb9f6afaada46e92d4778eda74249/rust-src/postgres.rs), `validate_schema_change` and named snapshots use the same metadata collector. It captures relation, column, constraint, index and extension metadata, but not function bodies, user triggers, RLS policies, grants or table rows. A successful command with an empty, non-truncated diff means **no difference in the captured metadata**; it does not mean the migration did nothing or that every intended change is correct.
+
+For a function-only migration, keep the repository's real migration command and add two explicit checks against the disposable target:
+
+1. Inspect the intended function signature and installed definition. PostgreSQL's [`pg_get_functiondef`](https://www.postgresql.org/docs/15/functions-info.html) reconstructs a function definition; identify the exact argument types when the name is overloaded. Review that output privately if definitions contain sensitive literals.
+2. Call the function with bounded fixtures and assert the expected results, including a case that fails with the old implementation. Definition inspection alone is not behavior proof. Use the fail-capable assertion and `ON_ERROR_STOP` pattern in Step 4 rather than treating a printed `false` as a failed process.
+
+For trigger or access-policy changes, add the [trigger execution checks](/blog/test-postgresql-triggers/) or [row-level security role checks](/blog/test-postgres-row-level-security/). Do not substitute a lifecycle admin connection for the sandbox role when checking application behavior. Record command exit, captured schema delta, object-specific assertions and cleanup separately in the PR note. The [snapshot coverage controls](/blog/postgres-schema-snapshots-agent-migration-reviews/) show why a standalone function change can leave the metadata diff empty.
+
+The captured diff is still a useful proof artifact. A human reviewer can compare it against the migration file and ask better questions:
 
 - Did the agent create an index but forget the constraint?
 - Did it drop a column when it meant to rename it?

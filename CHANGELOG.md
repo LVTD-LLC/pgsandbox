@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-11-16
+
+- Clarified the compact schema-diff coverage boundary in the existing migration-testing guide and added function-specific definition, behavior, and negative-control checks. Linked the existing snapshot, trigger, and RLS owners; no runtime behavior changed.
+
 ## 2026-11-10
 
 - Clarified snapshot object coverage and empty-diff interpretation in the existing migration-review guide, with version-scoped no-op, data-only, standalone-function, and added-column controls. Added links to targeted trigger and RLS checks; no runtime behavior changed.

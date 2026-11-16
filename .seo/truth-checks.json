@@ -351,5 +351,21 @@
       "agent probably ran the wrong command"
     ],
     "flags": "i"
+  },
+  {
+    "claim": "Migration guide does not confuse empty captured metadata with complete migration proof",
+    "paths": [
+      "site/src/content/blog/database-migration-testing-agent-pr.md"
+    ],
+    "must_match": [
+      "no difference in the captured metadata",
+      "function bodies",
+      "old implementation",
+      "ON_ERROR_STOP"
+    ],
+    "must_not_match": [
+      "That diff is the proof artifact the PR needs"
+    ],
+    "flags": "i"
   }
 ]
