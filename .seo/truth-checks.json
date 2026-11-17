@@ -367,5 +367,20 @@
       "That diff is the proof artifact the PR needs"
     ],
     "flags": "i"
+  },
+  {
+    "claim": "RLS example normalizes empty transaction-local tenant context before UUID cast",
+    "paths": [
+      "site/src/content/blog/test-postgres-row-level-security.md"
+    ],
+    "must_match": [
+      "NULLIF\\(current_setting\\('app.tenant_id', true\\), ''\\)::uuid",
+      "22P02",
+      "version-scoped"
+    ],
+    "must_not_match": [
+      "(?<!NULLIF\\()current_setting\\('app.tenant_id', true\\)::uuid"
+    ],
+    "flags": "i"
   }
 ]

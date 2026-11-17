@@ -4,7 +4,7 @@ excerpt: "Prove that Postgres RLS filters tenant reads, rejects cross-tenant wri
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-07-28"
-updatedAt: "2026-10-25T02:00:00Z"
+updatedAt: "2026-11-17T02:00:00Z"
 tags: ["Postgres", "row-level security", "RLS testing", "multi-tenant databases", "coding agents"]
 category: "Engineering"
 metaTitle: "Test Postgres Row-Level Security in a Sandbox"
@@ -136,11 +136,11 @@ def reset_fixture():
             TO PUBLIC
             USING (
                 tenant_id =
-                current_setting('app.tenant_id', true)::uuid
+                NULLIF(current_setting('app.tenant_id', true), '')::uuid
             )
             WITH CHECK (
                 tenant_id =
-                current_setting('app.tenant_id', true)::uuid
+                NULLIF(current_setting('app.tenant_id', true), '')::uuid
             )
             """
         )
@@ -367,7 +367,11 @@ SELECT set_config('app.tenant_id', '<tenant-uuid>', true);
 
 The third argument makes the change local to the current transaction. PostgreSQL's [parameter-setting documentation](https://www.postgresql.org/docs/current/config-setting.html) describes `set_config(name, value, is_local)` as the function equivalent of `SET`; the [`SET` reference](https://www.postgresql.org/docs/current/sql-set.html) says `LOCAL` settings end at commit or rollback.
 
+The policy normalizes an unset or empty tenant setting to SQL `NULL` before the UUID cast: `NULLIF(current_setting('app.tenant_id', true), '')::uuid`. After a transaction-local custom setting resets, PostgreSQL can return an empty string rather than an absent setting. Casting that empty string directly to UUID raises `22P02` instead of testing default-deny visibility. With the normalization, a missing tenant does not satisfy the policy, so the protected query returns no rows. A nonempty malformed UUID still raises an error; this is not input validation or an authentication boundary.
+
 The harness opens a new transaction after the Tenant A and Tenant B proofs. It confirms the custom value is empty and an RLS-protected query sees no rows. That check matters when a connection pool reuses sessions across requests: tenant identity should be transaction state, not an indefinite session default.
+
+In a local check on 2026-11-17 with PGSandbox 0.5.0 and PostgreSQL 15, the unnormalized example failed with `22P02` at the context-free query. The corrected harness completed its identity, activation, tenant read/write, denied-insert, and context-reset assertions; both disposable databases were deleted. This is a version-scoped example check, not proof of PostgreSQL 18 or your application’s pool behavior.
 
 Application code must derive the tenant value from authenticated server-side context. Never trust a raw tenant identifier supplied by the caller merely because the RLS policy reads it.
 
