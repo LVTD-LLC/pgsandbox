@@ -76,3 +76,8 @@ Named snapshots use collect_schema_digest / WorkflowSchemaDigest, not the separa
 ## Migration workflow diff coverage — verified 2026-11-16
 
 At main304fdcaa, validate_schema_change_workflow calls collect_schema_digest_for_url before and after the command and diff_workflow_schema_digests, the same collector used by named snapshots. Its metadata does not include function bodies, user triggers, RLS policies, grants or rows. Empty captured metadata is not complete migration proof. Function definition inspection and fail-capable behavior assertions are separate checks; no new runtime execution is claimed. Sources: rust-src/postgres.rs validate_schema_change_workflow and collect_schema_digest; PostgreSQL15 functions-info pg_get_functiondef.
+
+
+## RLS transaction-local tenant reset — verified 2026-11-17
+
+A reset custom setting may return an empty string. The RLS example normalizes absent/empty tenant context with NULLIF(current_setting('app.tenant_id', true), '')::uuid before comparison. Missing context therefore yields no matching rows rather than an empty-string UUID cast error; nonempty malformed UUIDs still error. Installed PGSandbox0.5.0/PG15 original harness failed22P02 and corrected harness passed, both cleanup.deleted true. Sources: PostgreSQL15 ddl-rowsecurity and functions-admin current_setting/set_config; existing published harness executed in fresh tracked sandboxes. No PG18 or application pool guarantee.

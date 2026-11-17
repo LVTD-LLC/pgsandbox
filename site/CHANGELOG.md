@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-11-17
+
+- Fixed the existing RLS testing example to normalize empty transaction-local tenant context before casting to UUID. Added version-scoped failure/pass evidence and retained explicit cleanup; no runtime behavior changed.
+
 ## 2026-11-16
 
 - Clarified the compact schema-diff coverage boundary in the existing migration-testing guide and added function-specific definition, behavior, and negative-control checks. Linked the existing snapshot, trigger, and RLS owners; no runtime behavior changed.
