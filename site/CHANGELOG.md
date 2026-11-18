@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-11-18
+
+- Added checked behavioral negative controls to the existing trigger-testing guide: reject lost normalization and misdirected audit writes while preserving catalog identity. Recorded the PostgreSQL 15 runtime scope and independent cleanup results; no runtime behavior changed.
+
 ## 2026-11-17
 
 - Fixed the existing RLS testing example to normalize empty transaction-local tenant context before casting to UUID. Added version-scoped failure/pass evidence and retained explicit cleanup; no runtime behavior changed.

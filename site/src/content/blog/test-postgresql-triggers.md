@@ -4,7 +4,7 @@ excerpt: "Prove the installed trigger definition, firing paths, exact side effec
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-08-03"
-updatedAt: "2026-10-25T02:00:00Z"
+updatedAt: "2026-11-18T02:00:00Z"
 tags: ["Postgres", "triggers", "integration testing", "migration testing", "coding agents"]
 category: "Engineering"
 metaTitle: "How to Test PostgreSQL Triggers"
@@ -20,7 +20,7 @@ Checking that a trigger exists is not enough. A migration can install the wrong 
 
 This guide packages those checks into a five-part **Trigger Proof Contract**: declaration, firing matrix, effect oracle, atomicity, and teardown. PGSandbox MCP supplies a task-scoped database and restricted role in managed-local PostgreSQL by default (or an explicitly configured external profile). PostgreSQL catalog queries and application-level assertions supply the trigger proof.
 
-*Published August 3, 2026. Updated October 18, 2026.*
+*Published August 3, 2026. Updated November 18, 2026.*
 
 The complete proof has five steps:
 
@@ -419,6 +419,19 @@ This is stronger than catching an error on an autocommit connection. It proves t
 The child result should identify whether provisioning, the command, or cleanup failed. `--cleanup always` requests database deletion after either a passing or failing child process. TTL records eligibility for `cleanup_expired`, not automatic deletion. Explicitly delete a retained sandbox after inspection; after expiry, invoke expired cleanup explicitly or through a user-owned scheduler, scoped to the intended profile and resources, and inspect its result.
 
 If cleanup fails, keep the safe database ID and error category for a reviewed retry. Do not print or commit the injected connection URL.
+
+### Prove the assertions can reject a regression
+
+A passing harness is more useful when you know which mistakes it catches. Run the unchanged example first, then introduce one deliberate defect at a time in a disposable copy of `reset_fixture()`. Keep the trigger names, function names, timing, and event declarations unchanged: the catalog checks should still pass, leaving the behavioral assertions to detect the defect.
+
+- **Remove lowercasing.** Replace `NEW.email := lower(btrim(NEW.email));` with `NEW.email := btrim(NEW.email);`. The first `RETURNING` assertion should reject the uppercase stored email.
+- **Misdirect an audit write.** In the audit function's `ELSE` branch, replace `VALUES (NEW.id, TG_OP, OLD.email, NEW.email);` with `VALUES (NEW.id + 100, TG_OP, OLD.email, NEW.email);`. The exact audit-row assertion should reject the wrong account ID even though the base account row is correct.
+
+We checked these three cases on November 18, 2026 using installed PGSandbox 0.5.0 and managed-local PostgreSQL 15. The unchanged harness exited successfully; each modified copy exited with an assertion failure at the expected check. Each attempt used a fresh sandbox, and each session result reported `cleanup.deleted: true`.
+
+To reproduce that version scope, use the command above with `--postgres-version 15` and point its Python argument at the appropriate copy. Retain both the child's exit code and the separate cleanup result. A deliberately failing test is expected; a retained database is not. Restore the original fixture before running the application's real migration tests.
+
+These controls demonstrate two specific assertion boundaries, not complete trigger coverage or a PostgreSQL 18 runtime result. Add separate defects for your own trigger's `WHEN` clause, firing events, and other side effects. The [PostgreSQL 15 trigger behavior reference](https://www.postgresql.org/docs/15/trigger-definition.html) documents the transaction and firing rules behind this version-scoped check.
 
 ## Adapt the firing matrix to your trigger
 
