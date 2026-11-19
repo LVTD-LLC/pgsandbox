@@ -4,7 +4,7 @@ excerpt: "Prove advisory-lock contention, session and transaction lifetime, cata
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-07-29"
-updatedAt: "2026-10-25T02:00:00Z"
+updatedAt: "2026-11-19T02:00:00Z"
 tags: ["Postgres", "advisory locks", "concurrency testing", "integration testing", "coding agents"]
 category: "Engineering"
 metaTitle: "Test Postgres Advisory Locks Safely"
@@ -20,7 +20,7 @@ That last check catches lock-lifetime bugs. A session-level advisory lock surviv
 
 This guide packages the checks into an **Advisory Lock Proof Contract**: identity, contention, visibility, lifetime, and cleanup. PGSandbox MCP creates a disposable database and scoped role on your configured Postgres server so a coding agent can run the two-session proof without leaving lock experiments in shared development state.
 
-*Published and last updated July 29, 2026.*
+*Published July 29, 2026. Updated November 19, 2026.*
 
 The complete proof has five steps:
 
@@ -89,6 +89,8 @@ Save it as `tests/postgres_advisory_lock_proof.py`:
 ```python
 import json
 import os
+from contextlib import ExitStack
+from time import monotonic, sleep
 
 import psycopg
 
@@ -101,19 +103,23 @@ def scalar(conn, query, params=()):
     return conn.execute(query, params).fetchone()[0]
 
 
-def run_proof():
-    contender = psycopg.connect(
-        DATABASE_URL,
-        autocommit=True,
-        connect_timeout=5,
-    )
-    holder = psycopg.connect(
-        DATABASE_URL,
-        autocommit=True,
-        connect_timeout=5,
-    )
+def acquire_after_disconnect(conn, timeout_seconds=2):
+    deadline = monotonic() + timeout_seconds
+    while monotonic() < deadline:
+        if scalar(conn, "SELECT pg_try_advisory_lock(%s)", (LOCK_KEY,)):
+            return
+        sleep(0.01)
+    raise AssertionError("Contender could not acquire the key after holder disconnect")
 
-    try:
+
+def run_proof():
+    with ExitStack() as connections:
+        contender = connections.enter_context(
+            psycopg.connect(DATABASE_URL, autocommit=True, connect_timeout=5)
+        )
+        holder = connections.enter_context(
+            psycopg.connect(DATABASE_URL, autocommit=True, connect_timeout=5)
+        )
         holder_pid = scalar(holder, "SELECT pg_backend_pid()")
         contender_pid = scalar(contender, "SELECT pg_backend_pid()")
         assert holder_pid != contender_pid
@@ -163,11 +169,7 @@ def run_proof():
 
         # Session end releases every session-level lock held by that session.
         holder.close()
-        assert scalar(
-            contender,
-            "SELECT pg_try_advisory_lock(%s)",
-            (LOCK_KEY,),
-        ) is True
+        acquire_after_disconnect(contender)
         assert scalar(
             contender,
             "SELECT pg_advisory_unlock(%s)",
@@ -175,12 +177,9 @@ def run_proof():
         ) is True
 
         # A transaction-level lock is released by transaction rollback.
-        transaction_holder = psycopg.connect(
-            DATABASE_URL,
-            autocommit=True,
-            connect_timeout=5,
-        )
-        try:
+        with psycopg.connect(
+            DATABASE_URL, autocommit=True, connect_timeout=5
+        ) as transaction_holder:
             transaction_holder.execute("BEGIN")
             assert scalar(
                 transaction_holder,
@@ -205,8 +204,6 @@ def run_proof():
                 "SELECT pg_advisory_unlock(%s)",
                 (LOCK_KEY,),
             ) is True
-        finally:
-            transaction_holder.close()
 
         return {
             "lockKey": LOCK_KEY,
@@ -217,16 +214,11 @@ def run_proof():
             "transactionLockReleasedOnRollback": True,
             "finalAcquisitionSucceeded": True,
         }
-    finally:
-        if not holder.closed:
-            holder.execute("SELECT pg_advisory_unlock_all()")
-            holder.close()
-        contender.execute("SELECT pg_advisory_unlock_all()")
-        contender.close()
-
 
 print(json.dumps(run_proof(), sort_keys=True))
 ```
+
+The disconnect check retries only the contender’s nonblocking acquisition, for at most two seconds between attempts. A client-side close can return before PostgreSQL has finished ending the backend session. An arbitrary sleep can hide that race; a deadline lets the test fail clearly if the key remains held. The earlier contention check and the check after a confirmed transaction rollback still use a single attempt. Keep the outer command timeout: it bounds the child even if an individual SQL exchange stalls.
 
 The fixed key is safe for a task-scoped database, but an application should define a stable collision-resistant derivation rule for its real resource names.
 
@@ -234,11 +226,11 @@ Prerequisites are a configured PGSandbox Postgres profile, Python, `uv`, and cap
 
 ## 2. Run the proof with PGSandbox
 
-Run the complete two-session harness as one bounded child process:
+Run the complete two-session harness as one bounded child process. The example selects a managed PostgreSQL 15 runtime; use the major version installed for your test.
 
 ```bash
 pgsandbox with-database \
-  --postgres-version 18 \
+  --postgres-version 15 \
   --name-hint "advisory lock proof" \
   --ttl-minutes 30 \
   --cleanup always \
@@ -249,6 +241,8 @@ pgsandbox with-database \
 ```
 
 `with-database` creates a tracked database and scoped login role, injects `PGSANDBOX_DATABASE_URL`, captures bounded credential-redacted output, and applies the requested cleanup policy. The [agent test-session guide](/blog/run-integration-tests-disposable-postgres-database/) explains the versioned result and cleanup fields.
+
+On PostgreSQL 15.20 with PGSandbox 0.5.0, the revised harness returned `status: "succeeded"` and `cleanup.deleted: true`. As a negative control, leaving the holder open caused the disconnect assertion to fail; the runner reported `status: "child-failed"` and still deleted that sandbox. Treat the child proof and cleanup as separate checks.
 
 Use `--cleanup always` for CI and unattended agent runs. During active debugging, `--cleanup on-success` can retain a failed sandbox, but delete it explicitly after inspection. TTL records eligibility for `cleanup_expired`; expiry alone does not delete the database. After expiry, invoke that cleanup explicitly or through a user-owned scheduler, scope it to the intended profile and resources, and inspect its result.
 
@@ -300,11 +294,11 @@ Avoid relying on a language runtime's default string hash unless its stability a
 
 If production uses blocking acquisition, keep one separate test with a short transaction-local `lock_timeout` and an outer process timeout. The [deadlock and lock-timeout guide](/blog/test-postgres-deadlocks-lock-timeouts/) shows how to classify `55P03` without waiting indefinitely.
 
-### Close connections in `finally`
+### Close physical test connections on every path
 
 Session-level locks stack: repeated successful acquisitions require the same number of unlocks. `pg_advisory_unlock_all()` is useful as defensive test cleanup for the current session, and PostgreSQL also releases session locks when that session ends.
 
-Explicit cleanup still matters. It makes the intended boundary visible and prevents a reused test connection from carrying state into another case.
+The proof closes the holder explicitly at the boundary it tests. Psycopg connection context managers close the other physical test connections even if an assertion fails or a later connection cannot be opened. With pooled application connections, explicitly release the session lock before returning a connection to the pool.
 
 ### Do not acquire locks from an unordered limited query
 
