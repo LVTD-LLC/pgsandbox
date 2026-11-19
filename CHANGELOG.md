@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-11-19
+
+- Made the advisory-lock guide’s disconnect check tolerate backend teardown within a bounded retry window, and close physical test connections on failure. No runtime behavior changed.
+
 ## 2026-11-18
 
 - Added checked behavioral negative controls to the existing trigger-testing guide: reject lost normalization and misdirected audit writes while preserving catalog identity. Recorded the PostgreSQL 15 runtime scope and independent cleanup results; no runtime behavior changed.
