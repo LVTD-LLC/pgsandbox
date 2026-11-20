@@ -4,7 +4,7 @@ excerpt: "Run a repository test command against a fresh Postgres database, prese
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-07-22"
-updatedAt: "2026-11-08T02:00:00Z"
+updatedAt: "2026-11-20T02:00:00Z"
 tags: ["Postgres", "integration testing", "test databases", "coding agents", "CI"]
 category: "Engineering"
 metaTitle: "Run Tests in a Disposable Postgres Database"
@@ -26,6 +26,7 @@ This guide uses a **Session Proof Contract** with five fields: target, command, 
 - [Choose the exact Postgres target](#2-pin-the-postgres-target)
 - [Prepare migrations and other prerequisites](#3-prepare-the-repository-before-the-session)
 - [Handle Django, pytest, and environment aliases](#4-adapt-the-application-to-the-created-database)
+- [Run pytest shards on separate databases](#run-pytest-shards-on-separate-databases)
 - [Choose a cleanup policy](#5-choose-cleanup-from-the-debugging-need)
 - [Read structured session results](#6-make-the-result-machine-readable)
 - [Decide between one suite and several partitions](#7-partition-for-a-reason-not-by-reflex)
@@ -257,6 +258,10 @@ import pytest
 from django.core.management import call_command
 from django.db import connections
 
+def pytest_configure(config):
+    if config.getoption("numprocesses", default=0) or hasattr(config, "workerinput"):
+        raise pytest.UsageError("Use one pgsandbox session per pytest shard, not xdist")
+
 @pytest.fixture(scope="session")
 def django_db_setup(django_db_blocker):
     if not os.environ.get("PGSANDBOX_DATABASE_URL"):
@@ -291,11 +296,32 @@ pgsandbox with-database \
 
 Replace `settings_sandbox` and `tests/sandbox` with your actual module and directory. Keep the settings module importable through `python -m pytest`. Use a PostgreSQL major supported by your app and checked with `doctor`/`smoke-test`; 15 is the version of this recipe's check, not a universal recommendation.
 
-The check exercised an ORM insert, rollback isolation between tests, and a transactional test with migrated Django auth/contenttypes tables; the wrapper then reported successful deletion. It was not an application-suite, performance, parallel-worker, multi-database, or `manage.py test` validation. Start with one worker and one database. Do not add `-n auto`: this override bypasses pytest-django's normal worker-database creation, so concurrent workers could share and flush one sandbox. Allocate a separate PGSandbox session per worker before extending the adapter.
+The single-process check exercised an ORM insert, rollback isolation between tests, and a transactional test with migrated Django auth/contenttypes tables. The wrapper reported successful deletion. The configure hook rejects active xdist rather than letting several workers inherit the same database. The custom fixture bypasses [pytest-django’s normal worker-database creation](https://pytest-django.readthedocs.io/en/stable/usage.html#running-tests-in-parallel-with-pytest-xdist); removing the hook does not restore that behavior.
 
 `--reuse-db` alone is not this adapter: it still follows pytest-django's normal test-database setup and may need to create a database. Likewise, `--no-migrations` does not migrate the sandbox in this custom fixture. Read the session's child status **and** `cleanup.deleted`; passing tests do not prove deletion. On cleanup failure, use the reported safe database ID and the explicit closeout steps below.
 
 Do not print the injected connection variables. PGSandbox redacts its generated credentials from captured child output, but application logs should still treat database URLs and passwords as secrets.
+
+### Run pytest shards on separate databases
+
+For parallel CI, split the tests into non-overlapping paths and run each path in its own CI job, with **one `pgsandbox with-database` invocation per job**. This uses independent pytest processes, not workers spawned by xdist within one session. Keep the same dedicated settings module and fixture. For example, give one job `SHARD=accounts` and another `SHARD=billing`, replacing these names with directories that exist in your suite:
+
+```bash
+: "${SHARD:?Set SHARD to the test directory for this job}"
+pgsandbox with-database \
+  --postgres-version 15 \
+  --ttl-minutes 15 \
+  --cleanup always \
+  --timeout-seconds 120 \
+  --result-format json \
+  -- python -m pytest --ds=settings_sandbox "tests/sandbox/$SHARD"
+```
+
+If jobs share a new PostgreSQL instance, run one disposable session to completion before starting the parallel jobs. In a fresh managed PostgreSQL 15.20 cluster, two first-time PGSandbox 0.5.0 sessions raced to initialize the lifecycle tables; one stopped at `provision-failed` before pytest started. A successful, serial `pgsandbox with-database --postgres-version 15 --cleanup always -- psql --version` provisions and deletes a sandbox before the jobs fan out. Use the same runtime profile the jobs will use. Jobs with independent runtimes do not share this initialization step.
+
+Keep the [result and cleanup check](#6-make-the-result-machine-readable) for each job. On one shared PostgreSQL instance, compare the non-secret sandbox IDs: if both jobs report the same ID, the split has not established separate databases. Do not compare database names across independent PostgreSQL instances as if they were globally unique. Also check that the shard paths together cover the suite you intended to run.
+
+A synthetic local check ran two overlapping processes after serial initialization of one managed PostgreSQL 15.20 instance with PGSandbox 0.5.0, Django 5.2.7, pytest 8.4.2, pytest-django 4.11.1, and psycopg 3.2.10. Each wrote a different committed marker and read only its own after both writes completed; both session results confirmed deletion. A separate `-n 2` invocation with pytest-xdist 3.8.0 stopped before running tests and its sandbox was also deleted. This checks database separation, not hosted CI, application-suite coverage, or isolation of shared caches and other external services.
 
 ## 5. Choose cleanup from the debugging need
 

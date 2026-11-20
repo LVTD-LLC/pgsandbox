@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-11-20
+
+- Added checked parallel pytest CI shards to the disposable Postgres guide. Each shard gets a separate database; the single-session adapter now rejects xdist. No runtime behavior changed.
+
 ## 2026-11-19
 
 - Made the advisory-lock guide’s disconnect check tolerate backend teardown within a bounded retry window, and close physical test connections on failure. No runtime behavior changed.
