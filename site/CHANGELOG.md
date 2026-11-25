@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-11-25
+
+- Serialize lifecycle table initialization so parallel first-use sessions can provision separate databases on a fresh PostgreSQL instance.
+
 ## 2026-11-20
 
 - Added checked parallel pytest CI shards to the disposable Postgres guide. Each shard gets a separate database; the single-session adapter now rejects xdist. No runtime behavior changed.
