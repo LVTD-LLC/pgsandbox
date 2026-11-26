@@ -6516,6 +6516,7 @@ async fn ensure_metadata_table(client: &Client, profile: &SandboxProfile) -> any
     client
         .batch_execute(&format!(
             r#"
+              SELECT pg_advisory_xact_lock(1885827950, 1);
               CREATE TABLE IF NOT EXISTS {} (
                 database_id text PRIMARY KEY,
                 profile_name text NOT NULL,
@@ -6528,14 +6529,7 @@ async fn ensure_metadata_table(client: &Client, profile: &SandboxProfile) -> any
                 created_at timestamptz NOT NULL DEFAULT now(),
                 expires_at timestamptz NOT NULL,
                 deleted_at timestamptz
-              )
-            "#,
-            quote_ident(METADATA_TABLE)?
-        ))
-        .await?;
-    client
-        .batch_execute(&format!(
-            r#"
+              );
               CREATE TABLE IF NOT EXISTS {} (
                 event_id text PRIMARY KEY,
                 profile_name text NOT NULL,
@@ -6547,6 +6541,7 @@ async fn ensure_metadata_table(client: &Client, profile: &SandboxProfile) -> any
                 created_at timestamptz NOT NULL DEFAULT now()
               )
             "#,
+            quote_ident(METADATA_TABLE)?,
             quote_ident(AUDIT_TABLE)?
         ))
         .await?;
