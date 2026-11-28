@@ -4,7 +4,7 @@ excerpt: "Compare Testcontainers Postgres with task-scoped disposable Postgres s
 author: "PGSandbox Team"
 status: "published"
 publishedAt: "2026-07-03"
-updatedAt: "2026-10-10T02:00:00Z"
+updatedAt: "2026-11-28T02:00:00Z"
 tags: ["Postgres", "Testcontainers", "database sandbox", "AI agents", "MCP"]
 category: "Engineering"
 metaTitle: "Testcontainers vs Postgres Sandboxes"
@@ -140,6 +140,8 @@ A team can use Testcontainers for the application test suite and PGSandbox for a
 That split is healthy. The sandbox gives the agent a fast, task-scoped proof environment while it works. Testcontainers gives the repo a durable test harness after the code is committed.
 
 The inverse can also work. If the repo already has a mature Testcontainers setup, the agent can use the test command as the proof and avoid creating a separate sandbox. The deciding question is whether the existing test harness can answer the database question. If it can, use it. If it cannot, give the agent a smaller database workbench instead of broadening its access to shared state.
+
+If your Django suite needs only PostgreSQL, a database per CI shard is another option. The [pytest shard walkthrough](/blog/run-integration-tests-disposable-postgres-database/#run-pytest-shards-on-separate-databases) shows how to run each shard in its own session and check that its database was deleted. Keep Testcontainers when the test needs to start other services alongside Postgres.
 
 ## Decision checklist
 
