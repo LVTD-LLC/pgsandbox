@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-11-28
+
+- Linked the Testcontainers comparison to the Django CI walkthrough for teams that need a database per pytest shard.
+
 ## 2026-11-25
 
 - Serialize lifecycle table initialization so parallel first-use sessions can provision separate databases on a fresh PostgreSQL instance.
